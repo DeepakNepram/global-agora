@@ -1,0 +1,15 @@
+# Normalise line endings to LF everywhere, including Windows working copies.
+#
+# Without this, git's Windows default (core.autocrlf=true) checks files out as
+# CRLF, which fails `prettier --check` because .prettierrc.json sets
+# endOfLine: "lf". Keeping the working copy LF makes local and CI agree.
+* text=auto eol=lf
+
+# Never touch binaries.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
