@@ -1,0 +1,51 @@
+{
+  "compilerOptions": {
+    /* Language and emit. Vite handles the transpile; tsc is a type checker only. */
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "useDefineForClassFields": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "resolveJsonModule": true,
+    /* scripts/ runs directly under node --experimental-strip-types, which does no
+       extension resolution, so those imports carry explicit .ts specifiers. */
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+
+    /* Strictness. `strict` alone is not enough: noUncheckedIndexedAccess is what
+       stops `arr[i]` lying about being defined, which matters for the typed-array
+       columnar payload the globe reads every frame. */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Path alias. Keeps cross-layer imports explicit and greppable, which is what
+       the src/ui boundary lint rule keys on. */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+
+    "types": ["node", "vite/client"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.ts",
+    "workers/**/*.ts",
+    "scripts/**/*.ts",
+    "vite.config.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

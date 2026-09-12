@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+*.local
+
+# Env — .env.example is the only one that ships
+.env
+.env.*
+!.env.example
+
+# Test + tooling caches
+coverage/
+.vitest/
+.eslintcache
+*.tsbuildinfo
+
+# Playwright (Phase 5)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Cloudflare
+.wrangler/
+.dev.vars
+
+# Supabase local stack
+supabase/.temp/
+supabase/.branches/
+
+# Editors and OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Downloaded + generated Earth textures (~36MB source, ~40MB output).
+# Regenerate with: npm run textures
+.textures-cache/
+public/textures/*.webp
+public/textures/manifest.json
