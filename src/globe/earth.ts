@@ -1,10 +1,11 @@
 import { Group, Mesh, SphereGeometry, type Object3D } from 'three';
 
-import { GLOBE_RADIUS, type TextureSet } from '@/core';
+import { GLOBE_RADIUS, type TextureSet, type Vec3 } from '@/core';
 
 import { createCloudMaterial } from './cloudMaterial';
 import { createEarthMaterial } from './earthMaterial';
 import type { EarthChannel } from './shaders/earth.glsl';
+import { sunInSpinFrame, toVector3 } from './sunFrame';
 import { loadEarthTextures } from './textureLoading';
 import { earthTiltQuaternion } from './views';
 
@@ -34,6 +35,11 @@ export interface EarthOptions {
   readonly maxAnisotropy: number;
   /** A texture finished loading; the host must schedule a frame. */
   readonly onTextureLoad: () => void;
+  /**
+   * Unit vector toward the sun, Earth-fixed frame. Required so the first frame
+   * is lit for the right instant rather than for a placeholder sun.
+   */
+  readonly sunDirection: Vec3;
   readonly channel?: EarthChannel;
   readonly cloudsVisible?: boolean;
 }
@@ -43,6 +49,8 @@ export interface EarthLayer {
   readonly object3d: Object3D;
   setChannel(channel: EarthChannel): void;
   setCloudsVisible(visible: boolean): void;
+  /** Unit vector toward the sun, Earth-fixed frame (src/core sunDirection). */
+  setSunDirection(direction: Vec3): void;
   /** Advance time-driven motion. Returns true if anything moved. */
   advance(dtSeconds: number): boolean;
   dispose(): void;
@@ -52,12 +60,13 @@ export interface EarthLayer {
  * Builds the base Earth.
  *
  *   tilt            quaternion = 23.44° about X
- *    ├─ earth       SphereGeometry(1.0) + flat ShaderMaterial
+ *    ├─ earth       SphereGeometry(1.0) + sun-lit ShaderMaterial
  *    └─ cloudSpin   rotation.y advances
- *        └─ clouds  SphereGeometry(1.003) + transparent basic material
+ *        └─ clouds  SphereGeometry(1.003) + sun-lit transparent ShaderMaterial
  *
  * Tilt lives on one parent so clouds inherit it and spin about the *tilted*
- * axis, as real weather does.
+ * axis, as real weather does. The layer never reads the clock: the sun arrives
+ * through setSunDirection, driven by whatever instant the host is showing.
  */
 export function createEarth(options: EarthOptions): EarthLayer {
   const textures = loadEarthTextures(options.textures, {
@@ -66,14 +75,18 @@ export function createEarth(options: EarthOptions): EarthLayer {
   });
 
   const earthGeometry = new SphereGeometry(GLOBE_RADIUS, EARTH_SEGMENTS, EARTH_SEGMENTS);
-  const earthMaterial = createEarthMaterial(textures, options.channel ?? 'day');
+  const earthMaterial = createEarthMaterial(
+    textures,
+    options.channel ?? 'lit',
+    options.sunDirection,
+  );
   const earth = new Mesh(earthGeometry, earthMaterial.material);
   earth.name = 'earth';
 
   // Clouds are low-frequency, so half the latitude bands of the surface is plenty.
   const cloudGeometry = new SphereGeometry(CLOUD_RADIUS, EARTH_SEGMENTS, EARTH_SEGMENTS / 2);
   const cloudMaterial = createCloudMaterial(textures.clouds);
-  const clouds = new Mesh(cloudGeometry, cloudMaterial);
+  const clouds = new Mesh(cloudGeometry, cloudMaterial.material);
   clouds.name = 'clouds';
   // Draw after the opaque surface regardless of camera-distance sorting.
   clouds.renderOrder = 1;
@@ -88,6 +101,14 @@ export function createEarth(options: EarthOptions): EarthLayer {
   earthTiltQuaternion(tilt.quaternion);
   tilt.add(earth, cloudSpin);
 
+  // The Earth-fixed sun is kept so the cloud shell's copy can be re-derived
+  // whenever either the sun moves or the shell spins under it.
+  const sun = toVector3(options.sunDirection);
+  const syncCloudSun = (): void => {
+    sunInSpinFrame(sun, cloudSpin.rotation.y, cloudMaterial.sunDirection);
+  };
+  syncCloudSun();
+
   return {
     object3d: tilt,
 
@@ -99,6 +120,12 @@ export function createEarth(options: EarthOptions): EarthLayer {
       cloudSpin.visible = visible;
     },
 
+    setSunDirection(direction) {
+      toVector3(direction, sun);
+      earthMaterial.setSunDirection(direction);
+      syncCloudSun();
+    },
+
     advance(dtSeconds) {
       if (!cloudSpin.visible || dtSeconds <= 0) return false;
       // Constant angular velocity, so plain rate * dt is already frame-rate
@@ -106,6 +133,7 @@ export function createEarth(options: EarthOptions): EarthLayer {
       // a target; there is no target here.
       const step = Math.min(dtSeconds, MAX_STEP_SECONDS);
       cloudSpin.rotation.y = (cloudSpin.rotation.y + CLOUD_ANGULAR_SPEED * step) % TAU;
+      syncCloudSun();
       return true;
     },
 
@@ -114,7 +142,7 @@ export function createEarth(options: EarthOptions): EarthLayer {
       earthGeometry.dispose();
       cloudGeometry.dispose();
       earthMaterial.material.dispose();
-      cloudMaterial.dispose();
+      cloudMaterial.material.dispose();
       for (const texture of Object.values(textures)) texture.dispose();
     },
   };

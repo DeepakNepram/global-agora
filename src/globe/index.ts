@@ -18,5 +18,6 @@ export {
   type EarthOptions,
 } from './earth';
 export { EARTH_CHANNEL_INDEX, type EarthChannel } from './shaders/earth.glsl';
+export { sunInSpinFrame, toVector3 } from './sunFrame';
 export { aimCamera, cameraPositionFor, earthTiltQuaternion } from './views';
 export { MAX_ANISOTROPY } from './textureLoading';

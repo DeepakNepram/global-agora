@@ -23,7 +23,7 @@ export interface GlobeCanvasProps {
  */
 export function GlobeCanvas({ tier }: GlobeCanvasProps): JSX.Element {
   const [view, setView] = useState<ViewPresetId>('primeMeridian');
-  const [channel, setChannel] = useState<EarthChannel>('day');
+  const [channel, setChannel] = useState<EarthChannel>('lit');
   const [cloudsVisible, setCloudsVisible] = useState(true);
 
   // BASE_URL is resolved here, not in src/core, which must not read Vite globals.

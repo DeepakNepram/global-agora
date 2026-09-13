@@ -1,8 +1,9 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useState, type JSX } from 'react';
 
-import type { LatLon, TextureSet } from '@/core';
+import { sunDirection, type LatLon, type TextureSet } from '@/core';
 import { aimCamera, createEarth, type EarthChannel, type EarthLayer } from '@/globe';
+import { timeStore } from '@/state';
 
 import { useCloudTicker } from './useCloudTicker';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
@@ -45,6 +46,7 @@ export function GlobeScene({
       textures,
       maxAnisotropy: gl.capabilities.getMaxAnisotropy(),
       onTextureLoad: () => invalidate(),
+      sunDirection: sunDirection(new Date(timeStore.getState().timeMs)),
     });
     setEarth(layer);
     return () => {
@@ -64,6 +66,20 @@ export function GlobeScene({
     earth.setCloudsVisible(cloudsVisible);
     invalidate();
   }, [earth, cloudsVisible, invalidate]);
+
+  useEffect(() => {
+    if (!earth) return;
+    const showInstant = (timeMs: number): void => {
+      earth.setSunDirection(sunDirection(new Date(timeMs)));
+      invalidate();
+    };
+    showInstant(timeStore.getState().timeMs);
+    // Subscribed outside React: dragging a time slider rewrites one uniform and
+    // schedules one frame, with no component re-render in between.
+    return timeStore.subscribe((state, previous) => {
+      if (state.timeMs !== previous.timeMs) showInstant(state.timeMs);
+    });
+  }, [earth, invalidate]);
 
   useEffect(() => {
     // Portrait viewports are width-limited; back off so the limb isn't clipped.

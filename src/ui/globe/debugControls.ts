@@ -30,6 +30,7 @@ export interface ChannelOption {
 }
 
 export const CHANNEL_OPTIONS: readonly ChannelOption[] = [
+  { id: 'lit', key: 'l', label: 'Sunlit' },
   { id: 'day', key: 'd', label: 'Day' },
   { id: 'night', key: 'n', label: 'Night' },
   { id: 'specular', key: 's', label: 'Specular' },
