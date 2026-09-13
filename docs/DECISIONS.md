@@ -6,6 +6,108 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-09-14 — The camera is north-up, which supersedes the visible 23.44° lean
+
+Prompt 1.4's controls keep Earth's north as screen-up. A horizontal drag moves
+along a latitude, a vertical drag moves along a meridian, and the pitch clamp
+(±85°) sits at the real poles.
+
+**Why:** the 1.1 view presets kept world-up as screen-up so the tilt showed as a
+lean. That cannot coexist with orbiting: drags would run diagonally on screen at
+most longitudes, and "up" near the poles would swing as the globe turned. Google
+Earth, earth.nullschool.net and windy.com are all north-up.
+
+**Cost:** the lean is no longer visible on screen. The tilt still shows through
+the terminator's seasonal angle, and `earthTiltQuaternion` still orients the
+globe; the camera rig composes it as its body orientation. The 1.1 test
+"tilt visible on screen from the presets" was removed with `aimCamera`.
+
+---
+
+## 2026-09-14 — OrbitGlobeControls: DOM-free input, screen-space inertia, iterated zoom anchor
+
+`src/globe/camera/` takes plain input (canvas-relative CSS pixels plus the
+event's `timeStamp`) and moves only in `update(dt)`.
+`src/ui/globe/bindControlInput.ts` is the only file that touches DOM events, so a
+native host replaces that file and nothing else. It binds to the r3f event element
+(focusable, `role="application"`, `touch-action: none`). Keys are bound to that
+element rather than the window, so arrows never fight the time slider.
+
+**Pose:** a quaternion `q` in the Earth-fixed frame plus altitude. The world pose
+is `tilt · q`, with the camera at `q·(0,0,1+alt)`. Yaw is pre-multiplied (about
+Earth's axis) and pitch is post-multiplied (about the camera's right axis), so
+roll stays zero. No Euler objects and no `lookAt`. The public pose is plain
+`{ lat, lon, altitudeKm }`, for the discussion panel and share URLs.
+
+**Drag:** `rad per screen height = 2·tan(fov/2) · altitude / R`. The base is the
+ground span of one screen height looking straight down, so at 50 km the ground
+stays under the finger (tested within 2% by raycasting a real camera). Yaw is
+divided by `max(cos lat, 0.35)` so horizontal drags keep their ground speed at
+high latitudes.
+
+**Inertia** is stored in screen heights per second, not radians. The stop
+threshold (0.02) and the flick cap (8) then mean the same thing at every
+altitude. Each step moves by the exact integral `v(1−e^(−f·dt))/f`, so total spin
+is identical at 30, 60 and 144 fps. Friction is derived rather than tuned by eye:
+`f = ln(4 / 0.02) / 2.5 ≈ 2.12/s`, so a 4 screen-heights/s flick spins 2.5 s
+(measured 2.67 s including 100 ms polling in Chrome). A pointer that rests 50 ms
+before lifting does not coast.
+
+**Zoom anchor:** rotate the rig by `fromUnitVectors(P′, P)`, rebuild north-up
+from the new centre, and repeat until the hit is within 1e-10. The first version
+stopped after two passes. That left about 1e-3 rad per frame, which compounded
+to 160 px by city altitude. The iteration converges about 4× per pass, typically
+8–10 passes of a few vector operations. Measured in Chrome over 49 real wheel
+events from 19,113 km down to 50 km: 0.0001 px (8 mm). Pinch applies altitude
+directly (not smoothed) and uses the same anchor at the finger midpoint, so a
+two-finger drag also pans.
+
+**flyTo:**
+
+- Duration is `800 + 2200·√(angle/π)` ms. Measured against plan in Chrome: Paris
+  1088/1088 ms, New York 1961/1953 ms, Sydney 2827/2832 ms.
+- Altitude follows a parabola in log space, peaking at `1.2 R · angle` and never
+  below either end, so short hops don't rise.
+- Lateral progress is weighted by altitude, `u = ∫h / ∫h`. The ground's on-screen
+  speed is then independent of altitude: the camera climbs, travels near the top,
+  and descends. The departure city does not smear sideways while the camera is
+  still low.
+- Cancellation resolves `'cancelled'` rather than rejecting, so an interrupted
+  flight is not an unhandled rejection.
+
+**Render on demand:** input calls `invalidate` through `requestFrame`, and
+`update` asks for the next frame only while inertia, zoom or a flight is running.
+r3f's first delta after idle spans the whole idle gap, so the first step is
+capped at 1/60 s. Measured: idle 0 frames, 0 frames the second after a flick
+stops, 0 after arrival.
+
+**Clip planes** follow altitude (`near = 0.3·alt`). A fixed near of 0.1 would
+clip the globe below ~600 km.
+
+**Reduced motion** is honoured now, not in Prompt 5.1, because CLAUDE.md says
+accessibility is not a later phase. Flights cut, there is no inertia, and wheel
+zoom is instant. The developer machine has reduced motion on, so the dev panel
+has "Force full motion" (M) for feel testing.
+
+**Frame cost:** unchanged by camera pose. On HIGH at 1040×670 (Iris Xe, a slower
+GPU power state than in the 1.3 measurements), the GPU mean was:
+
+| Build / pose          | GPU mean    |
+| --------------------- | ----------- |
+| 1.3 build, world view | 7.8–10.9 ms |
+| 1.4 build, world view | 8.1–10.6 ms |
+| 1.4 build, 600 km     | 6.8–7.3 ms  |
+| 1.4 build, 50 km      | 7.0–7.3 ms  |
+
+The 1.3 build was measured minutes before the 1.4 builds, in the same tab.
+
+**Known, left for a later LOD pass:** below a few hundred km the imagery is soft
+(the 8K map is 4.9 km per texel) and the 2K cloud shell becomes a smear.
+
+**Cost:** +4.2 kB gzip of JS (323.3 → 327.5 kB). No new dependencies.
+
+---
+
 ## 2026-09-13 — Postprocessing uses `postprocessing` directly, and LOW has no composer
 
 CLAUDE.md's stack lists `@react-three/postprocessing`. We use the underlying
