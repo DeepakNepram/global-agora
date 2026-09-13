@@ -6,6 +6,87 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-09-13 — The store holds time; the sun is derived from it
+
+Prompt 1.2 says the sun direction "must come from a store value". The value
+stored is the **instant** (`timeStore.timeMs`, epoch ms) plus an `isLive` flag.
+The sun direction comes from it through `sunDirection(new Date(timeMs))`.
+
+**Why:** the scrubber (3.2) and pin fading need the same instant, so storing a
+direction would mean two values that could disagree. `GlobeScene` subscribes with
+`timeStore.subscribe` rather than a React selector. Dragging the slider rewrites
+one uniform and schedules one frame, with no re-render in between.
+
+**The wall clock is read in exactly one place,** `src/state/clock.ts`. ESLint
+(`no-restricted-properties` / `no-restricted-syntax`) and `tests/clock.test.ts`
+reject `Date.now()`, `performance.now()`, `new Date()` and `Date()` anywhere else
+in `src/`. The source-scan test exists because a lint rule can be disabled with
+one comment.
+
+**Live mode** re-syncs every 30s and on tab focus, and does nothing while the tab
+is hidden. The terminator moves 0.25°/min, so a 30s step is 0.125° inside an
+~11°-wide soft band: not visible, and it costs one frame. It keeps running under
+`prefers-reduced-motion`, because a step that small is not motion and the
+lighting should stay truthful.
+
+**Cost:** zustand 5.0.15, which is small because `useStore` sits on React's built-in
+`useSyncExternalStore`. The whole of Prompt 1.2 (store, sun math, both shaders)
+takes the production JS from 300.6 to 302.7 kB gzip.
+
+---
+
+## 2026-09-13 — Lighting is computed in the Earth-fixed frame
+
+`sunDirection()` returns a unit vector in the same frame as `latLonToVec3`, which
+is also the frame the textures use. The earth shader dots it with the object-space
+`normal`, not `normalMatrix * normal`.
+
+**Why:** the lighting is then independent of the 23.44° tilt group, the camera,
+and any later spin of the globe mesh. It is just "which way is the sun from this
+patch of ground". The first-frame sun is a required `createEarth` option, so the
+globe never draws once with a placeholder sun. `src/core` still cannot import
+three, so `sunDirection` returns a plain `Vec3` rather than the prompt's
+`Vector3`; `src/globe/sunFrame.ts` converts.
+
+---
+
+## 2026-09-13 — City lights get their own cut-off, stricter than the blend
+
+The prompt's blend is `mix(night * 0.9, day * max(ndl, 0), t)` with
+`t = smoothstep(-0.10, 0.10, ndl)`. On its own it leaves city lights at 45% on
+the terminator, and still 14% with the sun 3° above the horizon. That contradicts
+the prompt's own "night lights must not bleed across the terminator".
+
+**Decision:** keep the blend exactly as specified, but first multiply the lights
+by `1 - smoothstep(-0.10, 0.0, ndl)`. That factor is exactly 0 wherever the sun is
+up and reaches 1 as civil twilight ends (sun 6° down, ndl ≈ -0.10), which is
+about when real street lights come on. A shader test pins the expression.
+
+**Twilight tint** has two parts. The day term is warmed toward orange as the sun
+gets low (`mix(1, LOW_SUN_TINT, 1 - smoothstep(0, 0.30, ndl))`, gone by the sun
+~17° up). A faint additive glow of strength 0.012 straddles the line itself,
+where `day * ndl` is ~0 and a multiplied tint has nothing to colour. The first
+attempt was additive only, at 0.045. In the browser it drew a flat brown stripe
+along the terminator, so it was reworked. The tint stays subtle because 1.3's
+atmosphere adds its own reddening on HIGH.
+
+---
+
+## 2026-09-13 — Clouds are lit by the same terminator
+
+With the 1.1 `MeshBasicMaterial`, clouds stayed bright white across the whole
+night side, over the lights. Clouds now use a small ShaderMaterial with the same
+±0.10 band. Their day term matches the ground's. At night they fall to black at
+35% opacity, so they dim the lights beneath them without stamping black shapes
+over cities.
+
+The cloud shell spins relative to the ground, so it gets its own copy of the sun
+rotated into its frame: `R_y(-spin)`, re-derived on every `advance()`. A test
+checks that a point on the cloud shell gets the same ndl as the ground beneath it
+at several spin angles, and that test fails if the sign is flipped.
+
+---
+
 ## 2026-09-13 — React 19, not React 18
 
 The build plan and CLAUDE.md specified React 18. Every current release in the
