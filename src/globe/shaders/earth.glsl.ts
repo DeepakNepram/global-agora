@@ -10,6 +10,14 @@
  * for WebGL2 itself.
  */
 
+import {
+  NIGHT_BASE_GAIN,
+  NIGHT_KEY_HIGH,
+  NIGHT_KEY_LOW,
+  NIGHT_LIGHTS_GAIN,
+  glslFloat,
+} from '../hdr';
+
 /** Values for the uChannel uniform. Keep in sync with EARTH_FRAG. */
 export const EARTH_CHANNEL_INDEX = {
   day: 0,
@@ -55,7 +63,12 @@ varying vec3 vNormal;
 // Half-width of the terminator blend in ndl units. ndl is sin(solar elevation),
 // so 0.10 is the sun ~5.7° above or below the horizon.
 const float TERMINATOR_HALF_WIDTH = 0.10;
-const float NIGHT_LIGHTS_GAIN = 0.9;
+// Night gain keyed on texel luminance (src/globe/hdr.ts): the dim base keeps an
+// LDR gain, city cores get an HDR one that exceeds the bloom threshold.
+const float NIGHT_BASE_GAIN = ${glslFloat(NIGHT_BASE_GAIN)};
+const float NIGHT_LIGHTS_GAIN = ${glslFloat(NIGHT_LIGHTS_GAIN)};
+const float NIGHT_KEY_LOW = ${glslFloat(NIGHT_KEY_LOW)};
+const float NIGHT_KEY_HIGH = ${glslFloat(NIGHT_KEY_HIGH)};
 
 // City lights fade in over this much ndl below the horizon (sun ~2.3° down).
 // Fading them across the full band left a dark stripe between the night map and
@@ -90,7 +103,14 @@ void main() {
   // the sun has set:
   //   lightsOn = 1 - smoothstep(-LIGHTS_FADE, 0, ndl)
   float lightsOn = 1.0 - smoothstep(-LIGHTS_FADE, 0.0, ndl);
-  vec3 lights = night * NIGHT_LIGHTS_GAIN * lightsOn;
+  //   gain = mix(base, lights, smoothstep(keyLow, keyHigh, luminance(night)))
+  float nightLuminance = dot(night, vec3(0.2126, 0.7152, 0.0722));
+  float nightGain = mix(
+    NIGHT_BASE_GAIN,
+    NIGHT_LIGHTS_GAIN,
+    smoothstep(NIGHT_KEY_LOW, NIGHT_KEY_HIGH, nightLuminance)
+  );
+  vec3 lights = night * nightGain * lightsOn;
 
   //   lowSun = 1 - smoothstep(0, LOW_SUN_END, ndl)   1 at sunrise, 0 by ~14.5° up
   float lowSun = 1.0 - smoothstep(0.0, LOW_SUN_END, ndl);
@@ -112,6 +132,10 @@ void main() {
   }
 
   gl_FragColor = vec4(color, 1.0);
+
+  // ACES when three tone-maps per material (LOW tier); compiles to nothing when a
+  // composer renders to a buffer and tone-maps once at the end.
+  #include <tonemapping_fragment>
 
   // Raw ShaderMaterial gets linearToOutputTexel defined but never called. Without
   // this include the linear result is written straight to an sRGB canvas and the

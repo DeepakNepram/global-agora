@@ -2,8 +2,10 @@ import { Group, Mesh, SphereGeometry, type Object3D } from 'three';
 
 import { GLOBE_RADIUS, type TextureSet, type Vec3 } from '@/core';
 
+import { createAtmosphere } from './atmosphere';
 import { createCloudMaterial } from './cloudMaterial';
 import { createEarthMaterial } from './earthMaterial';
+import type { AtmosphereMode } from './renderSettings';
 import type { EarthChannel } from './shaders/earth.glsl';
 import { sunInSpinFrame, toVector3 } from './sunFrame';
 import { loadEarthTextures } from './textureLoading';
@@ -42,6 +44,8 @@ export interface EarthOptions {
   readonly sunDirection: Vec3;
   readonly channel?: EarthChannel;
   readonly cloudsVisible?: boolean;
+  /** Defaults to the cheap rim; see renderSettingsForTier. */
+  readonly atmosphere?: AtmosphereMode;
 }
 
 export interface EarthLayer {
@@ -49,6 +53,7 @@ export interface EarthLayer {
   readonly object3d: Object3D;
   setChannel(channel: EarthChannel): void;
   setCloudsVisible(visible: boolean): void;
+  setAtmosphereMode(mode: AtmosphereMode): void;
   /** Unit vector toward the sun, Earth-fixed frame (src/core sunDirection). */
   setSunDirection(direction: Vec3): void;
   /** Advance time-driven motion. Returns true if anything moved. */
@@ -61,8 +66,9 @@ export interface EarthLayer {
  *
  *   tilt            quaternion = 23.44° about X
  *    ├─ earth       SphereGeometry(1.0) + sun-lit ShaderMaterial
- *    └─ cloudSpin   rotation.y advances
- *        └─ clouds  SphereGeometry(1.003) + sun-lit transparent ShaderMaterial
+ *    ├─ cloudSpin   rotation.y advances
+ *    │   └─ clouds  SphereGeometry(1.003) + sun-lit transparent ShaderMaterial
+ *    └─ atmosphere  SphereGeometry(1.03), back faces, rim or scattering
  *
  * Tilt lives on one parent so clouds inherit it and spin about the *tilted*
  * axis, as real weather does. The layer never reads the clock: the sun arrives
@@ -96,14 +102,17 @@ export function createEarth(options: EarthOptions): EarthLayer {
   cloudSpin.add(clouds);
   cloudSpin.visible = options.cloudsVisible ?? true;
 
+  // The Earth-fixed sun is kept so the cloud shell's copy can be re-derived
+  // whenever either the sun moves or the shell spins under it. The atmosphere
+  // does not spin and reads this vector directly.
+  const sun = toVector3(options.sunDirection);
+  const atmosphere = createAtmosphere(options.atmosphere ?? 'rim', sun);
+
   const tilt = new Group();
   tilt.name = 'earth-tilt';
   earthTiltQuaternion(tilt.quaternion);
-  tilt.add(earth, cloudSpin);
+  tilt.add(earth, cloudSpin, atmosphere.mesh);
 
-  // The Earth-fixed sun is kept so the cloud shell's copy can be re-derived
-  // whenever either the sun moves or the shell spins under it.
-  const sun = toVector3(options.sunDirection);
   const syncCloudSun = (): void => {
     sunInSpinFrame(sun, cloudSpin.rotation.y, cloudMaterial.sunDirection);
   };
@@ -118,6 +127,10 @@ export function createEarth(options: EarthOptions): EarthLayer {
 
     setCloudsVisible(visible) {
       cloudSpin.visible = visible;
+    },
+
+    setAtmosphereMode(mode) {
+      atmosphere.setMode(mode);
     },
 
     setSunDirection(direction) {
@@ -143,6 +156,7 @@ export function createEarth(options: EarthOptions): EarthLayer {
       cloudGeometry.dispose();
       earthMaterial.material.dispose();
       cloudMaterial.material.dispose();
+      atmosphere.dispose();
       for (const texture of Object.values(textures)) texture.dispose();
     },
   };

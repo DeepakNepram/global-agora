@@ -55,7 +55,8 @@ void main() {
 
   gl_FragColor = vec4(color, alpha);
 
-  // See EARTH_FRAG: raw ShaderMaterial needs this to write to an sRGB canvas.
+  // See EARTH_FRAG for both includes.
+  #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
 `;

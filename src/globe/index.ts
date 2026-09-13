@@ -21,3 +21,6 @@ export { EARTH_CHANNEL_INDEX, type EarthChannel } from './shaders/earth.glsl';
 export { sunInSpinFrame, toVector3 } from './sunFrame';
 export { aimCamera, cameraPositionFor, earthTiltQuaternion } from './views';
 export { MAX_ANISOTROPY } from './textureLoading';
+export { ATMOSPHERE_RADIUS } from './shaders/atmosphere.glsl';
+export { BLOOM_THRESHOLD, NIGHT_LIGHTS_GAIN, ATMOSPHERE_MAX_LUMINANCE } from './hdr';
+export { renderSettingsForTier, type AtmosphereMode, type RenderSettings } from './renderSettings';
