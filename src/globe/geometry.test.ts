@@ -1,10 +1,10 @@
-import { Group, SphereGeometry, Vector3 } from 'three';
+import { SphereGeometry, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 
 import { latLonToVec3, uvToLatLon } from '@/core';
 
 import { CLOUD_RADIUS, EARTH_SEGMENTS } from './earth';
-import { cameraPositionFor, earthTiltQuaternion } from './views';
+import { earthTiltQuaternion } from './views';
 
 /**
  * The guarantee this file exists for: a coordinate passed to latLonToVec3 lands
@@ -58,44 +58,11 @@ describe('SphereGeometry UVs agree with latLonToVec3', () => {
   });
 });
 
-describe('tilt and camera placement', () => {
+describe('axial tilt', () => {
   it('tips the north pole 23.44° off vertical', () => {
     const pole = new Vector3(0, 1, 0).applyQuaternion(earthTiltQuaternion());
     const degrees = (Math.acos(pole.y) * 180) / Math.PI;
     expect(degrees).toBeCloseTo(23.44, 6);
   });
-
-  it.each([
-    ['prime meridian', { lat: 0, lon: 0 }],
-    ['antimeridian', { lat: 0, lon: 180 }],
-  ])('leaves the full tilt visible on screen from the %s view', (_label, at) => {
-    // Project the pole onto the screen plane of a camera aimed at this view.
-    // A tilt about the wrong axis is still 23.44° in world space but projects
-    // to 0° here, which is what the first browser check caught.
-    const forward = cameraPositionFor(at, 4).normalize().negate();
-    const pole = new Vector3(0, 1, 0).applyQuaternion(earthTiltQuaternion());
-    const onScreen = pole.clone().sub(forward.clone().multiplyScalar(pole.dot(forward)));
-    const screenUp = new Vector3(0, 1, 0).sub(forward.clone().multiplyScalar(forward.y));
-    const degrees = (onScreen.angleTo(screenUp) * 180) / Math.PI;
-    expect(degrees).toBeCloseTo(23.44, 6);
-  });
-
-  it.each([
-    { lat: 0, lon: 0 },
-    { lat: 0, lon: 180 },
-    { lat: 90, lon: 0 },
-    { lat: -90, lon: 0 },
-    { lat: 35.68, lon: 139.65 },
-  ])('puts $lat, $lon dead centre of the view', (at) => {
-    // Surface point in world space, through the same tilt the globe uses.
-    const tilt = new Group();
-    earthTiltQuaternion(tilt.quaternion);
-    tilt.updateMatrixWorld();
-    const local = latLonToVec3(at);
-    const surface = new Vector3(local.x, local.y, local.z).applyMatrix4(tilt.matrixWorld);
-
-    const camera = cameraPositionFor(at, 4);
-    // Collinear with the origin and on the near side: the point faces the camera.
-    expect(camera.clone().normalize().distanceTo(surface.clone().normalize())).toBeLessThan(1e-9);
-  });
+  // Camera placement under the tilt is covered by src/globe/camera/orientation.test.ts.
 });

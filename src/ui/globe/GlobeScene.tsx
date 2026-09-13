@@ -1,48 +1,33 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useState, type JSX } from 'react';
 
-import { sunDirection, type LatLon, type TextureSet } from '@/core';
-import {
-  aimCamera,
-  createEarth,
-  type AtmosphereMode,
-  type EarthChannel,
-  type EarthLayer,
-} from '@/globe';
+import { sunDirection, type TextureSet } from '@/core';
+import { createEarth, type AtmosphereMode, type EarthChannel, type EarthLayer } from '@/globe';
 import { timeStore } from '@/state';
 
 import { useCloudTicker } from './useCloudTicker';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
-
-/**
- * Camera distance in globe radii for a landscape viewport. With a 35° vertical
- * FOV the globe fills ~80% of the height.
- */
-const CAMERA_DISTANCE = 4;
 
 export interface GlobeSceneProps {
   readonly textures: TextureSet;
   readonly channel: EarthChannel;
   readonly cloudsVisible: boolean;
   readonly atmosphere: AtmosphereMode;
-  readonly view: LatLon;
 }
 
 /**
  * The r3f adapter for src/globe. It owns lifecycle and frame scheduling only;
- * everything that draws lives in src/globe and knows nothing about React.
+ * everything that draws lives in src/globe and knows nothing about React. The
+ * camera is not placed here: useGlobeControls owns it.
  */
 export function GlobeScene({
   textures,
   channel,
   cloudsVisible,
   atmosphere,
-  view,
 }: GlobeSceneProps): JSX.Element | null {
   const gl = useThree((state) => state.gl);
-  const camera = useThree((state) => state.camera);
   const invalidate = useThree((state) => state.invalidate);
-  const aspect = useThree((state) => state.size.width / Math.max(1, state.size.height));
   const reducedMotion = usePrefersReducedMotion();
 
   const [earth, setEarth] = useState<EarthLayer | null>(null);
@@ -94,12 +79,6 @@ export function GlobeScene({
       if (state.timeMs !== previous.timeMs) showInstant(state.timeMs);
     });
   }, [earth, invalidate]);
-
-  useEffect(() => {
-    // Portrait viewports are width-limited; back off so the limb isn't clipped.
-    aimCamera(camera, view, CAMERA_DISTANCE / Math.min(1, aspect));
-    invalidate();
-  }, [camera, view, aspect, invalidate]);
 
   useCloudTicker(invalidate, earth !== null && cloudsVisible && !reducedMotion);
 

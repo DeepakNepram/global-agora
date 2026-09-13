@@ -7,39 +7,26 @@ import {
   CLOUDS_KEY,
   DEBUG_BUTTON as BUTTON,
   DEBUG_KBD as KBD,
-  VIEW_PRESETS,
   isTypingTarget,
-  type ViewPresetId,
 } from './debugControls';
 import { TimeDebugControls } from './TimeDebugControls';
 
 export interface GlobeDebugPanelProps {
-  readonly view: ViewPresetId;
-  readonly onViewChange: (view: ViewPresetId) => void;
   readonly channel: EarthChannel;
   readonly onChannelChange: (channel: EarthChannel) => void;
   readonly cloudsVisible: boolean;
   readonly onCloudsVisibleChange: (visible: boolean) => void;
-  /** Extra control groups, placed between the texture and time groups. */
+  /** Extra control groups (camera, render), placed before the texture group. */
   readonly children?: ReactNode;
 }
 
 /**
- * UV-mapping inspection for Phase 1.1. Every control is a real <button> with
+ * Dev inspection panel. Every control is a real <button> with
  * aria-pressed, so Tab/Space/Enter work with no extra code; the single-key
  * shortcuts are a convenience on top of that, not the only path.
  */
 export function GlobeDebugPanel(props: GlobeDebugPanelProps): JSX.Element {
-  const {
-    view,
-    onViewChange,
-    channel,
-    onChannelChange,
-    cloudsVisible,
-    onCloudsVisibleChange,
-    children,
-  } = props;
-  const viewsLabel = useId();
+  const { channel, onChannelChange, cloudsVisible, onCloudsVisibleChange, children } = props;
   const channelsLabel = useId();
 
   useEffect(() => {
@@ -48,9 +35,6 @@ export function GlobeDebugPanel(props: GlobeDebugPanelProps): JSX.Element {
       if (isTypingTarget(event.target)) return;
       const key = event.key.toLowerCase();
 
-      const preset = VIEW_PRESETS.find((p) => p.key === key);
-      if (preset) return onViewChange(preset.id);
-
       const option = CHANNEL_OPTIONS.find((o) => o.key === key);
       if (option) return onChannelChange(option.id);
 
@@ -58,31 +42,14 @@ export function GlobeDebugPanel(props: GlobeDebugPanelProps): JSX.Element {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onViewChange, onChannelChange, onCloudsVisibleChange, cloudsVisible]);
+  }, [onChannelChange, onCloudsVisibleChange, cloudsVisible]);
 
   return (
     <aside
       aria-label="Globe inspection controls"
-      className="absolute right-4 top-4 flex w-52 flex-col gap-3 rounded-lg bg-void/80 p-3 backdrop-blur"
+      className="absolute right-4 top-4 flex max-h-[calc(100%-2rem)] w-52 flex-col gap-3 overflow-y-auto rounded-lg bg-void/80 p-3 backdrop-blur"
     >
-      <div role="group" aria-labelledby={viewsLabel} className="flex flex-col gap-1">
-        <p id={viewsLabel} className="text-[11px] uppercase tracking-wide text-muted">
-          View
-        </p>
-        {VIEW_PRESETS.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            className={BUTTON}
-            aria-pressed={view === preset.id}
-            aria-keyshortcuts={preset.key}
-            onClick={() => onViewChange(preset.id)}
-          >
-            <kbd className={KBD}>{preset.key}</kbd>
-            {preset.label}
-          </button>
-        ))}
-      </div>
+      {children}
 
       <div role="group" aria-labelledby={channelsLabel} className="flex flex-col gap-1">
         <p id={channelsLabel} className="text-[11px] uppercase tracking-wide text-muted">
@@ -112,8 +79,6 @@ export function GlobeDebugPanel(props: GlobeDebugPanelProps): JSX.Element {
           Clouds
         </button>
       </div>
-
-      {children}
 
       <TimeDebugControls />
     </aside>

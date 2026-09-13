@@ -1,29 +1,61 @@
-import type { LatLon } from '@/core';
-import type { EarthChannel } from '@/globe';
+import type { CameraPose, EarthChannel } from '@/globe';
 
 /**
- * Phase 1.1 inspection controls. These exist to verify UV mapping at the places
- * it fails — the antimeridian and the poles — before orbit controls exist.
- * Prompt 1.2's camera rig replaces the presets.
+ * Dev-only inspection controls: the texture channels from 1.1, and since 1.4
+ * the fly-to cities that exercise the camera.
  */
 
-export type ViewPresetId = 'primeMeridian' | 'antimeridian' | 'northPole' | 'southPole' | 'india';
+/** Low enough to feel like arriving somewhere; the imagery is still legible. */
+const CITY_ALTITUDE_KM = 600;
 
-export interface ViewPreset {
-  readonly id: ViewPresetId;
+export interface CityFlight {
+  readonly id: string;
   readonly key: string;
   readonly label: string;
-  readonly at: LatLon;
+  readonly pose: CameraPose;
 }
 
-export const VIEW_PRESETS: readonly ViewPreset[] = [
-  { id: 'primeMeridian', key: '1', label: 'Prime meridian', at: { lat: 0, lon: 0 } },
-  { id: 'antimeridian', key: '2', label: 'Antimeridian', at: { lat: 0, lon: 180 } },
-  { id: 'northPole', key: '3', label: 'North pole', at: { lat: 90, lon: 0 } },
-  { id: 'southPole', key: '4', label: 'South pole', at: { lat: -90, lon: 0 } },
-  // Prompt 1.2's check: sunrise sweeps India from ~23:30 to ~01:15 UTC.
-  { id: 'india', key: '5', label: 'India', at: { lat: 22, lon: 79 } },
+/**
+ * Picked for the routes between them, not the cities: Paris-London is a short
+ * hop with no climb, London-New York a medium arc, New York-Delhi runs close to
+ * the pitch clamp over the Arctic, and London-Sydney is nearly antipodal (the
+ * 3 s end of the duration curve). Delhi keeps 1.2's sunrise check reachable.
+ */
+export const CITY_FLIGHTS: readonly CityFlight[] = [
+  {
+    id: 'london',
+    key: '1',
+    label: 'London',
+    pose: { lat: 51.5074, lon: -0.1278, altitudeKm: CITY_ALTITUDE_KM },
+  },
+  {
+    id: 'paris',
+    key: '2',
+    label: 'Paris',
+    pose: { lat: 48.8566, lon: 2.3522, altitudeKm: CITY_ALTITUDE_KM },
+  },
+  {
+    id: 'newYork',
+    key: '3',
+    label: 'New York',
+    pose: { lat: 40.7128, lon: -74.006, altitudeKm: CITY_ALTITUDE_KM },
+  },
+  {
+    id: 'delhi',
+    key: '4',
+    label: 'Delhi',
+    pose: { lat: 28.6139, lon: 77.209, altitudeKm: CITY_ALTITUDE_KM },
+  },
+  {
+    id: 'sydney',
+    key: '5',
+    label: 'Sydney',
+    pose: { lat: -33.8688, lon: 151.2093, altitudeKm: CITY_ALTITUDE_KM },
+  },
 ];
+
+export const WORLD_VIEW_KEY = '0';
+export const FULL_MOTION_KEY = 'm';
 
 export interface ChannelOption {
   readonly id: EarthChannel;
@@ -55,9 +87,3 @@ export const DEBUG_BUTTON =
 // Inherits the button's colour at reduced opacity rather than using text-muted,
 // which drops to near-invisible on the accent background of a pressed button.
 export const DEBUG_KBD = 'mr-2 opacity-70';
-
-export function viewPreset(id: ViewPresetId): ViewPreset {
-  const preset = VIEW_PRESETS.find((p) => p.id === id);
-  if (!preset) throw new Error(`Unknown view preset: ${id}`);
-  return preset;
-}

@@ -19,7 +19,7 @@ export {
 } from './earth';
 export { EARTH_CHANNEL_INDEX, type EarthChannel } from './shaders/earth.glsl';
 export { sunInSpinFrame, toVector3 } from './sunFrame';
-export { aimCamera, cameraPositionFor, earthTiltQuaternion } from './views';
+export { earthTiltQuaternion } from './views';
 export { createOrbitGlobeControls } from './camera/OrbitGlobeControls';
 export {
   CAMERA_FOV_DEG,
