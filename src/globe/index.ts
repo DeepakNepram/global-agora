@@ -20,6 +20,26 @@ export {
 export { EARTH_CHANNEL_INDEX, type EarthChannel } from './shaders/earth.glsl';
 export { sunInSpinFrame, toVector3 } from './sunFrame';
 export { aimCamera, cameraPositionFor, earthTiltQuaternion } from './views';
+export { createOrbitGlobeControls } from './camera/OrbitGlobeControls';
+export {
+  CAMERA_FOV_DEG,
+  MAX_LATITUDE_DEG,
+  MIN_ALTITUDE_KM,
+  fitAltitudeKm,
+  type CameraPose,
+} from './camera/cameraMath';
+export { flightDurationMs, type FlightResult } from './camera/flight';
+export type { PointerInput } from './camera/pointerGestures';
+export type {
+  AltitudeLimits,
+  ControlsMode,
+  ControlsTelemetry,
+  FlyToOptions,
+  MotionPreference,
+  OrbitGlobeControls,
+  OrbitGlobeControlsOptions,
+  WheelInput,
+} from './camera/types';
 export { MAX_ANISOTROPY } from './textureLoading';
 export { ATMOSPHERE_RADIUS } from './shaders/atmosphere.glsl';
 export { BLOOM_THRESHOLD, NIGHT_LIGHTS_GAIN, ATMOSPHERE_MAX_LUMINANCE } from './hdr';
