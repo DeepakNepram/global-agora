@@ -23,4 +23,6 @@ export { aimCamera, cameraPositionFor, earthTiltQuaternion } from './views';
 export { MAX_ANISOTROPY } from './textureLoading';
 export { ATMOSPHERE_RADIUS } from './shaders/atmosphere.glsl';
 export { BLOOM_THRESHOLD, NIGHT_LIGHTS_GAIN, ATMOSPHERE_MAX_LUMINANCE } from './hdr';
+export { createGpuTimer, type GpuTimer } from './gpuTimer';
 export { renderSettingsForTier, type AtmosphereMode, type RenderSettings } from './renderSettings';
+export { createRenderPipeline, VIGNETTE, type RenderPipeline } from './renderPipeline';

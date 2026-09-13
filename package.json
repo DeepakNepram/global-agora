@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@react-three/fiber": "^9.7.0",
+    "postprocessing": "^6.39.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "three": "^0.186.0",
