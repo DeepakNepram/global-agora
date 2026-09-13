@@ -7,6 +7,7 @@ import type { EarthChannel } from '@/globe';
 import { viewPreset, type ViewPresetId } from './globe/debugControls';
 import { GlobeDebugPanel } from './globe/GlobeDebugPanel';
 import { GlobeScene } from './globe/GlobeScene';
+import { useLiveClock } from './globe/useLiveClock';
 
 export interface GlobeCanvasProps {
   readonly tier: QualityTier;
@@ -25,6 +26,7 @@ export function GlobeCanvas({ tier }: GlobeCanvasProps): JSX.Element {
   const [view, setView] = useState<ViewPresetId>('primeMeridian');
   const [channel, setChannel] = useState<EarthChannel>('lit');
   const [cloudsVisible, setCloudsVisible] = useState(true);
+  useLiveClock();
 
   // BASE_URL is resolved here, not in src/core, which must not read Vite globals.
   const textures = useMemo(

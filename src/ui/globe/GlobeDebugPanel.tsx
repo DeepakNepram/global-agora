@@ -3,6 +3,7 @@ import { useEffect, useId, type JSX } from 'react';
 import type { EarthChannel } from '@/globe';
 
 import { CHANNEL_OPTIONS, CLOUDS_KEY, VIEW_PRESETS, type ViewPresetId } from './debugControls';
+import { TimeDebugControls } from './TimeDebugControls';
 
 export interface GlobeDebugPanelProps {
   readonly view: ViewPresetId;
@@ -57,7 +58,7 @@ export function GlobeDebugPanel(props: GlobeDebugPanelProps): JSX.Element {
   return (
     <aside
       aria-label="Globe inspection controls"
-      className="absolute right-4 top-4 flex w-44 flex-col gap-3 rounded-lg bg-void/80 p-3 backdrop-blur"
+      className="absolute right-4 top-4 flex w-52 flex-col gap-3 rounded-lg bg-void/80 p-3 backdrop-blur"
     >
       <div role="group" aria-labelledby={viewsLabel} className="flex flex-col gap-1">
         <p id={viewsLabel} className="text-[11px] uppercase tracking-wide text-muted">
@@ -106,6 +107,8 @@ export function GlobeDebugPanel(props: GlobeDebugPanelProps): JSX.Element {
           Clouds
         </button>
       </div>
+
+      <TimeDebugControls />
     </aside>
   );
 }

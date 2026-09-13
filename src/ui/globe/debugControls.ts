@@ -7,7 +7,7 @@ import type { EarthChannel } from '@/globe';
  * Prompt 1.2's camera rig replaces the presets.
  */
 
-export type ViewPresetId = 'primeMeridian' | 'antimeridian' | 'northPole' | 'southPole';
+export type ViewPresetId = 'primeMeridian' | 'antimeridian' | 'northPole' | 'southPole' | 'india';
 
 export interface ViewPreset {
   readonly id: ViewPresetId;
@@ -21,6 +21,8 @@ export const VIEW_PRESETS: readonly ViewPreset[] = [
   { id: 'antimeridian', key: '2', label: 'Antimeridian', at: { lat: 0, lon: 180 } },
   { id: 'northPole', key: '3', label: 'North pole', at: { lat: 90, lon: 0 } },
   { id: 'southPole', key: '4', label: 'South pole', at: { lat: -90, lon: 0 } },
+  // Prompt 1.2's check: sunrise sweeps India from ~23:30 to ~01:15 UTC.
+  { id: 'india', key: '5', label: 'India', at: { lat: 22, lon: 79 } },
 ];
 
 export interface ChannelOption {
