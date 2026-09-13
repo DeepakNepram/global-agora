@@ -6,6 +6,151 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-09-13 — Postprocessing uses `postprocessing` directly, and LOW has no composer
+
+CLAUDE.md's stack lists `@react-three/postprocessing`. We use the underlying
+`postprocessing` library (6.39.5) instead, wrapped in `src/globe/renderPipeline.ts`.
+
+**Why:** the React wrapper also pulls in `n8ao` and `maath`, which we don't use.
+It would also move frame composition into React, whereas `src/globe` is where
+drawing lives and the native port reuses it. The host is one r3f `useFrame` at
+priority 1 (`src/ui/globe/useRenderPipeline.ts`), which also stops r3f's own
+`gl.render`.
+
+**Per tier** (`src/globe/renderSettings.ts`):
+
+|            | LOW                 | MEDIUM              | HIGH                |
+| ---------- | ------------------- | ------------------- | ------------------- |
+| Atmosphere | rim                 | rim                 | 6-sample scattering |
+| Composer   | none                | half-float, 4× MSAA | half-float, 4× MSAA |
+| Bloom      | off                 | half resolution     | full resolution     |
+| ACES       | three, per material | `ToneMappingEffect` | `ToneMappingEffect` |
+| Vignette   | CSS gradient        | `VignetteEffect`    | `VignetteEffect`    |
+
+On MEDIUM and HIGH, bloom, ACES and the vignette are merged into one
+`EffectPass`, which is a single full-screen draw. LOW draws straight to the canvas
+and gets r3f's default ACES through `#include <tonemapping_fragment>`. That
+include compiles to nothing when a composer renders to a buffer. LOW's CSS
+vignette is derived from the same `VIGNETTE` parameters
+(`src/ui/globe/vignette.ts`). It costs no GPU pass, but it will not appear in a
+future canvas capture.
+
+**Clear colour:** the page colour is set as `scene.background`, not with
+`setClearColor`. three converts a clear colour for whichever target is bound at
+the time it is set, which is the sRGB canvas. The composer's clear of its linear
+buffer then reused those numbers, so the background came out sRGB-encoded twice
+(a visible slate blue).
+
+**Cost:** +20.6 kB gzip of JS (302.7 → 323.3 kB). About 18 kB of that is
+`postprocessing`, tree-shaken to the five classes used.
+
+---
+
+## 2026-09-13 — Selective bloom is a luminance budget, not a bloom setting
+
+Prompt 1.3 asks for "only city lights and pins bloom, not the whole day side". In
+an LDR buffer a sunlit white cloud is as bright as a city, so no bloom threshold
+can separate them. The scene therefore renders to half-float, and every layer is
+kept inside a band (`src/globe/hdr.ts`, checked by `hdr.test.ts`):
+
+- The day side and clouds are ≤ 1, because albedo, Lambert and tint are all ≤ 1.
+- The atmosphere is capped below the threshold.
+- City-light cores are > `BLOOM_THRESHOLD` (1.05, smoothing to 1.30).
+
+**The city-light gain is keyed on the texel's own luminance.** A flat ×2.4 also
+lifted the night map's blue-grey base and painted the night ocean navy.
+Measured on `night-8192.webp`: ocean ~0.012 linear, p99 luminance 0.06,
+p99.9 0.64. The gain is `mix(0.9, 2.4, smoothstep(0.05, 0.5, luminance))`. The
+base keeps 1.2's 0.9 and the cores reach 2.4.
+
+**Pins (1.5)** must emit above `BLOOM_THRESHOLD` to bloom, and must stay below
+it if they should not.
+
+---
+
+## 2026-09-13 — Two atmospheres behind the tier
+
+Both run on the back faces of a 1.03-radius shell, in the Earth-fixed frame of
+`uSunDir`. The camera is moved into that frame in `onBeforeRender`.
+
+**Rim (LOW/MEDIUM).** This is the prompt's
+`pow(1 - abs(dot(viewDir, normal)), 3)`. On a back face that term peaks at the
+shell's own silhouette, which would draw a hard outer ring. So it is multiplied
+by a falloff on the altitude of the ray's closest approach to the centre. Sun
+facing is taken at that closest point, the limb under the ray, rather than at the
+far-side fragment. Depth test stays on, so the Earth rejects everything behind
+the disc before shading.
+
+**Scattering (HIGH).** The shader takes six samples along the view ray between
+the shell and the ground. Details:
+
+- Rayleigh 1/λ⁴ ratios, plus a grey aerosol term with a Henyey-Greenstein phase.
+- Optical depth toward the sun uses the closed-form air mass `1/(mu + 0.02)`
+  instead of a second march.
+- Depth test is off, so the haze also lies over the limb.
+- Blending is premultiplied, with in-scatter capped at `alpha × 0.9`, so haze over
+  a white cloud cannot cross the bloom threshold.
+
+The sunset reddening comes from the air mass. Blue is stripped only within about
+2° of the horizon, so the warm band stays at the terminator.
+
+Two tuning failures are recorded here so they are not repeated:
+
+- **β too high.** Physically sized Rayleigh extinction (blue ×16) washed the
+  Pacific teal-grey. At ×6 the vertical depth is ~0.05 and the limb path is ~30×
+  longer.
+- **Wrong alpha.** Alpha was the mean of the three channels' extinction. Blue
+  in-scatter then always hit the cap and was flattened to green's level. Alpha is
+  now the strongest channel's extinction.
+
+---
+
+## 2026-09-13 — Frame cost is measured with GPU timer queries
+
+The dev overlay (`src/ui/globe/FrameTimeOverlay.tsx`) reports two numbers:
+
+- **CPU:** the JS time spent inside the draw call. It reads
+  `monotonicNowMs()`, a second sanctioned export of `src/state/clock.ts`, for
+  durations only.
+- **GPU:** measured with `EXT_disjoint_timer_query_webgl2`. Results from disjoint
+  intervals are discarded.
+
+A frame interval would only show vsync. "Benchmark" draws 30 warm-up frames and
+then 300 measured frames continuously. Everything else stays render-on-demand, and
+the overlay reads "Drawn 0/s" when idle.
+
+**Measured 2026-09-13.** Intel Iris Xe (integrated), Chrome, 1020×670 physical
+pixels, India at 00:30 UTC, clouds on, reduced motion on. Figures are GPU mean /
+p95 ms, the median of runs 2–6 after a reload per tier.
+
+| Tier   | GPU mean | GPU p95 | CPU mean |
+| ------ | -------- | ------- | -------- |
+| LOW    | 2.5      | 3.2     | 0.12     |
+| MEDIUM | 3.7      | 4.4     | 0.33     |
+| HIGH   | 4.4      | 4.8     | 0.38     |
+
+HIGH ablations on one page, 3 alternating repeats:
+
+| Atmosphere | Bloom | GPU mean |
+| ---------- | ----- | -------- |
+| rim        | off   | 3.5      |
+| rim        | on    | 3.8      |
+| scattering | off   | 4.2      |
+| scattering | on    | 4.6      |
+
+So on this machine the scattering atmosphere costs ~0.7 ms, full-resolution bloom
+~0.35 ms, and the composer plus larger textures ~1 ms. HIGH costs ~1.9 ms more
+than LOW. Both are far inside 16.7 ms.
+
+Run-to-run spread is ±0.5 ms: the GPU's power state drifts, and the first run
+after a reload is always slower.
+
+**Not measured:** mid-range Android. A 2× phone fills ~3.8× these pixels, and
+MEDIUM's half-float MSAA plus bloom is the biggest risk to the 30 fps budget.
+Measure before Phase 1 ships. The fallback is MEDIUM without bloom.
+
+---
+
 ## 2026-09-13 — The store holds time; the sun is derived from it
 
 Prompt 1.2 says the sun direction "must come from a store value". The value
