@@ -4,7 +4,7 @@
  * Stores own plain data only. Keep Three.js objects out of them — mutating a
  * store every frame triggers React re-render storms and breaks render-on-demand.
  */
-export { wallClockNow } from './clock';
+export { monotonicNowMs, wallClockNow } from './clock';
 export {
   createTimeStore,
   timeStore,

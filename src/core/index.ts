@@ -36,6 +36,9 @@ export type { LatLon, Uv, Vec3 } from './geo';
 
 export { equationOfTimeMinutes, julianDay, subsolarPoint, sunDirection } from './sun';
 
+export { createFrameStats, percentile } from './frameStats';
+export type { FrameStats, FrameSummary } from './frameStats';
+
 export {
   textureFileName,
   textureSetForTier,
