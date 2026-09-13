@@ -2,6 +2,7 @@ import { useMemo, type JSX } from 'react';
 
 import type { AppConfig } from '@/core';
 
+import { GlobeCanvas } from './GlobeCanvas';
 import { resolveQuality } from './platform/capabilities';
 
 export interface AppProps {
@@ -9,10 +10,9 @@ export interface AppProps {
 }
 
 /**
- * Phase 0 shell. The globe canvas mounts into the <main> region in Phase 1;
- * until then this is the blank canvas the Phase 0 gate asks for, plus a readout
- * of the detected quality tier so the texture pipeline is verifiable in a real
- * browser rather than only in unit tests.
+ * App shell: skip link, header, the globe, and a readout of the detected quality
+ * tier so the texture choice is verifiable in a real browser rather than only in
+ * unit tests.
  */
 export function App({ config }: AppProps): JSX.Element {
   // Probing creates and discards a GL context, so do it once per mount.
@@ -30,17 +30,12 @@ export function App({ config }: AppProps): JSX.Element {
       <header className="flex items-baseline gap-3 px-6 py-4">
         <h1 className="text-lg font-semibold tracking-tight">Global Agora</h1>
         <p className="text-sm text-muted">
-          Phase 0 — skeleton. Last {config.historyWindowHours}h of news lands here.
+          Phase 1 — base Earth. Last {config.historyWindowHours}h of news lands here.
         </p>
       </header>
 
-      <main
-        id="globe"
-        tabIndex={-1}
-        aria-label="News globe"
-        className="grid flex-1 place-items-center"
-      >
-        <p className="text-sm text-muted">Globe canvas mounts here in Phase 1.</p>
+      <main id="globe" tabIndex={-1} aria-label="News globe" className="relative min-h-0 flex-1">
+        <GlobeCanvas tier={quality.tier} />
       </main>
 
       <footer className="px-6 py-3 text-xs text-muted">

@@ -25,6 +25,98 @@ from `src/core` and `src/globe`.
 
 ---
 
+## 2026-09-13 — src/globe contains no React, not even r3f
+
+ESLint allowed React in `src/globe`, but CLAUDE.md's directory rule says "Three.js
+only. No React". The lint rule was the weaker of the two, so it was the one that
+changed.
+
+**Decision:** `src/globe` exports imperative factories — `createEarth()` returns
+`{ object3d, setChannel, setCloudsVisible, advance(dt), dispose() }` — and
+`src/ui/globe/GlobeScene.tsx` mounts `object3d` through `<primitive>`. React,
+react-dom and `@react-three/*` are now forbidden in `src/globe` by lint.
+
+**Why:** the native port reuses `src/globe` verbatim and replaces only the host.
+It is also why textures load through `THREE.TextureLoader` rather than r3f's
+`useTexture`. As a side effect, the loader returns a `Texture` immediately and
+fills it later, which suits render-on-demand: one `invalidate()` per image, and
+no suspense boundary.
+
+**Cost:** lifecycle is manual. The globe is built and disposed inside a single
+effect so StrictMode's double mount gets a fresh globe, not a disposed one.
+
+---
+
+## 2026-09-13 — lat/lon → world is pinned to SphereGeometry's UV layout
+
+**Decision:** `src/core/geo.ts` uses `phi = (lon+180)°`, `theta = (90-lat)°`,
+`x = -r·cos(phi)·sin(theta)`, `y = r·cos(theta)`, `z = r·sin(phi)·sin(theta)`.
+That is THREE.SphereGeometry's vertex loop solved for its own UVs, not a textbook
+convention. `src/globe/geometry.test.ts` checks it against every vertex of the
+real geometry, and it fails if longitude is off by 1°.
+
+**Consequences:** (0,0) is +X, lon −90 is +Z, and lon ±180 is −X. A camera on +Z
+therefore faces the Americas, so the view presets place the camera with the same
+function rather than assuming Greenwich faces +Z.
+
+**Tilt is about X, not Z.** The first version tilted about Z. That is 23.44° in
+world space, but Greenwich and the antimeridian lie on the X axis, which put both
+preset cameras inside the tilt plane. The axis projected dead vertical and the
+tilt could not be seen. Only the browser check caught this; every unit test
+passed. There is now a test that measures the tilt as it appears on screen from
+both presets.
+
+The shader uses the geometry's UVs rather than deriving UV from position.
+SphereGeometry duplicates the seam column (u = 0 and u = 1 share a position), so
+u never wraps inside a triangle and no mip-derivative seam can form.
+
+---
+
+## 2026-09-13 — Flat, unlit output for 1.1
+
+Checking texture mapping only works if nothing between the texture and the screen
+changes the colour.
+
+**Decision:**
+
+- `<Canvas flat>` (NoToneMapping). r3f defaults to ACESFilmic.
+- `#include <colorspace_fragment>` ends the fragment shader. A raw
+  `ShaderMaterial` gets `linearToOutputTexel` defined but never called, and
+  without the include the globe renders dark. A test asserts the include is
+  present.
+- The specular mask is sampled as `NoColorSpace` (it is data); day, night and
+  clouds use `SRGBColorSpace`.
+- `wrapS = RepeatWrapping` on every map, with anisotropy capped at 8.
+- Clouds use `MeshBasicMaterial`. The pipeline already bakes them as white RGB
+  with alpha, so no custom shader is needed.
+
+The fragment shader samples all three maps unconditionally and selects one
+with a runtime `uChannel` uniform. Because the uniform is not a compile-time
+constant, no sampler can be eliminated, so switching channels actually proves
+each binding. The inspection panel is `import.meta.env.DEV` only.
+
+---
+
+## 2026-09-13 — Clouds idle at 12fps, not 60 and not 0
+
+"Clouds rotate slowly" and "render on demand" conflict: something that moves
+forever never lets the globe idle.
+
+**Decision:** clouds turn once every 10 minutes. While the tab is visible,
+`useCloudTicker` calls `invalidate()` at 12Hz. It stops completely when the tab
+is hidden, when clouds are toggled off, and under `prefers-reduced-motion`,
+which also freezes the rotation. At this speed one frame moves the clouds about
+0.05°, which is less than a pixel, so 12fps looks continuous. Rotation is
+`rate * dt`: CLAUDE.md's exp() smoothing is for easing toward a target, and a
+constant spin has none. `dt` is clamped to 0.25s, because under
+`frameloop="demand"` the delta after a hidden tab can be minutes.
+
+**Cost:** about a fifth of a 60fps loop's GPU time while visible and idle. The
+alternative that honours constraint 4 literally, clouds advancing only on frames
+drawn for other reasons, makes clouds look frozen on a still screen.
+
+---
+
 ## 2026-09-12 — The specular mask is derived, not downloaded
 
 NASA retired Visible Earth into science.nasa.gov and no longer publishes a

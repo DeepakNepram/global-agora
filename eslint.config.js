@@ -39,11 +39,16 @@ const coreForbidden = [
   },
 ];
 
-/** src/globe is the pure render layer: Three.js and r3f only, never UI or backend. */
+/** src/globe is the pure render layer: Three.js only, never React, UI or backend. */
 const globeForbidden = [
   {
     group: uiLayer,
     message: boundaryMessage,
+  },
+  {
+    group: ['react', 'react-dom', 'react-dom/*', '@react-three/*'],
+    message:
+      'src/globe is Three.js only — no React, not even r3f. Return Object3Ds with dispose() and let src/ui mount them via <primitive>.',
   },
   {
     group: ['@supabase/*', 'zustand', 'zustand/*'],

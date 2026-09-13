@@ -18,3 +18,27 @@ export {
   TIER_TEXTURE_WIDTH,
 } from './quality';
 export type { DeviceCapabilities, QualityTier, TierDecision } from './quality';
+
+export {
+  degToRad,
+  kmToWorld,
+  latLonToUv,
+  latLonToVec3,
+  normalizeLon,
+  uvToLatLon,
+  vec3ToLatLon,
+  worldToKm,
+  EARTH_AXIAL_TILT_DEG,
+  EARTH_RADIUS_KM,
+  GLOBE_RADIUS,
+} from './geo';
+export type { LatLon, Uv, Vec3 } from './geo';
+
+export {
+  textureFileName,
+  textureSetForTier,
+  CLOUD_TEXTURE_WIDTH,
+  TEXTURE_BASE_PATH,
+  TEXTURE_LAYERS,
+} from './textures';
+export type { TextureLayer, TextureSet } from './textures';
