@@ -58,17 +58,26 @@ the terminator, and still 14% with the sun 3° above the horizon. That contradic
 the prompt's own "night lights must not bleed across the terminator".
 
 **Decision:** keep the blend exactly as specified, but first multiply the lights
-by `1 - smoothstep(-0.10, 0.0, ndl)`. That factor is exactly 0 wherever the sun is
-up and reaches 1 as civil twilight ends (sun 6° down, ndl ≈ -0.10), which is
-about when real street lights come on. A shader test pins the expression.
+by `1 - smoothstep(-0.04, 0.0, ndl)`. That factor is exactly 0 wherever the sun is
+up and reaches 1 with the sun ~2.3° down. A shader test pins the expression.
 
-**Twilight tint** has two parts. The day term is warmed toward orange as the sun
-gets low (`mix(1, LOW_SUN_TINT, 1 - smoothstep(0, 0.30, ndl))`, gone by the sun
-~17° up). A faint additive glow of strength 0.012 straddles the line itself,
-where `day * ndl` is ~0 and a multiplied tint has nothing to colour. The first
-attempt was additive only, at 0.045. In the browser it drew a flat brown stripe
-along the terminator, so it was reworked. The tint stays subtle because 1.3's
-atmosphere adds its own reddening on HIGH.
+**Why 0.04 and not the band's 0.10.** The first version faded lights over the
+full band, so it ended where civil twilight does. The night map, though, is not
+black: it carries a dim blue base of land and ocean. The (1 - t) weight in the
+blend and the mask then both faded that base toward the line. On the day side,
+`day * ndl` starts from zero. Together they left a dark stripe about 0.15 globe
+radii wide. Narrowing the mask roughly halves it. The ±0.10 band itself is
+unchanged.
+
+**Twilight tint** warms the day term as the sun gets low:
+`mix(1, LOW_SUN_TINT, 1 - smoothstep(0, 0.25, ndl))`, with LOW_SUN_TINT = (1.0,
+0.75, 0.55). Two earlier versions were tried in the browser and dropped:
+
+- an additive-only glow at 0.045, which drew a flat brown stripe along the line;
+- an additive glow at 0.012 plus a stronger tint, which still read as a brown
+  band.
+
+It stays subtle because 1.3's atmosphere adds its own reddening on HIGH.
 
 ---
 

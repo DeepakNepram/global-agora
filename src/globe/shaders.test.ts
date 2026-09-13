@@ -70,9 +70,11 @@ describe('earth fragment shader', () => {
   });
 
   it('gates city lights to where the sun has set', () => {
-    // smoothstep(-w, 0, ndl) is 1 for every ndl >= 0, so 1 - it is exactly 0 on
+    // smoothstep(-f, 0, ndl) is 1 for every ndl >= 0, so 1 - it is exactly 0 on
     // the sunlit side: no light bleed across the terminator.
-    expect(frag).toContain('float lightsOn = 1.0 - smoothstep(-TERMINATOR_HALF_WIDTH, 0.0, ndl);');
+    expect(frag).toContain('float lightsOn = 1.0 - smoothstep(-LIGHTS_FADE, 0.0, ndl);');
+    const fade = /const float LIGHTS_FADE = ([\d.]+);/.exec(frag);
+    expect(Number(fade?.[1])).toBeGreaterThan(0);
     expect(frag).toMatch(/vec3 lights = night \* NIGHT_LIGHTS_GAIN \* lightsOn;/);
     expect(frag).toMatch(/vec3 sunlit = day \* max\(ndl, 0\.0\) \* /);
     expect(frag).toContain('vec3 lit = mix(lights, sunlit, t);');

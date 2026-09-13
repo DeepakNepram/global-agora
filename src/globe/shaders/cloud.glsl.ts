@@ -34,10 +34,8 @@ const float TERMINATOR_HALF_WIDTH = 0.10;
 
 // Same low-sun warmth as EARTH_FRAG, reaching a little higher: cloud tops
 // catch sunset colour while the ground beneath is already in shade.
-const vec3 LOW_SUN_TINT = vec3(1.0, 0.6, 0.36);
-const float LOW_SUN_END = 0.35;
-const vec3 TWILIGHT_GLOW = vec3(1.0, 0.45, 0.18);
-const float TWILIGHT_GLOW_STRENGTH = 0.03;
+const vec3 LOW_SUN_TINT = vec3(1.0, 0.72, 0.5);
+const float LOW_SUN_END = 0.3;
 
 // Unlit clouds at night are dark, not gone: they dim the lights beneath them
 // without drawing black blotches over every city.
@@ -49,12 +47,9 @@ void main() {
   float ndl = dot(normalize(vNormal), uSunDir);
   float t = smoothstep(-TERMINATOR_HALF_WIDTH, TERMINATOR_HALF_WIDTH, ndl);
 
-  //   shade    = max(ndl, 0) * t * lowSunTint          same day term as the surface
-  //   twilight = (1 - smoothstep(0, w, |ndl|))^2
+  //   shade = max(ndl, 0) * t * mix(1, LOW_SUN_TINT, lowSun)   same day term as the surface
   float lowSun = 1.0 - smoothstep(0.0, LOW_SUN_END, ndl);
-  float twilight = 1.0 - smoothstep(0.0, TERMINATOR_HALF_WIDTH, abs(ndl));
-  vec3 color = cloud.rgb * (max(ndl, 0.0) * t) * mix(vec3(1.0), LOW_SUN_TINT, lowSun)
-    + TWILIGHT_GLOW * (twilight * twilight * TWILIGHT_GLOW_STRENGTH);
+  vec3 color = cloud.rgb * (max(ndl, 0.0) * t) * mix(vec3(1.0), LOW_SUN_TINT, lowSun);
 
   float alpha = cloud.a * mix(NIGHT_OPACITY, 1.0, t);
 

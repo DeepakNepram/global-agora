@@ -53,20 +53,20 @@ varying vec2 vUv;
 varying vec3 vNormal;
 
 // Half-width of the terminator blend in ndl units. ndl is sin(solar elevation),
-// so 0.10 is the sun ~5.7° above or below the horizon: about civil twilight.
+// so 0.10 is the sun ~5.7° above or below the horizon.
 const float TERMINATOR_HALF_WIDTH = 0.10;
 const float NIGHT_LIGHTS_GAIN = 0.9;
 
-// Low sun reddens the ground it still lights: full warmth on the terminator,
-// gone by ndl 0.30 (sun ~17° up). Kept subtle: the atmosphere pass adds its own
-// reddening on the HIGH tier.
-const vec3 LOW_SUN_TINT = vec3(1.0, 0.62, 0.38);
-const float LOW_SUN_END = 0.30;
+// City lights fade in over this much ndl below the horizon (sun ~2.3° down).
+// Fading them across the full band left a dark stripe between the night map and
+// the dim low-sun ground; this keeps the night side readable up to the line.
+const float LIGHTS_FADE = 0.04;
 
-// A faint glow straddling the line itself, where the day term is ~0 and a
-// multiplied tint would have nothing to colour.
-const vec3 TWILIGHT_GLOW = vec3(1.0, 0.4, 0.14);
-const float TWILIGHT_GLOW_STRENGTH = 0.012;
+// Low sun warms the ground it still lights: full warmth on the terminator, gone
+// by ndl 0.25 (sun ~14.5° up). Kept subtle: the atmosphere pass adds its own
+// reddening on the HIGH tier.
+const vec3 LOW_SUN_TINT = vec3(1.0, 0.75, 0.55);
+const float LOW_SUN_END = 0.25;
 
 void main() {
   // All three maps are sampled unconditionally. uChannel is a runtime uniform,
@@ -87,20 +87,16 @@ void main() {
 
   // The blend alone would leave lights at 45% on the terminator and 14% with the
   // sun 3° up. This mask is exactly 0 for ndl >= 0, so lights exist only where
-  // the sun has set, and reach full strength as civil twilight ends:
-  //   lightsOn = 1 - smoothstep(-w, 0, ndl)
-  float lightsOn = 1.0 - smoothstep(-TERMINATOR_HALF_WIDTH, 0.0, ndl);
+  // the sun has set:
+  //   lightsOn = 1 - smoothstep(-LIGHTS_FADE, 0, ndl)
+  float lightsOn = 1.0 - smoothstep(-LIGHTS_FADE, 0.0, ndl);
   vec3 lights = night * NIGHT_LIGHTS_GAIN * lightsOn;
 
-  //   lowSun = 1 - smoothstep(0, LOW_SUN_END, ndl)   1 at sunrise, 0 by ~17° up
+  //   lowSun = 1 - smoothstep(0, LOW_SUN_END, ndl)   1 at sunrise, 0 by ~14.5° up
   float lowSun = 1.0 - smoothstep(0.0, LOW_SUN_END, ndl);
   vec3 sunlit = day * max(ndl, 0.0) * mix(vec3(1.0), LOW_SUN_TINT, lowSun);
 
   vec3 lit = mix(lights, sunlit, t);
-
-  //   twilight = (1 - smoothstep(0, w, |ndl|))^2     1 on the terminator, 0 beyond w
-  float twilight = 1.0 - smoothstep(0.0, TERMINATOR_HALF_WIDTH, abs(ndl));
-  lit += TWILIGHT_GLOW * (twilight * twilight * TWILIGHT_GLOW_STRENGTH);
 
   vec3 color = day;
   if (uChannel == 1) {
