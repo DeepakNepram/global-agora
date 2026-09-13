@@ -57,6 +57,10 @@ const globeForbidden = [
   },
 ];
 
+const clockMessage =
+  'Do not read the wall clock here. Render the time store value (src/state/timeStore.ts); ' +
+  'only src/state/clock.ts may call wallClockNow().';
+
 export default tseslint.config(
   {
     ignores: ['dist/**', 'coverage/**', 'node_modules/**', '.wrangler/**', 'public/**'],
@@ -108,6 +112,29 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': 'off',
       '@typescript-eslint/no-restricted-imports': ['error', { patterns: globeForbidden }],
+    },
+  },
+
+  // The rendered time is the store's time, never "now", or the scrubber cannot
+  // replay the past. src/state/clock.ts is the one sanctioned wall-clock read;
+  // tests/clock.test.ts backs this up in case a rule is disabled inline.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/state/clock.ts', 'src/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        { object: 'Date', property: 'now', message: clockMessage },
+        { object: 'performance', property: 'now', message: clockMessage },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
+          message: clockMessage,
+        },
+        { selector: "CallExpression[callee.name='Date']", message: clockMessage },
+      ],
     },
   },
 
