@@ -2,7 +2,13 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useState, type JSX } from 'react';
 
 import { sunDirection, type LatLon, type TextureSet } from '@/core';
-import { aimCamera, createEarth, type EarthChannel, type EarthLayer } from '@/globe';
+import {
+  aimCamera,
+  createEarth,
+  type AtmosphereMode,
+  type EarthChannel,
+  type EarthLayer,
+} from '@/globe';
 import { timeStore } from '@/state';
 
 import { useCloudTicker } from './useCloudTicker';
@@ -18,6 +24,7 @@ export interface GlobeSceneProps {
   readonly textures: TextureSet;
   readonly channel: EarthChannel;
   readonly cloudsVisible: boolean;
+  readonly atmosphere: AtmosphereMode;
   readonly view: LatLon;
 }
 
@@ -29,6 +36,7 @@ export function GlobeScene({
   textures,
   channel,
   cloudsVisible,
+  atmosphere,
   view,
 }: GlobeSceneProps): JSX.Element | null {
   const gl = useThree((state) => state.gl);
@@ -66,6 +74,12 @@ export function GlobeScene({
     earth.setCloudsVisible(cloudsVisible);
     invalidate();
   }, [earth, cloudsVisible, invalidate]);
+
+  useEffect(() => {
+    if (!earth) return;
+    earth.setAtmosphereMode(atmosphere);
+    invalidate();
+  }, [earth, atmosphere, invalidate]);
 
   useEffect(() => {
     if (!earth) return;

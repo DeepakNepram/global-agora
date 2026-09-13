@@ -1,8 +1,16 @@
-import { useEffect, useId, type JSX } from 'react';
+import { useEffect, useId, type JSX, type ReactNode } from 'react';
 
 import type { EarthChannel } from '@/globe';
 
-import { CHANNEL_OPTIONS, CLOUDS_KEY, VIEW_PRESETS, type ViewPresetId } from './debugControls';
+import {
+  CHANNEL_OPTIONS,
+  CLOUDS_KEY,
+  DEBUG_BUTTON as BUTTON,
+  DEBUG_KBD as KBD,
+  VIEW_PRESETS,
+  isTypingTarget,
+  type ViewPresetId,
+} from './debugControls';
 import { TimeDebugControls } from './TimeDebugControls';
 
 export interface GlobeDebugPanelProps {
@@ -12,19 +20,9 @@ export interface GlobeDebugPanelProps {
   readonly onChannelChange: (channel: EarthChannel) => void;
   readonly cloudsVisible: boolean;
   readonly onCloudsVisibleChange: (visible: boolean) => void;
+  /** Extra control groups, placed between the texture and time groups. */
+  readonly children?: ReactNode;
 }
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
-}
-
-const BUTTON =
-  'rounded px-2 py-1 text-left text-xs text-ink hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent aria-pressed:bg-accent aria-pressed:text-void';
-
-// Inherits the button's colour at reduced opacity rather than using text-muted,
-// which drops to near-invisible on the accent background of a pressed button.
-const KBD = 'mr-2 opacity-70';
 
 /**
  * UV-mapping inspection for Phase 1.1. Every control is a real <button> with
@@ -32,8 +30,15 @@ const KBD = 'mr-2 opacity-70';
  * shortcuts are a convenience on top of that, not the only path.
  */
 export function GlobeDebugPanel(props: GlobeDebugPanelProps): JSX.Element {
-  const { view, onViewChange, channel, onChannelChange, cloudsVisible, onCloudsVisibleChange } =
-    props;
+  const {
+    view,
+    onViewChange,
+    channel,
+    onChannelChange,
+    cloudsVisible,
+    onCloudsVisibleChange,
+    children,
+  } = props;
   const viewsLabel = useId();
   const channelsLabel = useId();
 
@@ -107,6 +112,8 @@ export function GlobeDebugPanel(props: GlobeDebugPanelProps): JSX.Element {
           Clouds
         </button>
       </div>
+
+      {children}
 
       <TimeDebugControls />
     </aside>

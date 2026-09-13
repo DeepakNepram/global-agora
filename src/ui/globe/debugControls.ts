@@ -40,6 +40,21 @@ export const CHANNEL_OPTIONS: readonly ChannelOption[] = [
 ];
 
 export const CLOUDS_KEY = 'c';
+export const ATMOSPHERE_KEY = 'a';
+export const BLOOM_KEY = 'b';
+
+/** Single-key shortcuts must not fire while someone is typing into a field. */
+export function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+}
+
+export const DEBUG_BUTTON =
+  'rounded px-2 py-1 text-left text-xs text-ink hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent aria-pressed:bg-accent aria-pressed:text-void disabled:cursor-not-allowed disabled:opacity-50';
+
+// Inherits the button's colour at reduced opacity rather than using text-muted,
+// which drops to near-invisible on the accent background of a pressed button.
+export const DEBUG_KBD = 'mr-2 opacity-70';
 
 export function viewPreset(id: ViewPresetId): ViewPreset {
   const preset = VIEW_PRESETS.find((p) => p.id === id);
