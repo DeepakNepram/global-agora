@@ -10,7 +10,7 @@ Web first. Native mobile is a later phase, so code must stay portable.
 
 ## Stack
 
-- Vite + React 18 + TypeScript (strict)
+- Vite + React 19 + TypeScript (strict)
 - Three.js via @react-three/fiber, @react-three/drei, @react-three/postprocessing
 - Zustand for state
 - Tailwind CSS

@@ -6,6 +6,25 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-09-13 — React 19, not React 18
+
+The build plan and CLAUDE.md specified React 18. Every current release in the
+r3f ecosystem requires React 19: `@react-three/fiber@9`, `@react-three/drei@10`
+and `@react-three/postprocessing@3`. React 18 caps the stack at r3f 8.18, drei
+9.122 and postprocessing 2.19 — all maintenance-only.
+
+**Decision:** React 19.2.8 (exact), r3f 9.7, three 0.186. Not React 19.3:
+r3f 9.7 declares `react >=19 <19.3`. CLAUDE.md's stack line is updated.
+
+**Cost:** the upgrade itself was one line — the global `JSX` namespace is gone
+in `@types/react@19`, so components import `type JSX` from `react`. r3f 9.7
+still uses the deprecated `THREE.Clock` internally, which logs one console
+warning per load; it is r3f's, not ours. r3f also brings `zustand` in
+transitively. That does not change the rule: lint still blocks importing it
+from `src/core` and `src/globe`.
+
+---
+
 ## 2026-09-12 — The specular mask is derived, not downloaded
 
 NASA retired Visible Earth into science.nasa.gov and no longer publishes a
