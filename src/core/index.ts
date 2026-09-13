@@ -34,6 +34,8 @@ export {
 } from './geo';
 export type { LatLon, Uv, Vec3 } from './geo';
 
+export { angularDistance, antipodalTangent, interpolateGreatCircle } from './greatCircle';
+
 export { equationOfTimeMinutes, julianDay, subsolarPoint, sunDirection } from './sun';
 
 export { createFrameStats, percentile } from './frameStats';
