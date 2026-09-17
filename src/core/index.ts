@@ -36,6 +36,11 @@ export type { LatLon, Uv, Vec3 } from './geo';
 
 export { angularDistance, antipodalTangent, interpolateGreatCircle } from './greatCircle';
 
+export { createNodeBuffer, nodeBufferCapacity, NEWS_CATEGORIES } from './nodeBuffer';
+export type { NewsCategory, NodeBuffer } from './nodeBuffer';
+export { fillMockNodes } from './mockNodes';
+export type { MockNodeOptions } from './mockNodes';
+
 export { equationOfTimeMinutes, julianDay, subsolarPoint, sunDirection } from './sun';
 
 export { createFrameStats, percentile } from './frameStats';
