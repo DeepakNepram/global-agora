@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--port", "5173", "--strictPort"],
       "port": 5173
+    },
+    {
+      "name": "vite-lan",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--mode", "lan", "--port", "5173", "--strictPort"],
+      "port": 5173
     }
   ]
 }

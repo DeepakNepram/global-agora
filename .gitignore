@@ -23,6 +23,9 @@ coverage/
 /blob-report/
 /playwright/.cache/
 
+# Self-signed certificate for `vite --mode lan` (phone testing). Never commit a key.
+.cert/
+
 # Cloudflare
 .wrangler/
 .dev.vars
