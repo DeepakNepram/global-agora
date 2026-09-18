@@ -27,6 +27,13 @@ function describe(summary: FrameSummary, gpuSupported: boolean): string {
   return `CPU ${ms(summary.cpuMeanMs)} / ${ms(summary.cpuP95Ms)} · ${gpu}`;
 }
 
+/** Only meaningful for a benchmark, where frames are drawn back to back. */
+function frameRate(summary: FrameSummary): string {
+  const interval = summary.intervalMeanMs;
+  if (interval === null || interval <= 0) return '';
+  return ` · ${(1000 / interval).toFixed(1)} fps (p95 ${ms(summary.intervalP95Ms)} ms)`;
+}
+
 /**
  * Dev-only frame-time readout. Figures are mean / p95 milliseconds of the draw
  * call itself (CPU: command submission; GPU: timer query), over the last 120
@@ -85,7 +92,7 @@ export function FrameTimeOverlay({
 
       <p aria-live="polite" className="mt-1">
         {benchmark.result && !benchmark.running
-          ? `${label ?? ''} @ ${benchmark.resultBuffer ?? '?'}: ${describe(benchmark.result, probe.gpuSupported)}`
+          ? `${label ?? ''} @ ${benchmark.resultBuffer ?? '?'}: ${describe(benchmark.result, probe.gpuSupported)}${frameRate(benchmark.result)}`
           : ''}
       </p>
     </section>

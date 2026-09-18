@@ -19,6 +19,7 @@ import { createFrameProbe } from './globe/frameProbe';
 import { FrameTimeOverlay } from './globe/FrameTimeOverlay';
 import { GlobeDebugPanel } from './globe/GlobeDebugPanel';
 import { GlobeScene } from './globe/GlobeScene';
+import { PinBenchmark } from './globe/PinBenchmark';
 import { PinDebugControls } from './globe/PinDebugControls';
 import { PinScene } from './globe/PinScene';
 import { RenderDebugControls } from './globe/RenderDebugControls';
@@ -177,6 +178,17 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
             count={pinCount}
             onCountChange={setPinCount}
           />
+          {probe && (
+            <PinBenchmark
+              probe={probe}
+              tier={tier}
+              controls={controls}
+              pinsVisible={pinsVisible}
+              pinCount={pinCount}
+              onPinsVisibleChange={setPinsVisible}
+              onPinCountChange={setPinCount}
+            />
+          )}
           <RenderDebugControls
             atmosphere={atmosphere}
             onAtmosphereChange={setAtmosphere}

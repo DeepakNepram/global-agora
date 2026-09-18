@@ -26,6 +26,9 @@ coverage/
 # Self-signed certificate for `vite --mode lan` (phone testing). Never commit a key.
 .cert/
 
+# Benchmark reports and canvas captures posted to the dev server (vite.config.ts).
+.bench/
+
 # Cloudflare
 .wrangler/
 .dev.vars

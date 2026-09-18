@@ -1,10 +1,11 @@
 /// <reference types="vitest/config" />
-import { existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import type { IncomingMessage } from 'node:http';
 import { fileURLToPath, URL } from 'node:url';
 
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig, type ServerOptions } from 'vite';
+import { defineConfig, type Plugin, type ServerOptions } from 'vite';
 
 const DEV_KEY = '.cert/dev-key.pem';
 const DEV_CERT = '.cert/dev-cert.pem';
@@ -29,8 +30,80 @@ function lanServer(mode: string): ServerOptions {
   return { host: '0.0.0.0', https: { key: readFileSync(DEV_KEY), cert: readFileSync(DEV_CERT) } };
 }
 
+/** Gitignored. Measurements from every device that loaded the dev build land here. */
+const REPORT_DIR = '.bench';
+const MAX_REPORT_BYTES = 16 * 1024;
+const MAX_CAPTURE_BYTES = 8 * 1024 * 1024;
+
+function readBody(request: IncomingMessage, maxBytes: number): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    request.on('data', (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > maxBytes) {
+        reject(new Error(`body over ${maxBytes} bytes`));
+        request.destroy();
+      } else chunks.push(chunk);
+    });
+    request.on('end', () => resolve(Buffer.concat(chunks)));
+    request.on('error', reject);
+  });
+}
+
+/**
+ * Dev server only (`apply: 'serve'`): lets the dev build on a phone hand its
+ * measurements back to this machine, so a phone benchmark is read from a file
+ * rather than copied off a small screen.
+ *
+ *   POST /__bench    JSON object, appended as one line to .bench/results.jsonl
+ *   POST /__capture  PNG of the canvas, written to .bench/capture-<time>.png
+ *
+ * File names are fixed here, never taken from the request, and bodies are capped.
+ */
+function devReports(): Plugin {
+  return {
+    name: 'agora-dev-reports',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        const route = request.url?.split('?')[0];
+        if (request.method !== 'POST' || (route !== '/__bench' && route !== '/__capture')) {
+          next();
+          return;
+        }
+        const isCapture = route === '/__capture';
+        readBody(request, isCapture ? MAX_CAPTURE_BYTES : MAX_REPORT_BYTES)
+          .then((body) => {
+            mkdirSync(REPORT_DIR, { recursive: true });
+            const stamp = new Date().toISOString();
+            if (isCapture) {
+              const file = `${REPORT_DIR}/capture-${stamp.replace(/[:.]/g, '-')}.png`;
+              writeFileSync(file, body);
+              server.config.logger.info(`[capture] ${file} (${body.length} bytes)`);
+            } else {
+              const report: unknown = JSON.parse(body.toString('utf8'));
+              if (typeof report !== 'object' || report === null || Array.isArray(report)) {
+                throw new Error('report must be a JSON object');
+              }
+              const line = JSON.stringify({ receivedAt: stamp, ...report });
+              appendFileSync(`${REPORT_DIR}/results.jsonl`, `${line}\n`);
+              server.config.logger.info(`[bench] ${line}`);
+            }
+            response.statusCode = 204;
+            response.end();
+          })
+          .catch((error: unknown) => {
+            response.statusCode = 400;
+            response.end(error instanceof Error ? error.message : 'bad request');
+          });
+      });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), devReports()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

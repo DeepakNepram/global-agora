@@ -55,6 +55,29 @@ describe('createFrameStats', () => {
     expect(stats.summary(10_000).framesLastSecond).toBe(0);
   });
 
+  it('measures the gaps between frames, which give the frame rate', () => {
+    const stats = createFrameStats(100);
+    // 20 frames at 60 fps, then one 50 ms hitch.
+    for (let i = 0; i < 20; i++) stats.recordCpu(i * (1000 / 60), 1);
+    stats.recordCpu(19 * (1000 / 60) + 50, 1);
+    const s = stats.summary(1000);
+    expect(s.intervalMeanMs).toBeCloseTo((19 * (1000 / 60) + 50) / 20, 9);
+    expect(s.intervalP95Ms).toBeCloseTo(1000 / 60, 9);
+    expect(stats.summary(1000).intervalP95Ms).not.toBeNull();
+  });
+
+  it('orders timestamps before differencing, once the ring has wrapped', () => {
+    const stats = createFrameStats(4);
+    for (let i = 0; i < 7; i++) stats.recordCpu(i * 10, 1);
+    expect(stats.summary(100)).toMatchObject({ intervalMeanMs: 10, intervalP95Ms: 10 });
+  });
+
+  it('has no interval with fewer than two frames', () => {
+    const stats = createFrameStats(4);
+    stats.recordCpu(0, 1);
+    expect(stats.summary(0)).toMatchObject({ intervalMeanMs: null, intervalP95Ms: null });
+  });
+
   it('reset empties every buffer', () => {
     const stats = createFrameStats(4);
     stats.recordCpu(0, 1);
