@@ -30,12 +30,12 @@ export function App({ config }: AppProps): JSX.Element {
       <header className="flex items-baseline gap-3 px-6 py-4">
         <h1 className="text-lg font-semibold tracking-tight">Global Agora</h1>
         <p className="text-sm text-muted">
-          Phase 1 — base Earth. Last {config.historyWindowHours}h of news lands here.
+          Phase 1 preview. Pins are random placeholder data, not real news.
         </p>
       </header>
 
       <main id="globe" tabIndex={-1} aria-label="News globe" className="relative min-h-0 flex-1">
-        <GlobeCanvas tier={quality.tier} />
+        <GlobeCanvas tier={quality.tier} historyWindowHours={config.historyWindowHours} />
       </main>
 
       <footer className="px-6 py-3 text-xs text-muted">

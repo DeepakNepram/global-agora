@@ -14,10 +14,13 @@ import {
 
 import { CameraDebugControls } from './globe/CameraDebugControls';
 import { CameraOverlay } from './globe/CameraOverlay';
+import { PIN_COUNTS, type PinCount } from './globe/debugControls';
 import { createFrameProbe } from './globe/frameProbe';
 import { FrameTimeOverlay } from './globe/FrameTimeOverlay';
 import { GlobeDebugPanel } from './globe/GlobeDebugPanel';
 import { GlobeScene } from './globe/GlobeScene';
+import { PinDebugControls } from './globe/PinDebugControls';
+import { PinScene } from './globe/PinScene';
 import { RenderDebugControls } from './globe/RenderDebugControls';
 import { useGlobeControls, type GlobeControlsOptions } from './globe/useGlobeControls';
 import { useLiveClock } from './globe/useLiveClock';
@@ -27,6 +30,8 @@ import { vignetteCssGradient } from './globe/vignette';
 
 export interface GlobeCanvasProps {
   readonly tier: QualityTier;
+  /** AppConfig.historyWindowHours: the placeholder stories span this window. */
+  readonly historyWindowHours: number;
 }
 
 /** Matches --color-void, so the opaque canvas is indistinguishable from the page. */
@@ -66,7 +71,7 @@ const GLOBE_LABEL =
  * - dpr capped at 2: a 3x phone would otherwise fill 2.25x the pixels of 2x
  *   for no visible gain on a sphere.
  */
-export function GlobeCanvas({ tier }: GlobeCanvasProps): JSX.Element {
+export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX.Element {
   const settings = renderSettingsForTier(tier);
   const [channel, setChannel] = useState<EarthChannel>('lit');
   const [cloudsVisible, setCloudsVisible] = useState(true);
@@ -75,6 +80,8 @@ export function GlobeCanvas({ tier }: GlobeCanvasProps): JSX.Element {
   const [controls, setControls] = useState<OrbitGlobeControls | null>(null);
   const reducedMotionPreferred = usePrefersReducedMotion();
   const [fullMotion, setFullMotion] = useState(false);
+  const [pinsVisible, setPinsVisible] = useState(true);
+  const [pinCount, setPinCount] = useState<PinCount>(PIN_COUNTS[0]);
   const motion = reducedMotionPreferred && !fullMotion ? 'reduced' : 'full';
   useLiveClock();
 
@@ -131,6 +138,12 @@ export function GlobeCanvas({ tier }: GlobeCanvasProps): JSX.Element {
           cloudsVisible={cloudsVisible}
           atmosphere={atmosphere}
         />
+        <PinScene
+          count={pinCount}
+          visible={pinsVisible}
+          motion={motion}
+          windowHours={historyWindowHours}
+        />
         <ControlsHost motion={motion} onReady={setControls} />
         <PipelineHost settings={settings} bloomEnabled={bloomEnabled} probe={probe} />
       </Canvas>
@@ -157,6 +170,12 @@ export function GlobeCanvas({ tier }: GlobeCanvasProps): JSX.Element {
             reducedMotionPreferred={reducedMotionPreferred}
             fullMotion={fullMotion}
             onFullMotionChange={setFullMotion}
+          />
+          <PinDebugControls
+            visible={pinsVisible}
+            onVisibleChange={setPinsVisible}
+            count={pinCount}
+            onCountChange={setPinCount}
           />
           <RenderDebugControls
             atmosphere={atmosphere}

@@ -74,6 +74,11 @@ export const CHANNEL_OPTIONS: readonly ChannelOption[] = [
 export const CLOUDS_KEY = 'c';
 export const ATMOSPHERE_KEY = 'a';
 export const BLOOM_KEY = 'b';
+export const PINS_KEY = 'p';
+
+/** Prompt 1.5's acceptance load, and a stress load to show the headroom above it. */
+export const PIN_COUNTS = [3000, 10_000] as const;
+export type PinCount = (typeof PIN_COUNTS)[number];
 
 /** Single-key shortcuts must not fire while someone is typing into a field. */
 export function isTypingTarget(target: EventTarget | null): boolean {
