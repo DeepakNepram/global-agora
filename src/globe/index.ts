@@ -40,6 +40,8 @@ export type {
   OrbitGlobeControlsOptions,
   WheelInput,
 } from './camera/types';
+export { createPinLayer, type PinLayer, type PinLayerOptions } from './pins/pinLayer';
+export { PIN_HALF_SIZE_CSS_PX } from './pins/pinStyle';
 export { MAX_ANISOTROPY } from './textureLoading';
 export { ATMOSPHERE_RADIUS } from './shaders/atmosphere.glsl';
 export { BLOOM_THRESHOLD, NIGHT_LIGHTS_GAIN, ATMOSPHERE_MAX_LUMINANCE } from './hdr';

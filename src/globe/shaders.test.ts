@@ -7,6 +7,7 @@ import {
   SCATTER_FRAG,
 } from './shaders/atmosphere.glsl';
 import { CLOUD_FRAG, CLOUD_VERT } from './shaders/cloud.glsl';
+import { PIN_FRAG } from './pins/pins.glsl';
 import { EARTH_CHANNEL_INDEX, EARTH_FRAG, EARTH_VERT } from './shaders/earth.glsl';
 
 /** Strips comments so a name mentioned only in a comment cannot pass. */
@@ -26,6 +27,7 @@ describe.each([
   ['cloud', CLOUD_FRAG],
   ['atmosphere rim', RIM_FRAG],
   ['atmosphere scattering', SCATTER_FRAG],
+  ['pin', PIN_FRAG],
 ])('%s fragment shader output', (_name, source) => {
   it('tone-maps, then encodes output colour space, as the last statements', () => {
     // Without colorspace_fragment the globe renders dark and desaturated (see

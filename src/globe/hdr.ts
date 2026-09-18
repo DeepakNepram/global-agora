@@ -9,7 +9,8 @@
  *   clouds      white * ndl * tint   <= 1
  *   atmosphere  premultiplied haze   <= ATMOSPHERE_MAX_LUMINANCE, blended over
  *   city lights night * gain         cores > BLOOM_THRESHOLD
- *   pins (1.5)  emissive             must exceed BLOOM_THRESHOLD to bloom
+ *   pin dots    hue <= 1; a white-hot centre > BLOOM_THRESHOLD for ~4.8 h (pins/pinStyle.ts)
+ *   pin halos   additive, <= 0.3 alone; only dense overlaps cross the threshold
  *
  * Shaders interpolate these constants rather than restating them, so the budget
  * has one source of truth and src/globe/hdr.test.ts can check it.
