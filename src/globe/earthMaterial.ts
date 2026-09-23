@@ -1,4 +1,4 @@
-import { ShaderMaterial, type Texture } from 'three';
+import { ShaderMaterial } from 'three';
 
 import type { Vec3 } from '@/core';
 
@@ -9,11 +9,13 @@ import {
   type EarthChannel,
 } from './shaders/earth.glsl';
 import { toVector3 } from './sunFrame';
+import type { TextureSlot } from './textureLoading';
 
+/** Slots, not textures: the loader swaps a preview for the full map inside them. */
 export interface EarthMaps {
-  readonly day: Texture;
-  readonly night: Texture;
-  readonly specular: Texture;
+  readonly day: TextureSlot;
+  readonly night: TextureSlot;
+  readonly specular: TextureSlot;
 }
 
 export interface EarthMaterial {
@@ -32,9 +34,9 @@ export function createEarthMaterial(
   // whose index signature makes every access `IUniform | undefined`. three keeps
   // this same object, so mutating it updates the GPU uniform on the next draw.
   const uniforms = {
-    uDayMap: { value: maps.day },
-    uNightMap: { value: maps.night },
-    uSpecularMask: { value: maps.specular },
+    uDayMap: maps.day,
+    uNightMap: maps.night,
+    uSpecularMask: maps.specular,
     uSunDir: { value: toVector3(sunDirection) },
     uChannel: { value: EARTH_CHANNEL_INDEX[channel] as number },
   };

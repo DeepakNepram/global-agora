@@ -1,7 +1,7 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useState, type JSX } from 'react';
 
-import { sunDirection, type TextureSet } from '@/core';
+import { sunDirection, type PreviewTextureSet, type TextureSet } from '@/core';
 import { createEarth, type AtmosphereMode, type EarthChannel, type EarthLayer } from '@/globe';
 import { timeStore } from '@/state';
 
@@ -10,6 +10,8 @@ import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 
 export interface GlobeSceneProps {
   readonly textures: TextureSet;
+  /** Drawn while `textures` download; see previewTextureSet. */
+  readonly previewTextures: PreviewTextureSet;
   readonly channel: EarthChannel;
   readonly cloudsVisible: boolean;
   readonly atmosphere: AtmosphereMode;
@@ -22,6 +24,7 @@ export interface GlobeSceneProps {
  */
 export function GlobeScene({
   textures,
+  previewTextures,
   channel,
   cloudsVisible,
   atmosphere,
@@ -37,6 +40,7 @@ export function GlobeScene({
   useEffect(() => {
     const layer = createEarth({
       textures,
+      previewTextures,
       maxAnisotropy: gl.capabilities.getMaxAnisotropy(),
       onTextureLoad: () => invalidate(),
       sunDirection: sunDirection(new Date(timeStore.getState().timeMs)),
@@ -46,7 +50,7 @@ export function GlobeScene({
       setEarth(null);
       layer.dispose();
     };
-  }, [textures, gl, invalidate]);
+  }, [textures, previewTextures, gl, invalidate]);
 
   useEffect(() => {
     if (!earth) return;

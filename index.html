@@ -9,6 +9,25 @@
       content="Browse the world's news on a living 3D Earth, scrub back through the last 24 hours, and debate hot stories."
     />
     <title>Global Agora</title>
+    <!--
+      The first Earth the globe draws (previewTextureSet in src/core/textures.ts):
+      fetched alongside the JavaScript, not after it runs. crossorigin must match
+      three's TextureLoader ('anonymous') or the browser downloads each map twice.
+    -->
+    <link
+      rel="preload"
+      as="image"
+      type="image/webp"
+      href="/textures/day-2048.webp"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="preload"
+      as="image"
+      type="image/webp"
+      href="/textures/night-2048.webp"
+      crossorigin="anonymous"
+    />
   </head>
   <body>
     <div id="root"></div>

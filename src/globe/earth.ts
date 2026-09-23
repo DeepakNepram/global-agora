@@ -34,6 +34,11 @@ const TAU = Math.PI * 2;
 
 export interface EarthOptions {
   readonly textures: TextureSet;
+  /**
+   * Low-resolution maps to draw while `textures` download (previewTextureSet in
+   * src/core). Omit to draw nothing until the full maps land.
+   */
+  readonly previewTextures?: Partial<TextureSet> | undefined;
   readonly maxAnisotropy: number;
   /** A texture finished loading; the host must schedule a frame. */
   readonly onTextureLoad: () => void;
@@ -78,11 +83,12 @@ export function createEarth(options: EarthOptions): EarthLayer {
   const textures = loadEarthTextures(options.textures, {
     maxAnisotropy: options.maxAnisotropy,
     onLoad: () => options.onTextureLoad(),
+    preview: options.previewTextures,
   });
 
   const earthGeometry = new SphereGeometry(GLOBE_RADIUS, EARTH_SEGMENTS, EARTH_SEGMENTS);
   const earthMaterial = createEarthMaterial(
-    textures,
+    textures.slots,
     options.channel ?? 'lit',
     options.sunDirection,
   );
@@ -91,7 +97,7 @@ export function createEarth(options: EarthOptions): EarthLayer {
 
   // Clouds are low-frequency, so half the latitude bands of the surface is plenty.
   const cloudGeometry = new SphereGeometry(CLOUD_RADIUS, EARTH_SEGMENTS, EARTH_SEGMENTS / 2);
-  const cloudMaterial = createCloudMaterial(textures.clouds);
+  const cloudMaterial = createCloudMaterial(textures.slots.clouds);
   const clouds = new Mesh(cloudGeometry, cloudMaterial.material);
   clouds.name = 'clouds';
   // Draw after the opaque surface regardless of camera-distance sorting.
@@ -157,7 +163,7 @@ export function createEarth(options: EarthOptions): EarthLayer {
       earthMaterial.material.dispose();
       cloudMaterial.material.dispose();
       atmosphere.dispose();
-      for (const texture of Object.values(textures)) texture.dispose();
+      textures.dispose();
     },
   };
 }

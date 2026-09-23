@@ -28,6 +28,27 @@ export function textureFileName(layer: TextureLayer, width: number): string {
   return `${layer}-${width}.webp`;
 }
 
+/**
+ * Layers drawn at low resolution while the tier's own maps download. Specular
+ * has none: the lit view does not read it. Clouds have none: a moment without
+ * clouds reads as weather, not as a missing globe.
+ */
+export const PREVIEW_LAYERS = ['day', 'night'] as const;
+export type PreviewLayer = (typeof PREVIEW_LAYERS)[number];
+export type PreviewTextureSet = Readonly<Record<PreviewLayer, string>>;
+
+/**
+ * The first maps the globe draws, whatever the tier: LOW's day and night
+ * (272 KB together). index.html preloads exactly these, so they download
+ * alongside the JavaScript rather than after it has run; the tier's maps
+ * replace them as they arrive. On LOW they are the final maps, so LOW
+ * downloads nothing extra. src/core/textures.test.ts keeps index.html in step.
+ */
+export function previewTextureSet(basePath: string = TEXTURE_BASE_PATH): PreviewTextureSet {
+  const low = textureSetForTier('low', basePath);
+  return { day: low.day, night: low.night };
+}
+
 export function textureSetForTier(
   tier: QualityTier,
   basePath: string = TEXTURE_BASE_PATH,

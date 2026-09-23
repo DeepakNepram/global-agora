@@ -1,6 +1,7 @@
-import { FrontSide, ShaderMaterial, Vector3, type Texture } from 'three';
+import { FrontSide, ShaderMaterial, Vector3 } from 'three';
 
 import { CLOUD_FRAG, CLOUD_VERT } from './shaders/cloud.glsl';
+import type { TextureSlot } from './textureLoading';
 
 export interface CloudMaterial {
   readonly material: ShaderMaterial;
@@ -13,9 +14,10 @@ export interface CloudMaterial {
  * with the ground at the terminator. The texture is flat white with coverage in
  * alpha, so the shader only needs its alpha and the sun.
  */
-export function createCloudMaterial(map: Texture): CloudMaterial {
+/** `map` is a slot the loader fills, so the uniform follows a preview-to-full swap. */
+export function createCloudMaterial(map: TextureSlot): CloudMaterial {
   const uniforms = {
-    uCloudMap: { value: map },
+    uCloudMap: map,
     uSunDir: { value: new Vector3(1, 0, 0) },
   };
 

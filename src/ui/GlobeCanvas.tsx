@@ -2,7 +2,7 @@ import { Canvas } from '@react-three/fiber';
 import { useMemo, useState, type JSX } from 'react';
 import { Color } from 'three';
 
-import { textureSetForTier, type QualityTier } from '@/core';
+import { previewTextureSet, textureSetForTier, type QualityTier } from '@/core';
 import {
   CAMERA_FOV_DEG,
   renderSettingsForTier,
@@ -99,6 +99,10 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
     () => textureSetForTier(tier, `${import.meta.env.BASE_URL}textures`),
     [tier],
   );
+  const previewTextures = useMemo(
+    () => previewTextureSet(`${import.meta.env.BASE_URL}textures`),
+    [],
+  );
 
   const gl = useMemo(
     () => ({
@@ -140,6 +144,7 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
       >
         <GlobeScene
           textures={textures}
+          previewTextures={previewTextures}
           channel={channel}
           cloudsVisible={cloudsVisible}
           atmosphere={atmosphere}

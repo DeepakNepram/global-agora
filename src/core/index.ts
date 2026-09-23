@@ -47,10 +47,12 @@ export { createFrameStats, percentile } from './frameStats';
 export type { FrameStats, FrameSummary } from './frameStats';
 
 export {
+  previewTextureSet,
   textureFileName,
   textureSetForTier,
   CLOUD_TEXTURE_WIDTH,
+  PREVIEW_LAYERS,
   TEXTURE_BASE_PATH,
   TEXTURE_LAYERS,
 } from './textures';
-export type { TextureLayer, TextureSet } from './textures';
+export type { PreviewLayer, PreviewTextureSet, TextureLayer, TextureSet } from './textures';

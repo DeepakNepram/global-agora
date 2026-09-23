@@ -6,7 +6,9 @@ import { describe, expect, it } from 'vitest';
 import { QUALITY_TIERS } from './quality';
 import {
   CLOUD_TEXTURE_WIDTH,
+  PREVIEW_LAYERS,
   TEXTURE_LAYERS,
+  previewTextureSet,
   textureSetForTier,
   type TextureLayer,
 } from './textures';
@@ -27,6 +29,34 @@ describe('textureSetForTier', () => {
 
   it('honours a sub-path base without doubling slashes', () => {
     expect(textureSetForTier('low', '/agora/textures/').day).toBe('/agora/textures/day-2048.webp');
+  });
+});
+
+describe('previewTextureSet', () => {
+  it("is LOW's day and night, so LOW downloads nothing extra", () => {
+    expect(previewTextureSet()).toEqual({
+      day: textureSetForTier('low').day,
+      night: textureSetForTier('low').night,
+    });
+  });
+});
+
+describe('index.html preloads', () => {
+  const html = readFileSync(fileURLToPath(new URL('../../index.html', import.meta.url)), 'utf8');
+  const preloads = [...html.matchAll(/<link\b[^>]*\brel="preload"[^>]*>/g)].map(([tag]) => tag);
+
+  it('fetch exactly the preview maps', () => {
+    const hrefs = preloads.map((tag) => /\bhref="([^"]+)"/.exec(tag)?.[1]).sort();
+    expect(hrefs).toEqual(PREVIEW_LAYERS.map((layer) => previewTextureSet()[layer]).sort());
+  });
+
+  it("match three's image requests, or the browser downloads each map twice", () => {
+    // TextureLoader requests images with crossOrigin 'anonymous'; a preload in
+    // another CORS mode is a different cache entry and goes unused.
+    for (const tag of preloads) {
+      expect(tag).toMatch(/\bas="image"/);
+      expect(tag).toMatch(/\bcrossorigin="anonymous"/);
+    }
   });
 });
 
