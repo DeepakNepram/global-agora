@@ -12,6 +12,13 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--mode", "lan", "--port", "5173", "--strictPort"],
       "port": 5173
+    },
+    {
+      "name": "vite-preview-lan",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "preview", "--", "--mode", "lan", "--port", "4173", "--strictPort"],
+      "port": 4173,
+      "url": "https://localhost:4173"
     }
   ]
 }
