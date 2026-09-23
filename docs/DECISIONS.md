@@ -6,6 +6,147 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-09-23 — Phone benchmarks are paired, run with the screen awake and the dev overlays hidden
+
+The first two phone runs of Prompt 1.5 disagreed with the clean one by 30%.
+Both mistakes were in the method, not the renderer:
+
+| Run (Adreno 610, MEDIUM)                     | Pins off | 3000 pins |
+| -------------------------------------------- | -------- | --------- |
+| Landscape: the canvas was only 164 px tall   | 57.6 fps | 52.7 fps  |
+| Portrait, dev overlays shown, fixed order    | 35.3 fps | 31.2 fps  |
+| Portrait, clean method (below), two sessions | 47.1 fps | 40.2–40.6 |
+
+- **Dev overlays.** The debug panels' backdrop blur covered half the portrait
+  screen and was recomposited every frame. Production has no such panels, so
+  the benchmark now hides them (the `hidden` attribute, not unmounting, so the
+  run keeps going) and shows a plain status line instead.
+- **Run order.** Pins off always ran first, so a phone warming up billed its
+  slowdown to the pins. The benchmark now does a warm-up run, then three
+  off/3000 pairs in alternating order, and reports medians of the paired
+  difference.
+- **Screen sleep.** Android turned the screen off mid-run, which pauses
+  rendering, so one frame interval lasted minutes and a 10,000-pin run read
+  1 fps. A screen wake lock is now held for the run (the LAN dev server is
+  HTTPS, which the wake lock needs), and any run during which the page was
+  hidden is flagged and left out of the medians.
+
+Separately, on this laptop the GPU reads 2–3× slower on battery. Desktop
+figures are only recorded on mains power.
+
+Results travel from the phone to the development machine without copying:
+the dev server accepts `POST /__bench` (JSON appended to the gitignored
+`.bench/results.jsonl`) and `POST /__capture` (a canvas PNG). Both exist only
+under `vite serve`, write fixed file names and cap body size. A quality-tier
+switch (Auto / Low / Medium, reloads) lets the same run go on LOW from the
+phone. High is left out: its 8K textures could exhaust a phone's memory, and
+the override persists, so a crash would repeat on every load.
+
+---
+
+## 2026-09-23 — Pins: one InstancedMesh of clip-space quads, fed from one interleaved buffer
+
+**Structure.** `src/globe/pins/` draws every story with one `InstancedMesh`
+of camera-facing quads (CLAUDE.md constraint 2):
+
+- The quad is built in clip space, so a pin keeps its pixel size at every
+  altitude: `clip.xy += corner · halfSizePx · (2 / viewport) · clip.w`.
+- Every per-pin value lives in one `InstancedInterleavedBuffer`: 12 floats,
+  48 bytes a pin. `updateInstances(nodes)` is one pass over the `NodeBuffer`'s
+  typed arrays and one upload, limited to the live rows with `addUpdateRange`,
+  with no per-pin allocation.
+- `instanceMatrix` stays identity and is never read. The pin position is its
+  own attribute because the quad is built after projection.
+- Growing past capacity replaces the mesh rather than adding one.
+
+**Look.** The dot, a soft dark ring and the halo come from one draw with
+premultiplied blending (`ONE, ONE_MINUS_SRC_ALPHA`):
+
+- the dot has alpha 1, so it covers what is under it;
+- the ring has alpha 0.4 and no colour, so it darkens, which gives the dot an
+  edge over sunlit desert and cloud;
+- the halo has alpha 0, so it only adds light.
+
+Hues are scaled so their brightest channel is 1. Fresh stories add a white-hot
+centre, and that centre is what crosses the bloom threshold, for about their
+first 4.8 hours. Colour alone never can. Halos are weighted by the cosine of
+the view angle to the ground, so foreshortened pins crowding the limb do not
+sum into a bright ring.
+
+The first version scaled hues to equal luminance and lifted fresh pins to
+2.0. ACES flattened red and blue (up to 4× in one channel) into pastels, and
+the limb glowed as a solid ring. Both were caught in screenshots, not tests.
+
+**Horizon.** The prompt's rule hides a pin when
+`dot(normalize(P), normalize(cam)) < R / |cam|`. It fades in over a band 10%
+of the visible cap's depth wide, so the fade is a few degrees from orbit and
+a few kilometres from 50 km up. A hidden pin's vertices go outside the clip
+volume, so it rasterises nothing. Depth testing is off: the globe is the only
+occluder, and the horizon test handles it exactly with no z-fighting against
+clouds.
+
+**Pulse.** `scale = base · (1 + 0.15 · sin(t · rate + phase) · recency)`:
+
+- recency is `exp(−age / 6 h)`;
+- rate goes from 0.25 Hz (old) to 1 Hz (new);
+- the phase comes from the publish time (a Weyl sequence), so stories
+  published seconds apart do not pulse in step.
+
+Moving the displayed time changes every rate. Each phase absorbs
+`clock · (oldRate − newRate)`, so scrubbing never makes a pin jump. The pulse
+clock is rebased every 600 s, before float32 precision could show.
+
+**Frames.** The user chose a full-rate pulse. While pins pulse, the globe draws
+at display rate, even when idle. Under reduced motion the pins hold still and
+the globe idles at 0 frames. Measured: reduced motion 0/s; full motion
+120/s; full motion with pins hidden 0/s. This trades battery and phone heat for
+a living globe (see "not measured" below).
+
+**Mock data** (`src/core/mockNodes.ts`) is seeded, uniform by area, and spread
+over the configured history window, and it shows in every build until Prompt
+2.3. The header says the pins are placeholder data.
+
+**Measured, world view (the worst case, with the most pins on screen):**
+
+| Device                                    | Tier   | Pins off           | 3000 pins           | Pins cost       |
+| ----------------------------------------- | ------ | ------------------ | ------------------- | --------------- |
+| Iris Xe, 1084×610 @1.25, mains            | HIGH   | GPU 4.5 ms         | GPU 5.4 ms, 144 fps | +0.9 ms         |
+| Iris Xe, same                             | MEDIUM | GPU 4.3 ms         | GPU 4.6 ms, 144 fps | +0.3 ms         |
+| Adreno 610, Android 10, portrait 720×1025 | MEDIUM | 47.1 fps (21.2 ms) | 40.2–40.6 fps       | +3.4–3.7 ms     |
+| Adreno 610, same                          | LOW    | 60.4 fps (vsync)   | 60.4 fps            | hidden by vsync |
+
+- Desktop figures are medians of 6 alternating pairs; the p95 GPU time was at
+  most 6.3 ms. 144 fps is the display's refresh rate.
+- Phone figures are medians of 3 pairs, with the frame rate taken from frame
+  intervals because the phone has no GPU timer. The phone's p95 interval is
+  about 35 ms with or without pins, which comes from the MEDIUM pipeline, not
+  the pins.
+- One scrub tick (sun plus all 3000 pins rewritten) costs 0.125 ms of CPU.
+- 10,000 pins cost about 2 ms of desktop GPU over the baseline (paired, but
+  measured on battery). Not re-measured on mains power or on the phone.
+
+**Where the phone's time goes.** The MEDIUM composer (half-float, 4× MSAA,
+half-resolution bloom) costs at least 4.7 ms over LOW. LOW is vsync-capped, so
+the true gap is larger. Pins cost more on MEDIUM than on LOW because every pin
+fragment blends into that 4× MSAA half-float buffer. At 3000 pins the frame is
+25 ms against a 33.3 ms budget.
+
+This is also the first Android measurement of the 1.3 pipeline. MEDIUM holds
+47 fps without pins, so the no-bloom fallback 1.3 named is not needed yet.
+
+**Not measured:** sustained heat. Each run lasted about 2 minutes. With the
+pulse at display rate, a phone renders flat out whenever the globe is
+visible, and a 10-minute soak may show throttling. Available levers, if needed:
+
+1. Trim the pin quad to where the halo is visible. Beyond r ≈ 0.75 the halo is
+   below 3%, so this means about 44% fewer pin fragments.
+2. Cap mobile pixel density at 1.5×.
+3. Drop MSAA or bloom on MEDIUM.
+
+**Cost:** +4.0 kB gzip of JS (327.5 → 331.5 kB). No new dependencies.
+
+---
+
 ## 2026-09-14 — The camera is north-up, which supersedes the visible 23.44° lean
 
 Prompt 1.4's controls keep Earth's north as screen-up. A horizontal drag moves
