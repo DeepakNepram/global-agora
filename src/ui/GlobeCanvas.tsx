@@ -23,6 +23,7 @@ import { PinBenchmark } from './globe/PinBenchmark';
 import { PinDebugControls } from './globe/PinDebugControls';
 import { PinScene } from './globe/PinScene';
 import { RenderDebugControls } from './globe/RenderDebugControls';
+import { TierDebugControls } from './globe/TierDebugControls';
 import { useGlobeControls, type GlobeControlsOptions } from './globe/useGlobeControls';
 import { useLiveClock } from './globe/useLiveClock';
 import { usePrefersReducedMotion } from './globe/usePrefersReducedMotion';
@@ -83,6 +84,10 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
   const [fullMotion, setFullMotion] = useState(false);
   const [pinsVisible, setPinsVisible] = useState(true);
   const [pinCount, setPinCount] = useState<PinCount>(PIN_COUNTS[0]);
+  // Set while the pin benchmark runs. The dev overlays hide meanwhile: their
+  // backdrop blur is recomposited over the canvas every frame, which costs a
+  // phone real time and which production never pays.
+  const [benchmarking, setBenchmarking] = useState(false);
   const motion = reducedMotionPreferred && !fullMotion ? 'reduced' : 'full';
   useLiveClock();
 
@@ -161,6 +166,7 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
       {/* Inspection tooling only; compiled out of production builds. */}
       {import.meta.env.DEV && (
         <GlobeDebugPanel
+          hidden={benchmarking}
           channel={channel}
           onChannelChange={setChannel}
           cloudsVisible={cloudsVisible}
@@ -187,6 +193,7 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
               pinCount={pinCount}
               onPinsVisibleChange={setPinsVisible}
               onPinCountChange={setPinCount}
+              onRunningChange={setBenchmarking}
             />
           )}
           <RenderDebugControls
@@ -196,16 +203,30 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
             onBloomEnabledChange={setBloomEnabled}
             bloomAvailable={settings.postprocessing}
           />
+          <TierDebugControls tier={tier} />
         </GlobeDebugPanel>
       )}
-      {import.meta.env.DEV && controls && <CameraOverlay controls={controls} />}
-      {import.meta.env.DEV && probe && (
-        <FrameTimeOverlay
-          probe={probe}
-          tier={tier}
-          atmosphere={atmosphere}
-          bloomEnabled={settings.postprocessing && bloomEnabled}
-        />
+      {import.meta.env.DEV && (
+        <div hidden={benchmarking}>
+          {controls && <CameraOverlay controls={controls} />}
+          {probe && (
+            <FrameTimeOverlay
+              probe={probe}
+              tier={tier}
+              atmosphere={atmosphere}
+              bloomEnabled={settings.postprocessing && bloomEnabled}
+            />
+          )}
+        </div>
+      )}
+      {benchmarking && (
+        // Plain, not blurred, so it costs the same with pins off and on.
+        <p
+          role="status"
+          className="absolute left-4 top-4 rounded bg-void px-2 py-1 text-xs text-ink"
+        >
+          Pin benchmark running, about 2 minutes. Keep this page in front.
+        </p>
       )}
     </div>
   );

@@ -18,6 +18,8 @@ export interface GlobeDebugPanelProps {
   readonly onCloudsVisibleChange: (visible: boolean) => void;
   /** Extra control groups (camera, render), placed before the texture group. */
   readonly children?: ReactNode;
+  /** Hidden, not unmounted, so a benchmark running inside keeps going. */
+  readonly hidden?: boolean;
 }
 
 /**
@@ -26,7 +28,8 @@ export interface GlobeDebugPanelProps {
  * shortcuts are a convenience on top of that, not the only path.
  */
 export function GlobeDebugPanel(props: GlobeDebugPanelProps): JSX.Element {
-  const { channel, onChannelChange, cloudsVisible, onCloudsVisibleChange, children } = props;
+  const { channel, onChannelChange, cloudsVisible, onCloudsVisibleChange, children, hidden } =
+    props;
   const channelsLabel = useId();
 
   useEffect(() => {
@@ -46,6 +49,7 @@ export function GlobeDebugPanel(props: GlobeDebugPanelProps): JSX.Element {
 
   return (
     <aside
+      hidden={hidden}
       aria-label="Globe inspection controls"
       className="absolute right-4 top-4 flex max-h-[calc(100%-2rem)] w-52 flex-col gap-3 overflow-y-auto rounded-lg bg-void/80 p-3 backdrop-blur"
     >
