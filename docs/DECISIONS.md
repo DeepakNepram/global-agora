@@ -6,6 +6,80 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-09-23 — Cold start: a preloaded low-resolution Earth first, then full maps day-first
+
+**The budget** is "cold start to interactive under 2 s". Interactive here
+means the Earth's map is on screen **and** dragging works. Input is ready
+well before the maps arrive, but until then the globe is a black ball of
+pins; on the phone profile that was still the picture at 1.5 s, so input
+readiness alone is not counted.
+
+**The first measurement missed on phones.** Nothing requested a map until
+the JavaScript (319 KB gzip) had arrived and run. Then all four MEDIUM maps
+(1.65 MB) shared the connection, and the day map lost bandwidth to 527 KB of
+clouds.
+
+**The fix:**
+
+- `index.html` preloads LOW's day and night maps (272 KB), so they download
+  alongside the JavaScript. The preload uses `crossorigin="anonymous"` to
+  match three's `TextureLoader`; a mismatch would download each map twice
+  (a test checks this). The globe draws these maps first.
+- The tier's maps replace them in stages: day alone, then night and clouds,
+  then specular, which the lit view does not read.
+- On LOW the preview maps are the final maps, so LOW downloads nothing
+  extra.
+- The loader hands out uniform-shaped slots that the materials use directly,
+  so a swap is one assignment. A preview that lands after its full map is
+  discarded.
+
+**Method.** The production build is served by `vite preview --mode lan`.
+Requesting `/?coldstart` returns it with `scripts/vite/coldStartProbe.ts`
+injected as the first script. The probe records:
+
+- first paint;
+- the first WebGL draw;
+- when the globe starts accepting input;
+- the upload of each map (a map appears in the frame it is uploaded in).
+
+It posts the results to `.bench/results.jsonl`. "Cold" means the cache and
+storage were cleared (headless Chrome) or a fresh Incognito session was used
+(the phone). Figures are medians of 3 runs, in seconds from navigation start.
+
+| Profile                                       | Tier   | Earth on screen, before → after | Full day map | All maps | Download |
+| --------------------------------------------- | ------ | ------------------------------- | ------------ | -------- | -------- |
+| Laptop, no throttling                         | MEDIUM | 0.34 → **0.33**                 | 0.47         | 0.64     | 2.24 MB  |
+| Big monitor, 50 Mbit/s, 20 ms                 | HIGH   | 1.69 → **0.42**                 | 1.10         | 1.76     | 4.90 MB  |
+| Phone profile: 9 Mbit/s, 60 ms, CPU 4×        | MEDIUM | 2.90 → **1.44**                 | 2.25         | 3.16     | 2.24 MB  |
+| Lighthouse mobile: 1.6 Mbit/s, 150 ms, CPU 4× | MEDIUM | 11.6 → 4.15                     | 7.71         | 13.14    | 2.24 MB  |
+| Adreno 610 phone, Wi-Fi, real device          | MEDIUM | n/a → **0.83** (worst 1.24)     | 1.18         | 1.74     | 2.24 MB  |
+
+- The 4× CPU profile is a fair stand-in for the phone. From the JavaScript
+  arriving to the Earth on screen, the real phone took about 0.7 s and the
+  profile 0.72 s. So on good 4G the phone should land near 1.4–1.5 s, but
+  that figure is inferred, not measured on a cellular connection.
+- The before runs were over HTTP and the after runs over HTTPS.
+- The network profiles are Chrome's emulation: latency per request and
+  bandwidth shared evenly, with no HTTP/2 prioritisation. Real 4G varies.
+
+**Costs:**
+
+- MEDIUM and HIGH download 272 KB more.
+- The preloads share the connection with the JavaScript, so it arrives
+  later: by 0.23 s on the phone profile and by 1.3 s on Lighthouse mobile,
+  which is exactly 272 KB at 1.6 Mbit/s. That is still a large win, because
+  the Earth appears at 4.2 s instead of 11.6 s.
+- Loading in stages makes "all maps" later on good 4G (2.90 → 3.16 s). By
+  then the Earth has been on screen for 1.7 s.
+
+**Known limit:** Lighthouse's slow 4G profile stays over 2 s. The
+JavaScript alone needs about 1.6 s to transfer at 1.6 Mbit/s, before
+round-trips. Meeting 2 s there would take a smaller first bundle (splitting
+three, postprocessing and the app), which is a separate project. The budget
+is judged on good 4G and the real phone.
+
+---
+
 ## 2026-09-23 — Phone benchmarks are paired, run with the screen awake and the dev overlays hidden
 
 The first two phone runs of Prompt 1.5 disagreed with the clean one by 30%.
