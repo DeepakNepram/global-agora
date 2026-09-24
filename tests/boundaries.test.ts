@@ -75,6 +75,22 @@ function supabaseImportsOutsideDb(): string[] {
     );
 }
 
+/** Every import specifier in the files under `dir`, resolved when relative. */
+function importsUnder(dir: string): { file: string; specifier: string; target: string }[] {
+  return sourceFilesIn(dir).flatMap((file) =>
+    [...readFileSync(file, 'utf8').matchAll(SPECIFIER_RE)].flatMap((match) => {
+      const specifier = match[1];
+      if (specifier === undefined) return [];
+      const target = specifier.startsWith('.') ? resolve(dirname(file), specifier) : specifier;
+      return [{ file: relative(repoRoot, file).replaceAll(sep, '/'), specifier, target }];
+    }),
+  );
+}
+
+function isInside(target: string, dir: string): boolean {
+  return target === dir || target.startsWith(dir + sep);
+}
+
 describe('layer boundaries', () => {
   it.each(['globe', 'core'])('src/%s does not import from src/ui', (layer) => {
     expect(uiImportsIn(layer)).toEqual([]);
@@ -93,6 +109,29 @@ describe('layer boundaries', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('workers import nothing from the app except src/core', () => {
+    // Workers hold the service key. Sharing core models is fine; pulling in UI,
+    // renderer or store code would tie the Worker bundle to the app.
+    const srcDir = resolve(repoRoot, 'src');
+    const coreDir = resolve(srcDir, 'core');
+    const offenders = importsUnder(resolve(repoRoot, 'workers'))
+      .filter(
+        ({ specifier, target }) =>
+          /^@\/(ui|globe|state)(\/|$)/.test(specifier) ||
+          (isInside(target, srcDir) && !isInside(target, coreDir)),
+      )
+      .map(({ file, specifier }) => `${file} imports '${specifier}'`);
+    expect(offenders).toEqual([]);
+  });
+
+  it('the app never imports workers/ (CLAUDE.md #9)', () => {
+    const workersDir = resolve(repoRoot, 'workers');
+    const offenders = importsUnder(resolve(repoRoot, 'src'))
+      .filter(({ target }) => isInside(target, workersDir))
+      .map(({ file, specifier }) => `${file} imports '${specifier}'`);
+    expect(offenders).toEqual([]);
+  });
+
   it('detects a violation when one exists', () => {
     // Guards the guard: if the detector silently stopped matching, the two tests
     // above would pass vacuously forever.
@@ -101,5 +140,11 @@ describe('layer boundaries', () => {
     expect(pointsAtUi('../../ui/App', resolve(repoRoot, 'src/core/deep/x.ts'))).toBe(true);
     expect(pointsAtUi('src/ui/App', resolve(repoRoot, 'src/core/x.ts'))).toBe(true);
     expect(pointsAtUi('@/core/config', resolve(repoRoot, 'src/globe/x.ts'))).toBe(false);
+    expect(isInside(resolve(repoRoot, 'workers/ingest/x.ts'), resolve(repoRoot, 'workers'))).toBe(
+      true,
+    );
+    expect(isInside(resolve(repoRoot, 'workers-old/x.ts'), resolve(repoRoot, 'workers'))).toBe(
+      false,
+    );
   });
 });

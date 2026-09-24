@@ -69,13 +69,47 @@ const globeForbidden = [
   },
 ];
 
+/**
+ * Workers run on Cloudflare with service keys. They may share src/core (models,
+ * categories, generated types) but never the app's UI, renderer or stores.
+ */
+const workersForbidden = [
+  {
+    group: [
+      '@/ui',
+      '@/ui/*',
+      '@/globe',
+      '@/globe/*',
+      '@/state',
+      '@/state/*',
+      '**/src/ui',
+      '**/src/ui/**',
+      '**/src/globe',
+      '**/src/globe/**',
+      '**/src/state',
+      '**/src/state/**',
+    ],
+    message: 'Workers may import src/core only. UI, renderer and store code stay in the app.',
+  },
+  {
+    group: ['react', 'react-dom', 'react-dom/*', 'three', 'three/*', '@react-three/*', 'zustand'],
+    message: 'Workers never render. Keep React, Three.js and Zustand in the app.',
+  },
+];
+
+/** The app must never bundle Worker code: that is where the service key lives. */
+const workersFromApp = {
+  group: ['**/workers', '**/workers/**'],
+  message: 'src/ must not import workers/. Worker code holds service keys (CLAUDE.md #9).',
+};
+
 const clockMessage =
   'Do not read the wall clock here. Render the time store value (src/state/timeStore.ts); ' +
   'only src/state/clock.ts may call wallClockNow().';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'coverage/**', 'node_modules/**', '.wrangler/**', 'public/**'],
+    ignores: ['dist/**', 'coverage/**', 'node_modules/**', '**/.wrangler/**', 'public/**'],
   },
 
   js.configs.recommended,
@@ -119,7 +153,7 @@ export default tseslint.config(
       'no-restricted-imports': 'off',
       '@typescript-eslint/no-restricted-imports': [
         'error',
-        { patterns: [...coreForbidden, supabaseSeam] },
+        { patterns: [...coreForbidden, supabaseSeam, workersFromApp] },
       ],
     },
   },
@@ -127,7 +161,10 @@ export default tseslint.config(
     files: ['src/core/db/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': 'off',
-      '@typescript-eslint/no-restricted-imports': ['error', { patterns: coreForbidden }],
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { patterns: [...coreForbidden, workersFromApp] },
+      ],
     },
   },
   {
@@ -135,14 +172,28 @@ export default tseslint.config(
     ignores: ['src/core/**', 'src/globe/**'],
     rules: {
       'no-restricted-imports': 'off',
-      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [supabaseSeam] }],
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { patterns: [supabaseSeam, workersFromApp] },
+      ],
     },
   },
   {
     files: ['src/globe/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': 'off',
-      '@typescript-eslint/no-restricted-imports': ['error', { patterns: globeForbidden }],
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { patterns: [...globeForbidden, workersFromApp] },
+      ],
+    },
+  },
+
+  {
+    files: ['workers/**/*.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: workersForbidden }],
     },
   },
 

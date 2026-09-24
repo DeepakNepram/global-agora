@@ -50,7 +50,12 @@ export default defineConfig(({ mode }) => ({
     // No jsdom yet: nothing in the skeleton renders. Add it (and
     // @testing-library/react) in Phase 1 when there are components to mount.
     environment: 'node',
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'tests/**/*.test.ts'],
+    include: [
+      'src/**/*.test.ts',
+      'src/**/*.test.tsx',
+      'tests/**/*.test.ts',
+      'workers/**/*.test.ts',
+    ],
     globals: false,
   },
 }));
