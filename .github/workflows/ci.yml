@@ -43,3 +43,38 @@ jobs:
       # budget in CLAUDE.md is for the data payload, but watch this number too.
       - name: Build
         run: npm run build
+
+  # RLS and constraints, tested against a real Postgres. Runs beside `verify`,
+  # so a policy regression fails the build instead of waiting for someone to
+  # run `npm run db:test` locally (CLAUDE.md #8).
+  database:
+    name: database (RLS, constraints, types)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Postgres only: applies every migration, then supabase/seed.sql, so a
+      # seed that breaks a constraint fails here too.
+      - name: Start Postgres with migrations and seed
+        run: npx supabase db start
+
+      - name: pgTAP tests
+        run: npx supabase test db
+
+      # src/core/db/types.ts must be what the migrations generate.
+      - name: Generated types match the schema
+        run: |
+          npx supabase gen types typescript --local --schema public > "$RUNNER_TEMP/types.ts"
+          npx prettier --stdin-filepath src/core/db/types.ts < "$RUNNER_TEMP/types.ts" \
+            | diff -u src/core/db/types.ts - \
+            || { echo "::error::src/core/db/types.ts is stale. Run npm run db:types."; exit 1; }
