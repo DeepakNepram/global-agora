@@ -2,7 +2,7 @@
 -- Run with `npm run db:test`. Each file runs in a transaction that rolls back.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(27);
+select plan(32);
 
 -- CLAUDE.md #8, checked generically so a table added later is covered too.
 select is(
@@ -28,9 +28,9 @@ select is(
 -- A new table fails here until someone decides its row in the matrix below.
 select tables_are(
   'public',
-  array['articles', 'blocks', 'discussions', 'feature_flags', 'posts',
-        'profiles', 'reports', 'stories', 'votes'],
-  'public holds exactly the v1 tables'
+  array['articles', 'blocks', 'discussions', 'feature_flags', 'ingest_runs', 'posts',
+        'profiles', 'reports', 'stories', 'story_signals', 'votes'],
+  'public holds exactly the v1 tables and the ingest ledger'
 );
 
 -- The grant matrix (docs/DATA_SCHEMA.md). Grants are the first lock, RLS the second.
@@ -43,6 +43,8 @@ select table_privs_are('public', 'reports',       'anon', '{}'::text[],   'anon:
 select table_privs_are('public', 'blocks',        'anon', '{}'::text[],   'anon: nothing on blocks');
 select table_privs_are('public', 'profiles',      'anon', '{}'::text[],   'anon: nothing on profiles');
 select table_privs_are('public', 'feature_flags', 'anon', '{}'::text[],   'anon: nothing on feature_flags');
+select table_privs_are('public', 'story_signals', 'anon', '{}'::text[],   'anon: nothing on story_signals');
+select table_privs_are('public', 'ingest_runs',   'anon', '{}'::text[],   'anon: nothing on ingest_runs');
 
 select table_privs_are('public', 'stories',       'authenticated', array['SELECT'], 'signed in: read stories');
 select table_privs_are('public', 'articles',      'authenticated', array['SELECT'], 'signed in: read articles');
@@ -53,6 +55,8 @@ select table_privs_are('public', 'reports',       'authenticated', '{}'::text[],
 select table_privs_are('public', 'blocks',        'authenticated', array['SELECT'], 'signed in: read blocks (RLS: own)');
 select table_privs_are('public', 'profiles',      'authenticated', array['SELECT'], 'signed in: read profiles (RLS: own)');
 select table_privs_are('public', 'feature_flags', 'authenticated', array['SELECT'], 'signed in: read feature_flags');
+select table_privs_are('public', 'story_signals', 'authenticated', '{}'::text[],   'signed in: nothing on story_signals');
+select table_privs_are('public', 'ingest_runs',   'authenticated', '{}'::text[],   'signed in: nothing on ingest_runs');
 
 -- Generic guards that survive new tables and functions.
 select is(
@@ -90,6 +94,10 @@ select ok(
 
 select has_index('public', 'stories', 'stories_geog_gist', 'stories has a geography index');
 select index_is_type('public', 'stories', 'stories_geog_gist', 'gist', 'the geography index is GIST');
+
+-- Ingest reads signals by recency, and prunes them by it.
+select has_index('public', 'story_signals', 'story_signals_last_seen_idx',
+  'story_signals are indexed by when they were last seen');
 
 select * from finish();
 rollback;

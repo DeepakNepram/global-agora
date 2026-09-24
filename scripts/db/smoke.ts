@@ -83,6 +83,8 @@ const closed: readonly TableName[] = [
   'votes',
   'reports',
   'blocks',
+  'story_signals',
+  'ingest_runs',
 ];
 for (const table of closed) {
   const { error } = await db.from(table).select('*').limit(1);
@@ -110,6 +112,14 @@ record(
   'anon cannot delete articles',
   remove.error?.code === DENIED,
   remove.error?.message ?? 'DELETED',
+);
+
+// The ingest Worker's write functions are service-only (Prompt 2.2).
+const prune = await db.rpc('ingest_prune', { p_story_cutoff: since, p_run_cutoff: since });
+record(
+  'anon cannot call the ingest functions',
+  prune.error?.code === DENIED,
+  prune.error?.message ?? 'CALLED',
 );
 
 // --- Report. ------------------------------------------------------------------

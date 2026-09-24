@@ -145,6 +145,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      ingest_runs: {
+        Row: {
+          attempts: number;
+          counts: Json | null;
+          error: string | null;
+          finished_at: string | null;
+          slot: string;
+          started_at: string;
+          status: string;
+        };
+        Insert: {
+          attempts?: number;
+          counts?: Json | null;
+          error?: string | null;
+          finished_at?: string | null;
+          slot: string;
+          started_at?: string;
+          status: string;
+        };
+        Update: {
+          attempts?: number;
+          counts?: Json | null;
+          error?: string | null;
+          finished_at?: string | null;
+          slot?: string;
+          started_at?: string;
+          status?: string;
+        };
+        Relationships: [];
+      };
       posts: {
         Row: {
           author_id: string;
@@ -355,6 +385,35 @@ export type Database = {
         };
         Relationships: [];
       };
+      story_signals: {
+        Row: {
+          keys: string[];
+          last_seen_at: string;
+          state: Json;
+          story_id: string;
+        };
+        Insert: {
+          keys?: string[];
+          last_seen_at: string;
+          state: Json;
+          story_id: string;
+        };
+        Update: {
+          keys?: string[];
+          last_seen_at?: string;
+          state?: Json;
+          story_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'story_signals_story_id_fkey';
+            columns: ['story_id'];
+            isOneToOne: true;
+            referencedRelation: 'stories';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       votes: {
         Row: {
           created_at: string;
@@ -399,7 +458,43 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      ingest_apply: { Args: { p_batch: Json }; Returns: Json };
+      ingest_candidates: {
+        Args: { p_clusters: Json; p_min_overlap?: number; p_since: string };
+        Returns: {
+          cluster: number;
+          discussion_state: string;
+          first_seen_at: string;
+          heat: number;
+          keys: string[];
+          overlap: number;
+          published_at: string;
+          state: Json;
+          story_id: string;
+        }[];
+      };
+      ingest_claim: {
+        Args: { p_slot: string; p_stale?: string };
+        Returns: boolean;
+      };
+      ingest_finish: {
+        Args: {
+          p_counts?: Json;
+          p_error?: string;
+          p_slot: string;
+          p_status: string;
+        };
+        Returns: string;
+      };
+      ingest_known_urls: { Args: { p_urls: string[] }; Returns: string[] };
+      ingest_prune: {
+        Args: {
+          p_run_cutoff: string;
+          p_signal_cutoff?: string;
+          p_story_cutoff: string;
+        };
+        Returns: Json;
+      };
     };
     Enums: {
       [_ in never]: never;
