@@ -33,20 +33,54 @@ npm run textures
 
 ## Scripts
 
-| Script                 | What it does                                      |
-| ---------------------- | ------------------------------------------------- |
-| `npm run dev`          | Vite dev server with HMR                          |
-| `npm run build`        | Typecheck, then production build to `dist/`       |
-| `npm run preview`      | Serve the built bundle                            |
-| `npm run typecheck`    | `tsc --noEmit`                                    |
-| `npm run lint`         | ESLint, including the layer-boundary rules        |
-| `npm run lint:fix`     | ESLint with `--fix`                               |
-| `npm run format`       | Prettier write                                    |
-| `npm run format:check` | Prettier check (what CI runs)                     |
-| `npm run test`         | Vitest, once                                      |
-| `npm run test:watch`   | Vitest, watching                                  |
-| `npm run verify`       | typecheck + lint + format:check + test, in one go |
-| `npm run textures`     | fetch + build the Earth textures (see below)      |
+| Script                     | What it does                                      |
+| -------------------------- | ------------------------------------------------- |
+| `npm run dev`              | Vite dev server with HMR                          |
+| `npm run build`            | Typecheck, then production build to `dist/`       |
+| `npm run preview`          | Serve the built bundle                            |
+| `npm run typecheck`        | `tsc --noEmit`                                    |
+| `npm run lint`             | ESLint, including the layer-boundary rules        |
+| `npm run lint:fix`         | ESLint with `--fix`                               |
+| `npm run format`           | Prettier write                                    |
+| `npm run format:check`     | Prettier check (what CI runs)                     |
+| `npm run test`             | Vitest, once                                      |
+| `npm run test:watch`       | Vitest, watching                                  |
+| `npm run verify`           | typecheck + lint + format:check + test, in one go |
+| `npm run textures`         | fetch + build the Earth textures (see below)      |
+| `npm run db:start`         | Start local Supabase in Docker (see Database)     |
+| `npm run db:reset`         | Re-apply every migration, then the seed           |
+| `npm run db:test`          | pgTAP tests: RLS, grants, constraints             |
+| `npm run db:smoke`         | Query back through the anon key, as the app will  |
+| `npm run db:types`         | Regenerate `src/core/db/types.ts` from the schema |
+| `npm run db:seed:generate` | Regenerate `supabase/seed.sql`                    |
+| `npm run db:stop`          | Stop local Supabase                               |
+
+## Database
+
+Supabase runs locally in Docker; no account or credentials are needed.
+Docker Desktop must be running.
+
+```bash
+npm run db:start   # first run downloads about 1 GB of images
+npm run db:reset   # migrations + 200 fictional seed stories from the last 24 h
+npm run db:test    # 96 pgTAP assertions on RLS and constraints
+npm run db:smoke   # the stories come back; every other table refuses
+```
+
+The schema and the access matrix are in
+[`docs/DATA_SCHEMA.md`](docs/DATA_SCHEMA.md). After changing a migration, run
+`npm run db:reset` and then `npm run db:types`. CI fails if the types are stale.
+
+To put the schema on a hosted project, run these yourself, since they need your
+login and database password:
+
+```bash
+npx supabase login
+npx supabase link --project-ref <your-project-ref>
+npx supabase db push
+```
+
+`db push` leaves the fictional seed out unless you pass `--include-seed`.
 
 ## Layout
 
@@ -76,8 +110,8 @@ It is enforced in two independent places:
 Try it: add `import { App } from '@/ui';` to any file in `src/core/`, then run
 `npm run lint` and `npm run test`. Both fail.
 
-The same rules keep React, Three.js and Zustand out of `src/core/`, and Supabase
-and Zustand out of `src/globe/`.
+The same rules keep React, Three.js and Zustand out of `src/core/`, Supabase and
+Zustand out of `src/globe/`, and the Supabase SDK inside `src/core/db/`.
 
 ## Textures
 
@@ -142,4 +176,6 @@ Full rules: [`CLAUDE.md`](CLAUDE.md). Product plan:
 ## CI
 
 `.github/workflows/ci.yml` runs typecheck, lint, format check, test and build on
-every push and pull request.
+every push and pull request. A second job, alongside the first, starts
+Postgres with every migration and the seed, runs the pgTAP tests, and checks
+that `src/core/db/types.ts` matches the schema.

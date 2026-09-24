@@ -6,6 +6,78 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-09-24 — Database: deny by default, reads only, writes wait for their prompts
+
+**The schema is the build plan's §3**, applied in three migrations (news,
+accounts, discussions). [`DATA_SCHEMA.md`](DATA_SCHEMA.md) has the access
+matrix. Changes from §3, and why:
+
+- **Deny by default.** Supabase grants every new public table to `anon` and
+  `authenticated` and relies on RLS alone. The first migration revokes those
+  default grants, and every table grants exactly what its policies allow. A
+  policy mistake then still meets a missing grant, and a table added without
+  thought is closed rather than open. Functions get the same treatment,
+  because PostgREST serves them as RPC.
+  **Cost:** any future function a client calls, including helpers used inside
+  policies, needs an explicit `grant execute`.
+- **No client writes yet.** Prompt 2.1 says what signed-out users may not do
+  but does not define what signed-in users may write. The rules for that
+  belong to 4.1–4.3: rules accepted, open discussions only, rate limits, no
+  self-set `tier` or `strikes`. Writing them now would invent product
+  behaviour, so every client write is refused until then.
+- **Guests cannot read discussions**, as 2.1 says. Prompt 4.1 says reading
+  stays fully anonymous; that conflict is 4.1's to settle.
+- **`discussions.story_id` restricts deletes** instead of cascading. Prompt
+  2.2 deletes stories older than 48 hours, and a cascade would silently
+  delete a live debate with everyone's posts. Restrict makes the mistake loud,
+  so 2.2's cleanup must skip stories that have a discussion.
+- **Account deletion cascades** from `auth.users` to the profile and that
+  user's posts, votes and blocks (4.1: "deletion that actually deletes").
+  Reports keep their row with `reporter_id` set to null, so the moderation
+  record survives.
+- **The database enforces the product rules:**
+  - range and enum checks throughout;
+  - `category` 0–7, tied to `NEWS_CATEGORIES` by a unit test;
+  - http(s)-only URLs;
+  - length caps that make storing an article body impossible (summary 600,
+    snippet 400);
+  - a 64-character `region_label`;
+  - evidence posts must carry a URL.
+- **`feature_flags` exists** (CLAUDE.md's monetization hook), readable only
+  when signed in. Guests would get flags through the API Worker.
+- **PostGIS lives in `extensions`**, Supabase's convention, so its functions
+  are never API endpoints. `geog` is a generated column with schema-qualified
+  functions, so it does not depend on `search_path`.
+
+**The Supabase SDK sits behind one seam, `src/core/db`.** It costs 54 kB
+gzip, against a 327 kB app bundle (for comparison, `@supabase/postgrest-js`
+alone is 5 kB). The globe loads its data from the Worker payload (Prompt
+2.3), not from the SDK, so nothing imports `src/core/db` at startup. Features
+that need it later (sign-in, the story sheet) should `import()` it, so cold
+start never pays for it. An ESLint rule and a boundary test allow `@supabase/*`
+only inside `src/core/db`. `createDbClient` refuses a service-role JWT or an
+`sb_secret_` key, so a misplaced secret fails at startup instead of shipping.
+
+**Types are generated, then checked in CI.** `npm run db:types` writes
+`src/core/db/types.ts` from the local database. A second CI job starts
+Postgres with every migration and the seed, runs the pgTAP tests (96
+assertions), and fails if the generated types differ from the committed
+file. The job adds about two minutes and runs beside the existing one.
+
+**The seed is generated, not hand-written.** `scripts/seed/` builds 200
+stories deterministically, with times relative to `now()`, so the committed
+`supabase/seed.sql` never goes stale. A unit test fails if the file and the
+generator disagree. Cities are real; events and outlets are invented, with
+outlets on the reserved `.example` domain. Five multi-city stories give the
+Phase 3 scrubber something to show spreading.
+
+**Local stack only.** Development runs Supabase in Docker. `config.toml`
+turns off realtime, storage, studio, analytics, edge functions and mail until
+a prompt needs them. Pushing to a hosted project is a manual step that needs
+the owner's login.
+
+---
+
 ## 2026-09-23 — Cold start: a preloaded low-resolution Earth first, then full maps day-first
 
 **The budget** is "cold start to interactive under 2 s". Interactive here
