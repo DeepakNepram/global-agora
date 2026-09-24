@@ -6,7 +6,7 @@ import { DEFAULT_CONFIG, type IngestConfig } from '../src/config.ts';
 import type { ApplyResult, IngestDb, PruneResult } from '../src/db/service.ts';
 import type { Feed } from '../src/gdelt/feed.ts';
 import { slotIso, slotSeconds } from '../src/gdelt/slots.ts';
-import { createLogger } from '../src/log.ts';
+import { createLogger } from '../../shared/log.ts';
 import { createOutletCountries } from '../src/normalize/outlets.ts';
 import { runIngest, type RunDeps } from '../src/pipeline/run.ts';
 

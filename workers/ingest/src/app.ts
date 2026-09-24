@@ -11,7 +11,7 @@
  * route stays closed until a secret of at least 32 characters is configured.
  */
 
-import { errorFields, type Logger } from './log.ts';
+import { errorFields, type Logger } from '../../shared/log.ts';
 import { runIngest, type RunDeps } from './pipeline/run.ts';
 
 export const MIN_SECRET_LENGTH = 32;

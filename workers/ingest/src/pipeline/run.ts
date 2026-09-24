@@ -22,7 +22,7 @@ import {
   slotIso,
   slotSeconds,
 } from '../gdelt/slots.ts';
-import { errorFields, type Logger } from '../log.ts';
+import { errorFields, type Logger } from '../../../shared/log.ts';
 import type { OutletCountry } from '../normalize/outlets.ts';
 
 import { clusterKeys, planBatch } from './plan.ts';

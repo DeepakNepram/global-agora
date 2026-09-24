@@ -20,7 +20,7 @@ import { NEWS_CATEGORIES } from '../../src/core/nodeBuffer.ts';
 import { DEFAULT_CONFIG, type IngestConfig } from '../../workers/ingest/src/config.ts';
 import { createFeed, type Feed } from '../../workers/ingest/src/gdelt/feed.ts';
 import { previousSlot, slotSeconds } from '../../workers/ingest/src/gdelt/slots.ts';
-import { createLogger } from '../../workers/ingest/src/log.ts';
+import { createLogger } from '../../workers/shared/log.ts';
 import { createOutletCountries } from '../../workers/ingest/src/normalize/outlets.ts';
 import { runIngest } from '../../workers/ingest/src/pipeline/run.ts';
 

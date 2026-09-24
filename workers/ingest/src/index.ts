@@ -12,7 +12,7 @@ import { resolveConfig, type Vars } from './config.ts';
 import outletList from './data/outlet-countries.txt';
 import { createServiceDb } from './db/service.ts';
 import { createFeed } from './gdelt/feed.ts';
-import { createLogger } from './log.ts';
+import { createLogger } from '../../shared/log.ts';
 import { createOutletCountries } from './normalize/outlets.ts';
 import type { RunDeps } from './pipeline/run.ts';
 

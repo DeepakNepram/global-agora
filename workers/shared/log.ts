@@ -1,7 +1,8 @@
 /**
- * Structured logs: one JSON object per line, which Workers Logs indexes by
- * field. Every line of a run carries its runId, so one run can be pulled out
- * of the stream; slot lines carry the slot.
+ * Structured logs for every Worker: one JSON object per line, which Workers
+ * Logs indexes by field. Base fields ride on every line (the ingest Worker's
+ * runId and slot, the API's route), so one run or request can be pulled out
+ * of the stream.
  */
 
 export type Level = 'info' | 'warn' | 'error';

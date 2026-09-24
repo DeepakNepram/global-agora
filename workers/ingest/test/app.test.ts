@@ -4,7 +4,7 @@ import { handleFetch, handleScheduled, secretMatches, type AppDeps } from '../sr
 import { DEFAULT_CONFIG, resolveConfig } from '../src/config.ts';
 import { createServiceDb, DbError } from '../src/db/service.ts';
 import type { Fetch } from '../src/gdelt/feed.ts';
-import { createLogger } from '../src/log.ts';
+import { createLogger } from '../../shared/log.ts';
 import type { RunDeps } from '../src/pipeline/run.ts';
 
 const SECRET = 'correct-horse-battery-staple-0123456789';
