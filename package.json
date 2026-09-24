@@ -31,7 +31,8 @@
     "db:types": "supabase gen types typescript --local --schema public > src/core/db/types.ts && prettier --write src/core/db/types.ts",
     "ingest:dev": "wrangler dev -c workers/ingest/wrangler.jsonc --test-scheduled",
     "ingest:replay": "node --experimental-strip-types scripts/ingest/replay.ts",
-    "ingest:data": "node --experimental-strip-types scripts/ingest/build-data.ts"
+    "ingest:data": "node --experimental-strip-types scripts/ingest/build-data.ts",
+    "api:dev": "wrangler dev -c workers/api/wrangler.jsonc"
   },
   "dependencies": {
     "@react-three/fiber": "^9.7.0",

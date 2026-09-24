@@ -8,6 +8,7 @@
  */
 
 import type { Database, Json } from '../../../../src/core/db/types.ts';
+import { restBase, supabaseAuthHeaders } from '../../../shared/supabase.ts';
 import type { Fetch } from '../gdelt/feed.ts';
 
 type Functions = Database['public']['Functions'];
@@ -80,19 +81,9 @@ function checkPage<T>(name: string, rows: T[]): T[] {
   return rows;
 }
 
-/**
- * New-style keys (`sb_secret_…`) go in `apikey` alone; a legacy service-role
- * JWT is also sent as the bearer token, which is how PostgREST picks the role.
- */
-function authHeaders(serviceKey: string): Record<string, string> {
-  return serviceKey.startsWith('sb_')
-    ? { apikey: serviceKey }
-    : { apikey: serviceKey, authorization: `Bearer ${serviceKey}` };
-}
-
 export function createServiceDb(url: string, serviceKey: string, fetchFn: Fetch = fetch): IngestDb {
-  const base = `${url.replace(/\/+$/, '')}/rest/v1`;
-  const headers = { ...authHeaders(serviceKey), 'content-type': 'application/json' };
+  const base = restBase(url);
+  const headers = { ...supabaseAuthHeaders(serviceKey), 'content-type': 'application/json' };
 
   async function call<F extends keyof Functions>(name: F, args: Args<F>): Promise<Returns<F>> {
     const response = await fetchFn(`${base}/rpc/${name}`, {

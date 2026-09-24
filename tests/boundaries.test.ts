@@ -124,6 +124,15 @@ describe('layer boundaries', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('the API Worker never touches the service key', () => {
+    // It only reads public news, so it runs on the publishable key under RLS;
+    // a service key there would bypass RLS for every request it serves.
+    const offenders = sourceFilesIn(resolve(repoRoot, 'workers', 'api'))
+      .filter((file) => /SERVICE_ROLE|sb_secret_/.test(readFileSync(file, 'utf8')))
+      .map((file) => relative(repoRoot, file).replaceAll(sep, '/'));
+    expect(offenders).toEqual([]);
+  });
+
   it('the app never imports workers/ (CLAUDE.md #9)', () => {
     const workersDir = resolve(repoRoot, 'workers');
     const offenders = importsUnder(resolve(repoRoot, 'src'))

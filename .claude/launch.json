@@ -25,6 +25,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "ingest:dev", "--", "--port", "8787"],
       "port": 8787
+    },
+    {
+      "name": "api-worker",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "api:dev", "--", "--port", "8788"],
+      "port": 8788
     }
   ]
 }

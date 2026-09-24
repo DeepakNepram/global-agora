@@ -1,0 +1,27 @@
+// The API Worker. Deploy: npx wrangler deploy -c workers/api/wrangler.jsonc
+// Set SUPABASE_URL and SUPABASE_ANON_KEY (the publishable key, not the secret
+// one) as vars or secrets. Locally they come from workers/api/.dev.vars.
+//
+// The edge cache (Cache API) does nothing on *.workers.dev, so production
+// needs a route on your own domain beside the Pages app, e.g.
+//   "routes": [{ "pattern": "example.com/api/*", "zone_name": "example.com" }]
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "global-agora-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  // node:zlib is the only Brotli encoder in workerd.
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  // Tuning; every value here is also the default in src/config.ts.
+  "vars": {
+    "API_NODE_LIMIT": "3000",
+    "API_MAX_HOURS": "24",
+    "API_CACHE_TTL_SECONDS": "60",
+    "API_STALE_SECONDS": "900",
+    "API_STALE_IF_ERROR_SECONDS": "86400",
+    "API_BROTLI_QUALITY": "11",
+    "API_STORY_ARTICLE_LIMIT": "1000",
+    "API_ALLOWED_ORIGINS": "",
+  },
+}
