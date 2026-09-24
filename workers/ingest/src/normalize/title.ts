@@ -105,7 +105,7 @@ export function isSiteName(title: string, domain: string): boolean {
 /** Wire digests list many stories at once and would glue unrelated events together. */
 export function isDigest(title: string): boolean {
   return (
-    /\bnews (summary|in brief|digest)\b/i.test(title) ||
+    /\b(news|world) (summary|in brief|digest)\b/i.test(title) ||
     /^(morning|evening) briefing\b/i.test(title)
   );
 }
