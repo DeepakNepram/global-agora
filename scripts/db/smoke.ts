@@ -122,6 +122,24 @@ record(
   prune.error?.message ?? 'CALLED',
 );
 
+// The API Worker's two reads are the only functions a client may call (2.3).
+const nodes = await db.rpc('api_nodes', { p_hours: windowHours, p_limit: 3000 });
+const nodeIds = (nodes.data as { payload?: { nodes?: { id?: number[] } } } | null)?.payload?.nodes
+  ?.id;
+record(
+  'anon calls api_nodes',
+  nodes.error === null && (nodeIds?.length ?? 0) > 0,
+  nodes.error?.message ?? `${nodeIds?.length ?? 0} nodes`,
+);
+
+const story = await db.rpc('api_story', { p_seq: nodeIds?.[0] ?? -1 });
+const storyTitle = (story.data as { title?: string } | null)?.title;
+record(
+  'anon calls api_story for a payload id',
+  story.error === null && storyTitle !== undefined,
+  story.error?.message ?? storyTitle ?? 'NOT FOUND',
+);
+
 // --- Report. ------------------------------------------------------------------
 console.log(`\nSupabase at ${config.url}\n`);
 console.log('Newest stories:');

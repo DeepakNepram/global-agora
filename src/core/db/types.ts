@@ -338,6 +338,7 @@ export type Database = {
           place_source: string | null;
           published_at: string;
           sentiment: number;
+          seq: number;
           source_count: number;
           summary: string | null;
           title: string;
@@ -358,6 +359,7 @@ export type Database = {
           place_source?: string | null;
           published_at: string;
           sentiment?: number;
+          seq?: never;
           source_count?: number;
           summary?: string | null;
           title: string;
@@ -378,6 +380,7 @@ export type Database = {
           place_source?: string | null;
           published_at?: string;
           sentiment?: number;
+          seq?: never;
           source_count?: number;
           summary?: string | null;
           title?: string;
@@ -458,6 +461,14 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      api_nodes: {
+        Args: { p_hours: number; p_known?: string; p_limit: number };
+        Returns: Json;
+      };
+      api_story: {
+        Args: { p_article_limit?: number; p_id?: string; p_seq?: number };
+        Returns: Json;
+      };
       ingest_apply: { Args: { p_batch: Json }; Returns: Json };
       ingest_candidates: {
         Args: { p_clusters: Json; p_min_overlap?: number; p_since: string };

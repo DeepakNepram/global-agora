@@ -67,15 +67,17 @@ select is(
   'no client role holds a write privilege on any public table'
 );
 
+-- Exactly the API's two read functions (Prompt 2.3); anything else a client
+-- could call is a mistake.
 select is(
-  (select coalesce(array_agg(p.proname::text), '{}')
+  (select coalesce(array_agg(p.proname::text order by p.proname), '{}')
      from pg_proc p
      join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public'
       and (has_function_privilege('anon', p.oid, 'execute')
            or has_function_privilege('authenticated', p.oid, 'execute'))),
-  '{}'::text[],
-  'no public function is callable by a client role unless granted on purpose'
+  array['api_nodes', 'api_story'],
+  'client roles can call exactly api_nodes and api_story'
 );
 
 -- The ingest Worker writes with the service role, so it must keep its grants.
