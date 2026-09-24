@@ -95,11 +95,20 @@ const scratchInner = createEnd();
 const scratchOuter = createEnd();
 const scratchSpring: SpringState = { u: 0, v: 0 };
 
+export function createDrawn(): DrawnState {
+  return { ...createEnd(), u: 0, v: 0, alpha: 0 };
+}
+
+function lookOf(state: DrawnState, heading: number, other: number): number {
+  const visibleLook = isVisibleLook(heading) ? heading : other;
+  return state.alpha >= 0.5 ? visibleLook : hiddenLook(visibleLook);
+}
+
 /**
  * Where `slot` is drawn at `clock`:
  *   ψ = (1 − u) · twist
  *   P = rotate(normalize(mix(inner, outer, u)), about inner, by ψ)      (Rodrigues)
- *   offset = rot2(ψ) · mix(innerPx, outerPx, u)
+ *   offset = innerPx + rot2(ψ) · u · (outerPx − innerPx)
  * The look is the visible end's while the slot is mostly drawn, else hidden.
  */
 export function drawnState(
@@ -111,6 +120,9 @@ export function drawnState(
   const at = slot * PIN_STRIDE;
   const inner = readEnd(array, slot, 'inner', scratchInner);
   const outer = readEnd(array, slot, 'outer', scratchOuter);
+  const heading = (array[at + PIN_OFFSET.target] ?? 0) >= 0.5 ? outer : inner;
+  const other = heading === outer ? inner : outer;
+
   const spring = springAt(
     array[at + PIN_OFFSET.u0] ?? 0,
     array[at + PIN_OFFSET.v0] ?? 0,
@@ -142,17 +154,14 @@ export function drawnState(
   out.y = py * cos + (kz * px - kx * pz) * sin + ky * dot * (1 - cos);
   out.z = pz * cos + (kx * py - ky * px) * sin + kz * dot * (1 - cos);
 
-  const ox = inner.ox + (outer.ox - inner.ox) * u;
-  const oy = inner.oy + (outer.oy - inner.oy) * u;
-  out.ox = ox * cos - oy * sin;
-  out.oy = ox * sin + oy * cos;
+  const wayX = (outer.ox - inner.ox) * u;
+  const wayY = (outer.oy - inner.oy) * u;
+  out.ox = inner.ox + wayX * cos - wayY * sin;
+  out.oy = inner.oy + wayX * sin + wayY * cos;
 
   out.u = u;
   out.v = spring.v;
   out.alpha = pathAlpha(inner.look, outer.look, u);
-  const target = (array[at + PIN_OFFSET.target] ?? 0) >= 0.5 ? outer.look : inner.look;
-  const other = target === outer.look ? inner.look : outer.look;
-  const visibleLook = isVisibleLook(target) ? target : other;
-  out.look = out.alpha >= 0.5 ? visibleLook : hiddenLook(visibleLook);
+  out.look = lookOf(out, heading.look, other.look);
   return out;
 }

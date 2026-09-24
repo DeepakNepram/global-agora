@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { latLonToVec3, PETAL_LEVEL, type ClusterLayout, type NodeBuffer } from '@/core';
+import {
+  latLonToVec3,
+  unclusteredLayout,
+  PETAL_LEVEL,
+  type ClusterLayout,
+  type NodeBuffer,
+} from '@/core';
 import {
   FIXTURE_EPOCH_SEC,
   stack,
@@ -40,11 +46,11 @@ function stage() {
 
   const show = (
     nodes: NodeBuffer,
-    layoutLevel: number,
+    layoutLevel: number | ClusterLayout,
     clock: number,
     instant = false,
   ): PlanResult & { departed: readonly number[] } => {
-    const layout = layoutFor(nodes, layoutLevel);
+    const layout = typeof layoutLevel === 'number' ? layoutFor(nodes, layoutLevel) : layoutLevel;
     const assigned = slots.assign(nodes.ids, nodes.count);
     rowSlots = assigned.rowSlots;
     writeAppearance(nodes, rowSlots, array, NOW, clock, assigned.fresh);
@@ -197,6 +203,23 @@ describe('planTransitions', () => {
     expectAt(s.at(1, done), 0, 0, 4);
     expectAt(s.at(2, done), 0, 1, 4);
     expect(lookKind(s.at(1, done).look)).toBe(LOOK.pin);
+  });
+
+  it('starts a path from a petal exactly where the petal is drawn', () => {
+    const s = stage();
+    const nodes = storyBuffer(STACK);
+    s.show(nodes, 8, 0);
+    s.show(nodes, PETAL_LEVEL, 10);
+    const settled = 11;
+    const before = ids.map((id) => s.at(id, settled));
+    // Clustering switched off: every petal heads for its own place, twisting on the way.
+    const plan = s.show(nodes, unclusteredLayout(nodes, NOW), settled);
+    expect(plan.moving).toBeGreaterThan(0);
+    ids.forEach((id, i) => {
+      const after = s.at(id, settled);
+      expect(after.ox).toBeCloseTo(before[i]?.ox ?? NaN, 4);
+      expect(after.oy).toBeCloseTo(before[i]?.oy ?? NaN, 4);
+    });
   });
 
   it('keeps every story still when a refresh only reorders the rows', () => {

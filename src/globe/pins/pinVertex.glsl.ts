@@ -128,16 +128,18 @@ void main() {
   // The path spirals about the parent: at progress u the point is turned
   //   ψ = (1 − u) · twist
   // about the inner anchor (Rodrigues), v' = v cosψ + (k × v) sinψ + k (k·v)(1 − cosψ),
-  // and the screen offset by the same angle, so a petal and a child with its
-  // own place both wind out the same way.
+  // and the screen offset's way out from the inner end by the same angle,
+  //   offset = innerPx + rot2(ψ) · u · (outerPx − innerPx)
+  // so a petal and a child with its own place both wind out the same way, and
+  // each end is exactly where it says at u = 0 and u = 1.
   float psi = (1.0 - u) * aPulse.w;
   float c = cos(psi);
   float s = sin(psi);
   vec3 k = normalize(aInner.xyz);
   vec3 p = normalize(mix(aInner.xyz, aOuter.xyz, u));
   vec3 centre = p * c + cross(k, p) * s + k * dot(k, p) * (1.0 - c);
-  vec2 offsetCss = mix(aOffsets.xy, aOffsets.zw, u);
-  vec2 offset = vec2(offsetCss.x * c - offsetCss.y * s, offsetCss.x * s + offsetCss.y * c) * uPixelRatio;
+  vec2 way = (aOffsets.zw - aOffsets.xy) * u;
+  vec2 offset = (aOffsets.xy + vec2(way.x * c - way.y * s, way.x * s + way.y * c)) * uPixelRatio;
 
   // Opacity: the visible end dominates, so a child is whole within the first
   // 30 % of its way out and fades in the last 30 % of its way back:
