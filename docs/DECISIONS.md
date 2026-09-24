@@ -6,6 +6,113 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-09-24 — Payload API: short ids, Brotli 11, and a cache that asks "changed?"
+
+Prompt 2.3's Worker lives in `workers/api/`. It serves `GET /api/nodes` (the
+columnar payload) and `GET /api/story/:id`, and the globe now draws real news.
+Every number below was measured on 24 real GDELT hours (96 slots,
+2026-09-23 10:00 to 09-24 09:45 UTC) run through the 2.2 pipeline.
+
+**The payload as first specified was over budget, so ids became integers.**
+With UUID ids, 3000 nodes were 180.5 KB at max-quality Brotli. Random UUIDs
+are 16 bytes of entropy each and do not compress: they cost ~56 KB. We chose a
+sequential `stories.seq` (identity column) as the public id: 5.6 KB.
+`/api/story/:id` takes the seq or the UUID, and returns the UUID, which
+discussions key on.
+**Cost:** a second key on `stories`; the seq reveals roughly how many stories
+we have ingested, which is not sensitive.
+
+**Brotli quality 11, applied by the Worker, not Cloudflare.** The served
+number was measured end to end: the same 24 hours ingested into local
+Supabase, then `npm run api:measure` against the Worker. The others are the
+same payload compressed offline.
+
+| Encoding                                 | 3000 nodes                   |
+| ---------------------------------------- | ---------------------------- |
+| **Brotli 11, served by the Worker**      | **134,646 bytes = 131.5 KB** |
+| Brotli 10                                | ~133 KB                      |
+| Brotli 5 (about Cloudflare's on-the-fly) | ~150 KB, the whole budget    |
+| gzip 6                                   | 157.4 KB                     |
+| identity                                 | 415.7 KB                     |
+
+The Worker compresses once per rebuild with `node:zlib` (workerd's only
+Brotli; `CompressionStream` has none, hence `nodejs_compat`) and serves the
+bytes with `encodeBody: 'manual'`. Quality 11 costs ~470 ms of CPU, 10 costs
+~170 ms; rebuilds happen only when the data changes, mostly in the background.
+Headlines are 92 KB of the 131.5: the budget's margin depends on them.
+
+**`no-transform` keeps the Brotli intact.** Cloudflare's edge keeps an
+origin's br for a client that accepts it; `Cache-Control: no-transform` on
+Brotli replies is its documented guarantee that nothing re-encodes them.
+Locally, wrangler's stand-in for the edge re-encodes to the client's
+first-listed coding, and browsers list gzip first: the browser got 161 KB of
+gzip until Vite's dev proxy was set to ask for `br, gzip`. In the browser the
+payload is now 134,646 bytes encoded, 425,701 decoded.
+
+**The payload is built in SQL, as columns.** `api_nodes` returns one JSON row,
+so PostgREST's 1000-row cap never applies, and it sends the quantized form, so
+egress is the payload's own size (~420 KB raw). Columns go through
+`array_to_json`, which writes no spaces; `json_agg`'s `", "` was 30 KB more.
+
+**The window ends at the newest story, not at the request's clock.** The
+payload is then a pure function of the data. The Worker passes the hash of
+what it already has, and when nothing changed `api_nodes` answers with the
+hash alone. So the 60 s revalidation costs a few hundred bytes and no
+compression; a full payload moves only when ingest wrote something, about
+every 15 minutes.
+
+**Stale-while-revalidate is the Worker's, over two stores.** The Cache API has
+none of its own. Entries carry the time they were last confirmed:
+
+- fresh for 60 s;
+- served stale for 15 min while a background rebuild runs;
+- served stale for 24 h if the database is down;
+- checked in the isolate's memory first, then the Cache API.
+
+The Cache API stores an opaque octet-stream, so the CDN never re-encodes the
+Brotli. Browsers get the same timings in `Cache-Control`, and weak ETags
+(one representation, two encodings) answer `If-None-Match` with a 304.
+
+**The API Worker holds the publishable key, not the service key.** Everything
+it reads is public, so it runs as `anon` under RLS. `api_nodes` and
+`api_story` are the only functions a client role may call, and the structure
+test pins that list. A boundary test keeps the service key out of
+`workers/api/`.
+
+**Costs and limits.**
+
+- **Egress:** per active Cloudflare location, ~1,440 unchanged checks a day
+  plus ~96 full payloads is ~1.2 GB a month. Supabase Free includes 5 GB. If
+  that gets tight, a global tier (KV) in front of the database is the fix.
+- **`*.workers.dev` has no Cache API:** there only the isolate memory caches.
+  Production should route `/api/*` on your own domain beside Pages.
+- **A cold location** builds before replying: 590 ms measured locally (the
+  database ~32 ms, Brotli most of the rest), then hits. An unchanged
+  re-check from the browser is a 304 of ~300 bytes.
+- **Phase 2's "news within 20 minutes of publication" cannot be met.** GDELT
+  files download about an hour after their slot (2.2); the API adds at most
+  60 s, and the client re-checks every 120 s (`VITE_PAYLOAD_REFRESH_SECONDS`).
+
+**Loading the 24 hours exposed a 2.2 bug, now fixed.** Ingest slowed from
+2 s to 17 s a slot once six hours were stored. Inside `ingest_candidates` the
+planner folded the batch's keys into the per-story unnest and re-read the
+batch's jsonb for every stored story: 6.8 to 12.6 s a call at 14,000 stories,
+so a full day would have hit statement timeouts on every run. 2.2's test had
+3,600 stories. Marking both key sets `MATERIALIZED` makes them hash-joined
+sets again: 128 to 179 ms, same results. A custom plan (`EXECUTE`) and
+`enable_nestloop = off` were tried first and did not help. It is a forward
+migration in case 2.2's is already on a hosted project.
+
+**The client decodes straight into typed arrays.** `src/core/data/nodes.ts`
+validates the payload with the same code the Worker used, then fills a
+`NodeBuffer` in one pass: `Float32Array` unit-sphere positions,
+`Int32Array` times, and the headline and place columns as string arrays, with
+no object per story. Categories map by name, so an older client shows a new
+category as world. The feed (`src/core/data/nodesFeed.ts`) pauses while the
+tab is hidden and retries failures from 5 s up to the refresh interval.
+
+---
+
 ## 2026-09-24 — Ingest: the GKG file feed, grouped by event, heat from independent sources
 
 Prompt 2.2's Worker lives in `workers/ingest/`. Every number below was

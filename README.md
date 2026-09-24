@@ -7,7 +7,9 @@ discussions.
 Web first. Native mobile is a later phase, so the code stays portable — see
 [the boundary](#the-boundary-that-matters).
 
-**Status: Phase 0 — skeleton.** No globe, no data, no discussions yet.
+**Status: Phase 2.** The globe shows real news from GDELT: ingested every 15
+minutes, grouped into stories, served as one compact payload. No scrubber,
+story sheet or discussions yet.
 
 ## Requirements
 
@@ -22,8 +24,9 @@ cp .env.example .env.local   # PowerShell: Copy-Item .env.example .env.local
 npm run dev
 ```
 
-`.env.local` can stay blank for Phase 0 — `src/core/config.ts` falls back to
-free-tier defaults. Open http://localhost:5173.
+`.env.local` can stay blank: `src/core/config.ts` falls back to free-tier
+defaults. Open http://localhost:5173. The pins come from the API Worker; see
+[API](#api) to run it locally, or pick a mock load in the dev panel.
 
 Textures are **not** in the repo. Before Phase 1 you will also need:
 
@@ -57,6 +60,8 @@ npm run textures
 | `npm run ingest:dev`       | Run the ingest Worker locally (see Ingest)        |
 | `npm run ingest:replay`    | Replay real GDELT slots in memory, print stats    |
 | `npm run ingest:data`      | Regenerate the FIPS and outlet-country tables     |
+| `npm run api:dev`          | Run the API Worker locally on :8788 (see API)     |
+| `npm run api:measure`      | Payload size, column costs and latency, live      |
 
 ## Database
 
@@ -66,7 +71,7 @@ Docker Desktop must be running.
 ```bash
 npm run db:start   # first run downloads about 1 GB of images
 npm run db:reset   # migrations + 200 fictional seed stories from the last 24 h
-npm run db:test    # 96 pgTAP assertions on RLS and constraints
+npm run db:test    # 173 pgTAP assertions: RLS, constraints, ingest, API
 npm run db:smoke   # the stories come back; every other table refuses
 ```
 
@@ -144,6 +149,52 @@ npx wrangler deploy -c workers/ingest/wrangler.jsonc
 
 Logs are one JSON line per step (Workers Logs is enabled in `wrangler.jsonc`).
 
+## API
+
+`workers/api/` serves the globe: `GET /api/nodes?hours=24`, the columnar
+payload, and `GET /api/story/:id`, one story in full. It reads with the
+**publishable** key only. Format and headers:
+[`docs/DATA_SCHEMA.md`](docs/DATA_SCHEMA.md); why it is built this way:
+[`docs/DECISIONS.md`](docs/DECISIONS.md).
+
+Run it locally against local Supabase:
+
+```bash
+cp workers/api/.dev.vars.example workers/api/.dev.vars
+```
+
+Set `SUPABASE_ANON_KEY` in `.dev.vars` to the `PUBLISHABLE_KEY` from
+`npx supabase status`. Then run the Worker and the app side by side; Vite
+proxies `/api` to it:
+
+```bash
+npm run api:dev
+```
+
+```bash
+npm run dev
+```
+
+Measure the payload from a second terminal. For a cold build, stop
+`api:dev`, delete `workers/api/.wrangler/state` (wrangler keeps its local edge
+cache between restarts) and start it again first:
+
+```bash
+npm run api:measure
+```
+
+**Deploying:** set the two values (the key is publishable, not secret, but
+`secret put` keeps it out of the repo) and deploy. The edge cache (the Cache
+API) does nothing on `*.workers.dev`, so give the Worker a route on your own
+domain beside the Pages app; `wrangler.jsonc` shows the shape.
+
+```bash
+npx supabase db push
+npx wrangler secret put SUPABASE_URL -c workers/api/wrangler.jsonc
+npx wrangler secret put SUPABASE_ANON_KEY -c workers/api/wrangler.jsonc
+npx wrangler deploy -c workers/api/wrangler.jsonc
+```
+
 ## Layout
 
 ```
@@ -151,7 +202,7 @@ src/globe/   Three.js only. No React, no DOM, no Supabase. Pure render layer.
 src/core/    Models, types, data fetching, geo math. Framework-agnostic, no DOM.
 src/ui/      React components. Tailwind. Talks to core/ and globe/.
 src/state/   Zustand stores.
-workers/     Cloudflare Workers: cron ingest, API endpoints.
+workers/     Cloudflare Workers: ingest/ (cron), api/ (payload), shared/.
 supabase/    Migrations, RLS policies, edge functions.
 docs/        ARCHITECTURE.md, DATA_SCHEMA.md, DECISIONS.md
 tests/       Cross-cutting tests that do not belong to one layer.

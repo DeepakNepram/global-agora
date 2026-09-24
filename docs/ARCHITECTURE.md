@@ -28,17 +28,31 @@ ui ──> state ──> core
  └───> globe ──> core
 ```
 
-## Data flow (target, Phase 3)
+## Data flow
+
+```
+GDELT GKG ──15 min──> ingest Worker ──service key──> Supabase
+                                                        │ api_nodes / api_story
+                                                        │ (publishable key, RLS)
+browser <──Brotli, ETag, SWR── API Worker <─────────────┘
+```
 
 1. The ingest Worker (`workers/ingest/`, Prompt 2.2) reads each 15-minute
    GDELT GKG file, de-duplicates it into stories, scores heat and writes them
    through one transactional RPC. Workers may import `src/core` only, and
    `src/` never imports `workers/` (ESLint plus `tests/boundaries.test.ts`).
-2. Worker serves one compact columnar payload for the whole 24h window,
-   edge-cached. Under 150KB compressed.
-3. Client loads it once into typed arrays. The time scrubber is then pure
-   client-side filtering — zero network calls, which is why it feels instant.
-4. Scrubbing updates pin visibility, pin brightness and sun position together.
+2. The API Worker (`workers/api/`, Prompt 2.3) serves one columnar payload
+   for the whole window (`GET /api/nodes`), about 131 KB with Brotli for 3000
+   stories, and one story in full on tap (`GET /api/story/:id`). It caches at
+   the edge with stale-while-revalidate and holds only the publishable key.
+3. The client (`src/core/data/`) decodes the payload straight into a
+   `NodeBuffer` of typed arrays and re-checks it every two minutes; an
+   unchanged payload is a 304. The pin layer draws the buffer as it is.
+4. Phase 3: the time scrubber filters those arrays client-side, with no
+   network calls, and moves pin visibility, brightness and the sun together.
+
+The wire format is defined once, in `src/core/data/payload.ts`, and both the
+Worker and the client validate against it.
 
 ## Render rules
 
