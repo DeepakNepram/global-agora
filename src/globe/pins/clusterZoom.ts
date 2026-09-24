@@ -1,13 +1,14 @@
 import {
   CLUSTER_REFERENCE_LAT_DEG,
   CLUSTER_TILE_PX,
+  EARTH_RADIUS_KM,
   PETAL_LEVEL,
   degToRad,
   worldToKm,
   GLOBE_RADIUS,
 } from '@/core';
 
-import { CAMERA_FOV_DEG, radiansPerScreenHeight } from '../camera/cameraMath';
+import { CAMERA_FOV_DEG, panBase, radiansPerScreenHeight } from '../camera/cameraMath';
 
 /**
  * Camera to cluster level. supercluster measures its 44 px radius in Web
@@ -34,6 +35,23 @@ export function clusterZoomFor(
   const radians = radiansPerScreenHeight(Math.max(altitudeKm, 1e-3), fovDeg);
   const pixelsPerRadian = Math.max(1, viewportCssHeight) / radians;
   return Math.log2((2 * Math.PI * pixelsPerRadian * REFERENCE_SCALE) / CLUSTER_TILE_PX);
+}
+
+/**
+ * The inverse: the altitude at which the view is at `zoom`. From the formula
+ * above with radiansPerScreenHeight = panBase · altitude / R:
+ *   altitude = 2π · H · cos(lat_ref) · R / (TILE_PX · panBase · 2^zoom)
+ */
+export function altitudeKmForZoom(
+  zoom: number,
+  viewportCssHeight: number,
+  fovDeg: number = CAMERA_FOV_DEG,
+): number {
+  const height = Math.max(1, viewportCssHeight);
+  return (
+    (2 * Math.PI * height * REFERENCE_SCALE * EARTH_RADIUS_KM) /
+    (CLUSTER_TILE_PX * panBase(fovDeg) * 2 ** zoom)
+  );
 }
 
 /** Altitude of a camera looking at the globe's centre from `distance` world units. */

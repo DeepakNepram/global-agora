@@ -52,6 +52,7 @@ export { BADGE_CELL_ASPECT, BADGE_GLYPHS } from './pins/badgeGlyphs';
 export { BLOOM_SETTLE_SECONDS, bloomSeconds } from './pins/bloom';
 export {
   altitudeKmAt,
+  altitudeKmForZoom,
   clusterZoomFor,
   nextClusterLevel,
   LEVEL_HYSTERESIS,

@@ -12,8 +12,11 @@ import {
   type OrbitGlobeControls,
 } from '@/globe';
 
+import { BloomBenchmark } from './globe/BloomBenchmark';
+import { createPresentLog } from './globe/bloomReport';
 import { CameraDebugControls } from './globe/CameraDebugControls';
 import { CameraOverlay } from './globe/CameraOverlay';
+import { ControlsHost, PipelineHost } from './globe/canvasHosts';
 import type { PinSource } from './globe/debugControls';
 import { createFrameProbe } from './globe/frameProbe';
 import { FrameTimeOverlay } from './globe/FrameTimeOverlay';
@@ -24,11 +27,9 @@ import { PinDebugControls } from './globe/PinDebugControls';
 import { PinScene } from './globe/PinScene';
 import { RenderDebugControls } from './globe/RenderDebugControls';
 import { TierDebugControls } from './globe/TierDebugControls';
-import { useGlobeControls, type GlobeControlsOptions } from './globe/useGlobeControls';
 import { useLiveClock } from './globe/useLiveClock';
 import { usePinNodes } from './globe/usePinNodes';
 import { usePrefersReducedMotion } from './globe/usePrefersReducedMotion';
-import { useRenderPipeline, type RenderPipelineOptions } from './globe/useRenderPipeline';
 import { vignetteCssGradient } from './globe/vignette';
 
 export interface GlobeCanvasProps {
@@ -41,16 +42,6 @@ export interface GlobeCanvasProps {
 function voidColor(): string {
   const value = getComputedStyle(document.documentElement).getPropertyValue('--color-void');
   return value.trim() || '#05070d';
-}
-
-function PipelineHost(props: RenderPipelineOptions): null {
-  useRenderPipeline(props);
-  return null;
-}
-
-function ControlsHost(props: GlobeControlsOptions): null {
-  useGlobeControls(props);
-  return null;
 }
 
 const CAMERA = { fov: CAMERA_FOV_DEG } as const;
@@ -97,6 +88,7 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
 
   // Timing is dev tooling; production draws without queries or bookkeeping.
   const probe = useMemo(() => (import.meta.env.DEV ? createFrameProbe() : null), []);
+  const presentLog = useMemo(() => (import.meta.env.DEV ? createPresentLog() : null), []);
 
   // BASE_URL is resolved here, not in src/core, which must not read Vite globals.
   const textures = useMemo(
@@ -159,6 +151,7 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
           visible={pinsVisible}
           motion={motion}
           clustering={clustering}
+          {...(presentLog ? { onPresent: presentLog.push } : {})}
         />
         <ControlsHost motion={motion} onReady={setControls} />
         <PipelineHost settings={settings} bloomEnabled={bloomEnabled} probe={probe} />
@@ -207,6 +200,21 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
               onPinsVisibleChange={setPinsVisible}
               onPinSourceChange={setPinSource}
               onClusteringChange={setClustering}
+              onRunningChange={setBenchmarking}
+            />
+          )}
+          {probe && presentLog && (
+            <BloomBenchmark
+              probe={probe}
+              log={presentLog}
+              tier={tier}
+              controls={controls}
+              pinSource={pinSource}
+              clustering={clustering}
+              fullMotion={fullMotion}
+              onPinSourceChange={setPinSource}
+              onClusteringChange={setClustering}
+              onFullMotionChange={setFullMotion}
               onRunningChange={setBenchmarking}
             />
           )}

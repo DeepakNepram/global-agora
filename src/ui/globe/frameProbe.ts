@@ -21,6 +21,14 @@ export interface BenchmarkState {
   readonly resultBuffer: string | null;
 }
 
+/** Every frame between startCapture and stopCapture, unwindowed. */
+export interface FrameCapture {
+  /** When each frame was drawn and its CPU time, ms. */
+  readonly frames: readonly { readonly atMs: number; readonly cpuMs: number }[];
+  /** GPU times as their queries resolved, a few frames late, stamped with the frame that received them. */
+  readonly gpu: readonly { readonly atMs: number; readonly ms: number }[];
+}
+
 export interface FrameProbe {
   readonly rolling: FrameStats;
   readonly gpuSupported: boolean;
@@ -28,6 +36,9 @@ export interface FrameProbe {
   startBenchmark(): void;
   /** Registers the render loop's kick; returns the unsubscribe. */
   onBenchmarkStart(listener: () => void): () => void;
+  /** Keeps every frame's timing until stopCapture (the bloom benchmark's windows). */
+  startCapture(): void;
+  stopCapture(): FrameCapture;
 
   // Render-loop side.
   setGpuSupported(supported: boolean): void;
@@ -53,6 +64,11 @@ export function createFrameProbe(): FrameProbe {
   let running = false;
   let result: FrameSummary | null = null;
   let resultBuffer: string | null = null;
+  let capture: {
+    frames: FrameCapture['frames'][number][];
+    gpu: FrameCapture['gpu'][number][];
+  } | null = null;
+  let lastFrameAtMs = 0;
 
   const measured = (): number => Math.max(0, drawn - BENCHMARK_WARMUP_FRAMES);
 
@@ -92,8 +108,20 @@ export function createFrameProbe(): FrameProbe {
       buffer = `${width}×${height}`;
     },
 
+    startCapture() {
+      capture = { frames: [], gpu: [] };
+    },
+
+    stopCapture() {
+      const captured = capture ?? { frames: [], gpu: [] };
+      capture = null;
+      return captured;
+    },
+
     recordFrame(atMs, cpuMs) {
       rolling.recordCpu(atMs, cpuMs);
+      lastFrameAtMs = atMs;
+      capture?.frames.push({ atMs, cpuMs });
       if (!running) return false;
 
       drawn += 1;
@@ -114,6 +142,7 @@ export function createFrameProbe(): FrameProbe {
 
     recordGpu(ms) {
       rolling.recordGpu(ms);
+      capture?.gpu.push({ atMs: lastFrameAtMs, ms });
       // Results lag by a few frames, so warm-up frames resolve inside the
       // warm-up window and are dropped here with it.
       if (running && measured() >= 1) run.recordGpu(ms);

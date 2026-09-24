@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { PETAL_LEVEL } from '@/core';
 
 import { MIN_ALTITUDE_KM, fitAltitudeKm, maxAltitudeKm } from '../camera/cameraMath';
-import { LEVEL_HYSTERESIS, altitudeKmAt, clusterZoomFor, nextClusterLevel } from './clusterZoom';
+import {
+  LEVEL_HYSTERESIS,
+  altitudeKmAt,
+  altitudeKmForZoom,
+  clusterZoomFor,
+  nextClusterLevel,
+} from './clusterZoom';
 
 describe('clusterZoomFor', () => {
   it('puts the world view near zoom 2 and a city view near 7', () => {
@@ -20,6 +26,12 @@ describe('clusterZoomFor', () => {
     const base = clusterZoomFor(400, 800);
     expect(clusterZoomFor(200, 800) - base).toBeCloseTo(1, 9);
     expect(clusterZoomFor(400, 1600) - base).toBeCloseTo(1, 9);
+  });
+
+  it('is inverted by altitudeKmForZoom', () => {
+    for (const zoom of [1.5, 4.2, 8.5, 9.5]) {
+      expect(clusterZoomFor(altitudeKmForZoom(zoom, 750), 750)).toBeCloseTo(zoom, 9);
+    }
   });
 
   it('stays finite at the far limit', () => {
