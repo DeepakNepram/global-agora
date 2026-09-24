@@ -1,4 +1,5 @@
 import { NEWS_CATEGORIES, nodeBufferCapacity, type NodeBuffer } from './nodeBuffer';
+import { mulberry32 } from './random';
 
 /**
  * Placeholder stories until Prompt 2.3 serves real ones.
@@ -14,21 +15,6 @@ export interface MockNodeOptions {
   /** From AppConfig.historyWindowHours: the window is a tier limit, not a constant. */
   readonly windowHours: number;
   readonly seed: number;
-}
-
-/**
- * mulberry32: a 32-bit state PRNG with good equidistribution for its size.
- * Math.random cannot be seeded, which would make benchmarks irreproducible.
- */
-function mulberry32(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 /**

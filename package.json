@@ -25,7 +25,8 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
-    "db:test": "supabase test db"
+    "db:test": "supabase test db",
+    "db:seed:generate": "node --experimental-strip-types scripts/seed/generate.ts"
   },
   "dependencies": {
     "@react-three/fiber": "^9.7.0",
