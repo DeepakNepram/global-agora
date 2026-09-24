@@ -1,9 +1,12 @@
 /**
  * src/core — models, types, data fetching and geo math.
  *
- * Framework-agnostic: no React, no DOM, no Three.js, no Supabase SDK, and never
- * an import from src/ui. Enforced by ESLint (@typescript-eslint/no-restricted-imports)
- * and by tests/boundaries.test.ts.
+ * Framework-agnostic: no React, no DOM, no Three.js, and never an import from
+ * src/ui. Enforced by ESLint (@typescript-eslint/no-restricted-imports) and by
+ * tests/boundaries.test.ts.
+ *
+ * The Supabase SDK is confined to src/core/db, which is not re-exported here:
+ * import '@/core/db' where it is needed, so the SDK stays out of the main bundle.
  */
 export { resolveConfig, FREE_TIER_DEFAULTS } from './config';
 export type { AppConfig, EnvBag } from './config';

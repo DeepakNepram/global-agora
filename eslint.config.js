@@ -22,7 +22,7 @@ const boundaryMessage =
   'Pass data down through an interface instead. This boundary is what makes ' +
   'the later native port possible — see CLAUDE.md "Directory rules".';
 
-/** src/core is framework-agnostic: no React, no DOM, no renderer, no backend SDK. */
+/** src/core is framework-agnostic: no React, no DOM, no renderer. */
 const coreForbidden = [
   {
     group: uiLayer,
@@ -38,6 +38,18 @@ const coreForbidden = [
     message: 'src/core must not depend on the renderer. Three.js belongs in src/globe.',
   },
 ];
+
+/**
+ * The Supabase SDK lives behind one seam, src/core/db. Everything else goes
+ * through its interface, which keeps the ~54 kB SDK out of the main bundle and
+ * leaves one file to swap when a native shell arrives.
+ */
+const supabaseSeam = {
+  group: ['@supabase/*'],
+  message:
+    'Only src/core/db may import the Supabase SDK. Import createDbClient from @/core/db ' +
+    '(dynamically, so the SDK stays out of the main bundle).',
+};
 
 /** src/globe is the pure render layer: Three.js only, never React, UI or backend. */
 const globeForbidden = [
@@ -102,9 +114,28 @@ export default tseslint.config(
   // --- The boundary. Everything above is style; this is architecture. ---
   {
     files: ['src/core/**/*.{ts,tsx}'],
+    ignores: ['src/core/db/**'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { patterns: [...coreForbidden, supabaseSeam] },
+      ],
+    },
+  },
+  {
+    files: ['src/core/db/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': 'off',
       '@typescript-eslint/no-restricted-imports': ['error', { patterns: coreForbidden }],
+    },
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/core/**', 'src/globe/**'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [supabaseSeam] }],
     },
   },
   {

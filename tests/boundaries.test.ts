@@ -59,9 +59,38 @@ function uiImportsIn(layer: string): string[] {
   });
 }
 
+/** Files outside src/core/db that import the Supabase SDK. */
+function supabaseImportsOutsideDb(): string[] {
+  const dbDir = resolve(repoRoot, 'src', 'core', 'db');
+
+  return sourceFilesIn(resolve(repoRoot, 'src'))
+    .filter((file) => !file.startsWith(dbDir + sep))
+    .flatMap((file) =>
+      [...readFileSync(file, 'utf8').matchAll(SPECIFIER_RE)]
+        .map((match) => match[1])
+        .filter((specifier) => specifier?.startsWith('@supabase/'))
+        .map(
+          (specifier) => `${relative(repoRoot, file).replaceAll(sep, '/')} imports '${specifier}'`,
+        ),
+    );
+}
+
 describe('layer boundaries', () => {
   it.each(['globe', 'core'])('src/%s does not import from src/ui', (layer) => {
     expect(uiImportsIn(layer)).toEqual([]);
+  });
+
+  it('only src/core/db imports the Supabase SDK', () => {
+    expect(supabaseImportsOutsideDb()).toEqual([]);
+  });
+
+  it('no client code names a service-role key (CLAUDE.md #9)', () => {
+    // Service keys live in Workers. Any mention under src/ is a key on its way
+    // into the public bundle.
+    const offenders = sourceFilesIn(resolve(repoRoot, 'src'))
+      .filter((file) => /SERVICE_ROLE_KEY/.test(readFileSync(file, 'utf8')))
+      .map((file) => relative(repoRoot, file).replaceAll(sep, '/'));
+    expect(offenders).toEqual([]);
   });
 
   it('detects a violation when one exists', () => {

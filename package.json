@@ -26,10 +26,13 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
-    "db:seed:generate": "node --experimental-strip-types scripts/seed/generate.ts"
+    "db:seed:generate": "node --experimental-strip-types scripts/seed/generate.ts",
+    "db:smoke": "node --experimental-strip-types scripts/db/smoke.ts",
+    "db:types": "supabase gen types typescript --local --schema public > src/core/db/types.ts && prettier --write src/core/db/types.ts"
   },
   "dependencies": {
     "@react-three/fiber": "^9.7.0",
+    "@supabase/supabase-js": "^2.117.1",
     "postprocessing": "^6.39.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
