@@ -32,7 +32,8 @@
     "ingest:dev": "wrangler dev -c workers/ingest/wrangler.jsonc --test-scheduled",
     "ingest:replay": "node --experimental-strip-types scripts/ingest/replay.ts",
     "ingest:data": "node --experimental-strip-types scripts/ingest/build-data.ts",
-    "api:dev": "wrangler dev -c workers/api/wrangler.jsonc"
+    "api:dev": "wrangler dev -c workers/api/wrangler.jsonc",
+    "api:measure": "node --experimental-strip-types scripts/api/measure.ts"
   },
   "dependencies": {
     "@react-three/fiber": "^9.7.0",
