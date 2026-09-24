@@ -1,7 +1,7 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useState, type JSX } from 'react';
 
-import type { NodeBuffer } from '@/core';
+import { unclusteredLayout, type NodeBuffer } from '@/core';
 import { createPinLayer, type MotionPreference, type PinLayer } from '@/globe';
 import { timeStore } from '@/state';
 
@@ -39,7 +39,7 @@ export function PinScene({ nodes, visible, motion }: PinSceneProps): JSX.Element
   // Each payload is a new NodeBuffer, so this runs once per real change.
   useEffect(() => {
     if (!layer || !nodes) return;
-    layer.updateInstances(nodes);
+    layer.present(nodes, unclusteredLayout(nodes, timeStore.getState().timeMs / 1000));
     invalidate();
   }, [layer, nodes, invalidate]);
 

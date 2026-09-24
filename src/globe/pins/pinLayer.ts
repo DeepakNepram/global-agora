@@ -1,39 +1,35 @@
-import {
-  BufferAttribute,
-  BufferGeometry,
-  CustomBlending,
-  DynamicDrawUsage,
-  Group,
-  InstancedInterleavedBuffer,
-  InstancedMesh,
-  InterleavedBufferAttribute,
-  OneFactor,
-  OneMinusSrcAlphaFactor,
-  ShaderMaterial,
-  Vector2,
-  Vector3,
-  type Object3D,
-} from 'three';
+import { Group, type Object3D, type Texture } from 'three';
 
-import type { NodeBuffer } from '@/core';
+import type { ClusterLayout, NodeBuffer } from '@/core';
 
 import type { MotionPreference } from '../camera/types';
 import { earthTiltQuaternion } from '../views';
 import {
-  PIN_OFFSET,
-  PIN_STRIDE,
-  rebasePulseClock,
-  writeInstances,
-  type InstanceWrite,
-} from './pinInstances';
-import { PIN_FRAG, PIN_VERT } from './pins.glsl';
+  createPinMaterial,
+  createPinMesh,
+  createPinUniforms,
+  disposePinMesh,
+  nextPowerOfTwo,
+  uploadSlots,
+  type PinMesh,
+} from './pinMesh';
+import { landSprings, rebaseClock, writeAppearance } from './pinInstances';
+import { createSlotMap } from './pinSlots';
 import { PIN_HALF_SIZE_CSS_PX, PULSE_CLOCK_REBASE_SECONDS } from './pinStyle';
+import { planTransitions } from './transitions';
 
-/** Enough for the 3000-story target without growing. */
+/** Enough for the 3000-story target, plus departures fading out, without growing. */
 const DEFAULT_CAPACITY = 4096;
 
 /** A step longer than this is a resumed tab, not motion; see earth.ts. */
 const MAX_STEP_SECONDS = 0.25;
+
+/**
+ * The first step after the layer was idle. r3f's first delta after an idle
+ * spell spans the whole spell, which would skip the start of a bloom; the
+ * camera controls cap the same way (RESUME_STEP_SECONDS).
+ */
+const RESUME_STEP_SECONDS = 1 / 60;
 
 export interface PinLayerOptions {
   /**
@@ -41,141 +37,108 @@ export interface PinLayerOptions {
    * the right recency rather than a placeholder one.
    */
   readonly timeMs: number;
-  /** Initial instance capacity; grows on demand. */
+  /** Initial slot capacity; grows on demand. */
   readonly capacity?: number;
+}
+
+export interface PresentOptions {
+  /** A different set of stories (dev pin sources): forget every slot and place without animating. */
+  readonly reset?: boolean;
+}
+
+export interface PresentResult {
+  /** Slots set moving. */
+  readonly moving: number;
+  /** Until the last of them settles, 0 when nothing moves. */
+  readonly durationMs: number;
 }
 
 export interface PinLayer {
   /** Add this to the scene. Carries the axial tilt, like the Earth layer. */
   readonly object3d: Object3D;
-  /** Pins that can be drawn without growing. */
+  /** Slots that can be drawn without growing. */
   readonly capacity: number;
-  /** Writes every node's attributes in one pass and uploads them once. */
-  updateInstances(nodes: NodeBuffer): void;
+  /**
+   * Shows `nodes` as `layout` arranges them. Slots are keyed by story id, so a
+   * story present before keeps its slot, and every change animates from where
+   * it is drawn now (instantly under reduced motion, and on the first call).
+   */
+  present(nodes: NodeBuffer, layout: ClusterLayout, options?: PresentOptions): PresentResult;
   /** The displayed instant (epoch ms). Re-derives recency for the current nodes. */
   setTime(timeMs: number): void;
   /** Drawing-buffer size and device pixel ratio, for constant on-screen size. */
   setViewport(bufferWidth: number, bufferHeight: number, pixelRatio: number): void;
   setMotion(motion: MotionPreference): void;
   setVisible(visible: boolean): void;
-  /** Advances the pulse. Returns true while pins pulse, so the host keeps drawing. */
+  /** The count glyphs (see badgeGlyphs.ts); null draws orbs without a count. The host owns it. */
+  setBadgeAtlas(atlas: Texture | null): void;
+  /** Milliseconds until every slot has settled; 0 when nothing moves. */
+  animationRemainingMs(): number;
+  /** Advances pulses and springs. Returns true while either moves, so the host keeps drawing. */
   advance(dtSeconds: number): boolean;
   dispose(): void;
 }
 
-function nextPowerOfTwo(n: number): number {
-  return 2 ** Math.ceil(Math.log2(Math.max(n, 1)));
-}
-
-/** Four corners at ±1; the vertex shader scales them to pixels. */
-function createQuadGeometry(): BufferGeometry {
-  const geometry = new BufferGeometry();
-  geometry.setAttribute(
-    'position',
-    new BufferAttribute(new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]), 3),
-  );
-  geometry.setIndex([0, 1, 2, 0, 2, 3]);
-  return geometry;
-}
-
-interface PinMesh {
-  readonly mesh: InstancedMesh;
-  readonly buffer: InstancedInterleavedBuffer;
-  /** The buffer's own array, typed: three declares it as any TypedArray. */
-  readonly array: Float32Array;
-}
-
 /**
- * The news pins: ONE InstancedMesh (CLAUDE.md constraint 2), with every
- * per-pin value in one interleaved Float32Array so an update is one pass and
- * one upload.
+ * The news pins: one InstancedMesh (see pinMesh.ts) whose slots are keyed by
+ * story id (pinSlots.ts), drawn as pins or cluster orbs and moved by the
+ * transition planner (transitions.ts).
  *
  *   tilt           quaternion = 23.44° about X (same as the Earth)
- *    └─ pins       InstancedMesh, quad × count, renderOrder 3
- *
- * instanceMatrix is left at identity and never read by the shader; the pin
- * position is its own attribute because the quad is built in clip space.
+ *    └─ pins       InstancedMesh, quad × slots, renderOrder 3
  */
 export function createPinLayer(options: PinLayerOptions): PinLayer {
-  const uniforms = {
-    uCameraLocal: { value: new Vector3(0, 0, 4) },
-    uTime: { value: 0 },
-    uPulse: { value: 1 },
-    uViewport: { value: new Vector2(1, 1) },
-    uHalfSizePx: { value: PIN_HALF_SIZE_CSS_PX },
-  };
-
-  const material = new ShaderMaterial({
-    vertexShader: PIN_VERT,
-    fragmentShader: PIN_FRAG,
-    uniforms,
-    transparent: true,
-    // The globe is the only thing that can hide a pin, and the horizon test
-    // does that exactly. Depth would clip halos against the globe and clouds.
-    depthTest: false,
-    depthWrite: false,
-    // Premultiplied: halo pixels (alpha 0) add, dot pixels (alpha 1) cover.
-    blending: CustomBlending,
-    blendSrc: OneFactor,
-    blendDst: OneMinusSrcAlphaFactor,
-  });
-
+  const uniforms = createPinUniforms();
+  const material = createPinMaterial(uniforms);
   const tilt = new Group();
   tilt.name = 'pins-tilt';
   earthTiltQuaternion(tilt.quaternion);
 
-  const buildMesh = (capacity: number): PinMesh => {
-    const geometry = createQuadGeometry();
-    const array = new Float32Array(capacity * PIN_STRIDE);
-    const buffer = new InstancedInterleavedBuffer(array, PIN_STRIDE);
-    buffer.setUsage(DynamicDrawUsage);
-    const view = (size: number, offset: number): InterleavedBufferAttribute =>
-      new InterleavedBufferAttribute(buffer, size, offset);
-    geometry.setAttribute('aCenter', view(3, PIN_OFFSET.center));
-    geometry.setAttribute('aColor', view(3, PIN_OFFSET.color));
-    geometry.setAttribute('aScale', view(1, PIN_OFFSET.scale));
-    geometry.setAttribute('aAlpha', view(1, PIN_OFFSET.alpha));
-    geometry.setAttribute('aPhase', view(1, PIN_OFFSET.phase));
-    geometry.setAttribute('aRate', view(1, PIN_OFFSET.rate));
-    geometry.setAttribute('aRecency', view(1, PIN_OFFSET.recency));
-    geometry.setAttribute('aHot', view(1, PIN_OFFSET.hot));
-
-    const mesh = new InstancedMesh(geometry, material, capacity);
-    mesh.name = 'pins';
-    mesh.count = 0;
-    // Pins cover the whole globe and cull themselves at the horizon; a bounding
-    // sphere from the identity instance matrices would be wrong anyway.
-    mesh.frustumCulled = false;
-    // After the surface (0), clouds (1) and atmosphere (2).
-    mesh.renderOrder = 3;
-    mesh.onBeforeRender = (_renderer, _scene, camera) => {
-      mesh.worldToLocal(uniforms.uCameraLocal.value.setFromMatrixPosition(camera.matrixWorld));
+  const attach = (capacity: number): PinMesh => {
+    const built = createPinMesh(capacity, material);
+    built.mesh.onBeforeRender = (_renderer, _scene, camera) => {
+      built.mesh.worldToLocal(
+        uniforms.uCameraLocal.value.setFromMatrixPosition(camera.matrixWorld),
+      );
     };
-    tilt.add(mesh);
-    return { mesh, buffer, array };
+    tilt.add(built.mesh);
+    return built;
   };
 
-  const disposeMesh = ({ mesh }: PinMesh): void => {
-    mesh.removeFromParent();
-    mesh.geometry.dispose();
-    mesh.dispose();
-  };
-
-  let pins = buildMesh(nextPowerOfTwo(options.capacity ?? DEFAULT_CAPACITY));
+  const slots = createSlotMap();
+  let pins = attach(nextPowerOfTwo(options.capacity ?? DEFAULT_CAPACITY));
+  let groupSlot = new Int32Array(pins.buffer.count).fill(-1);
   let nodes: NodeBuffer | null = null;
+  let rowSlots: Int32Array = new Int32Array(0);
+  let level: number | null = null;
   let nowSeconds = options.timeMs / 1000;
   let clock = 0;
-  let visibleCount = 0;
-  let pulseEnabled = true;
+  let settlesAt = 0;
+  let releases: { at: number; slots: readonly number[] }[] = [];
+  let published = 0;
+  let reducedMotion = false;
+  let wasActive = false;
 
-  const write = (mode: InstanceWrite): void => {
-    if (!nodes) return;
-    const { buffer, mesh, array } = pins;
-    visibleCount = writeInstances(nodes, array, nowSeconds, clock, mode);
-    buffer.clearUpdateRanges();
-    buffer.addUpdateRange(0, nodes.count * PIN_STRIDE);
-    buffer.needsUpdate = true;
-    mesh.count = nodes.count;
+  const ensureCapacity = (needed: number): void => {
+    if (needed <= pins.buffer.count) return;
+    // Replace, never add, so there is still exactly one InstancedMesh; the
+    // slots carry over as they are, animations and all.
+    const previous = pins;
+    pins = attach(nextPowerOfTwo(needed));
+    pins.array.set(previous.array);
+    disposePinMesh(previous);
+    const groups = new Int32Array(pins.buffer.count).fill(-1);
+    groups.set(groupSlot);
+    groupSlot = groups;
+  };
+
+  /** Lands every spring where it is heading: reduced motion switched on mid-bloom. */
+  const settleAll = (): void => {
+    landSprings(pins.array, slots.highWater, clock);
+    settlesAt = clock;
+    for (const release of releases) slots.release(release.slots);
+    releases = [];
+    uploadSlots(pins, slots.highWater);
   };
 
   return {
@@ -185,54 +148,107 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
       return pins.buffer.count;
     },
 
-    updateInstances(next) {
-      if (next.count > pins.buffer.count) {
-        // Rare (the payload outgrew the estimate): replace, never add, so there
-        // is still exactly one InstancedMesh.
-        disposeMesh(pins);
-        pins = buildMesh(nextPowerOfTwo(next.count));
+    present(next, layout, presentOptions = {}) {
+      const reset = presentOptions.reset === true;
+      if (reset) {
+        slots.reset();
+        groupSlot.fill(-1);
+        releases = [];
+        level = null;
       }
+      const instant = reset || nodes === null || reducedMotion;
+      const { rowSlots: assigned, departed, fresh } = slots.assign(next.ids, next.count);
+      ensureCapacity(slots.highWater);
       nodes = next;
-      write('replace');
+      rowSlots = assigned;
+      published = writeAppearance(next, rowSlots, pins.array, nowSeconds, clock, fresh);
+
+      const plan = planTransitions({
+        array: pins.array,
+        slotCount: slots.highWater,
+        nodes: next,
+        layout,
+        rowSlots,
+        fresh,
+        groupSlot,
+        departed,
+        clock,
+        direction: level === null ? 0 : Math.sign(layout.level - level),
+        instant,
+      });
+      level = layout.level;
+      settlesAt = Math.max(settlesAt, plan.endsAt);
+      if (departed.length > 0) {
+        if (instant) slots.release(departed);
+        else releases.push({ at: plan.endsAt, slots: departed });
+      }
+      uploadSlots(pins, slots.highWater);
+      pins.mesh.count = slots.highWater;
+      return { moving: plan.moving, durationMs: Math.max(0, plan.endsAt - clock) * 1000 };
     },
 
     setTime(timeMs) {
       if (!Number.isFinite(timeMs)) return;
       nowSeconds = timeMs / 1000;
-      write('retime');
+      if (!nodes) return;
+      published = writeAppearance(nodes, rowSlots, pins.array, nowSeconds, clock, null);
+      uploadSlots(pins, slots.highWater);
     },
 
     setViewport(bufferWidth, bufferHeight, pixelRatio) {
       uniforms.uViewport.value.set(Math.max(1, bufferWidth), Math.max(1, bufferHeight));
       uniforms.uHalfSizePx.value = PIN_HALF_SIZE_CSS_PX * pixelRatio;
+      uniforms.uPixelRatio.value = pixelRatio;
     },
 
     setMotion(motion) {
-      pulseEnabled = motion === 'full';
-      uniforms.uPulse.value = pulseEnabled ? 1 : 0;
+      reducedMotion = motion === 'reduced';
+      uniforms.uPulse.value = reducedMotion ? 0 : 1;
+      if (reducedMotion && clock < settlesAt) settleAll();
     },
 
     setVisible(visible) {
       tilt.visible = visible;
     },
 
+    setBadgeAtlas(atlas) {
+      uniforms.uBadgeAtlas.value = atlas;
+      uniforms.uHasBadges.value = atlas ? 1 : 0;
+    },
+
+    animationRemainingMs: () => Math.max(0, settlesAt - clock) * 1000,
+
     advance(dtSeconds) {
-      if (!pulseEnabled || !tilt.visible || visibleCount === 0 || !(dtSeconds > 0)) return false;
-      clock += Math.min(dtSeconds, MAX_STEP_SECONDS);
-      if (clock > PULSE_CLOCK_REBASE_SECONDS && nodes) {
-        const { buffer, array } = pins;
-        clock = rebasePulseClock(array, nodes.count, clock, clock);
-        buffer.clearUpdateRanges();
-        buffer.addUpdateRange(0, nodes.count * PIN_STRIDE);
-        buffer.needsUpdate = true;
+      const moving = clock < settlesAt;
+      const pulsing = !reducedMotion && tilt.visible && published > 0;
+      if (!(moving || pulsing) || !(dtSeconds > 0)) {
+        wasActive = false;
+        return false;
+      }
+      clock += Math.min(dtSeconds, wasActive ? MAX_STEP_SECONDS : RESUME_STEP_SECONDS);
+      wasActive = true;
+
+      if (clock > PULSE_CLOCK_REBASE_SECONDS) {
+        const by = clock;
+        clock = rebaseClock(pins.array, slots.highWater, clock, by);
+        settlesAt -= by;
+        releases = releases.map((release) => ({ ...release, at: release.at - by }));
+        uploadSlots(pins, slots.highWater);
       }
       uniforms.uTime.value = clock;
-      return true;
+
+      // Slots whose stories left are reusable once their fade-out has played.
+      const due = releases.filter((release) => release.at <= clock);
+      if (due.length > 0) {
+        for (const release of due) slots.release(release.slots);
+        releases = releases.filter((release) => release.at > clock);
+      }
+      return pulsing || clock < settlesAt;
     },
 
     dispose() {
       tilt.removeFromParent();
-      disposeMesh(pins);
+      disposePinMesh(pins);
       material.dispose();
     },
   };

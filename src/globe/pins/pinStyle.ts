@@ -57,6 +57,34 @@ export const PIN_HALF_SIZE_CSS_PX = 9;
 /** Dot radius as a fraction of the quad half-size (2.7 CSS px at scale 1). */
 export const CORE_RADIUS = 0.3;
 
+/**
+ * A cluster orb's quad scale (× PIN_HALF_SIZE_CSS_PX), growing a step per
+ * tenfold count so a 1,000-story orb is bigger than a 10-story one without
+ * swamping its neighbours: scale = ORB_SCALE_MIN + ORB_SCALE_PER_DECADE · log10(count).
+ * 2 stories ≈ 2.1 (a 23 px disc), 100 ≈ 2.7, 1,000 ≈ 3.05.
+ */
+export const ORB_SCALE_MIN = 2.0;
+export const ORB_SCALE_PER_DECADE = 0.35;
+/** An orb's disc radius as a fraction of its quad half-size; the rest is halo. */
+export const ORB_CORE_RADIUS = 0.6;
+/** The orb's dark ring reaches this far, like SHADOW_RADIUS for a pin. */
+export const ORB_SHADOW_RADIUS = 0.78;
+/** How much an orb's rim darkens, giving the disc an edge on bright ground. */
+export const ORB_RIM_DARKEN = 0.35;
+/** Orbs keep one brightness, not their stories' recency, so the count stays readable. */
+export const ORB_COLOR_GAIN = 0.9;
+/** A hidden end draws this small, so a pin grows out of an orb rather than popping. */
+export const HIDDEN_SCALE = 0.25;
+/**
+ * The count's ink, linear RGB: near-black reads on every category hue, which
+ * are saturated mid-tones (at least 4.5:1 for the darkest, violet).
+ */
+export const BADGE_INK: readonly [number, number, number] = [0.004, 0.005, 0.009];
+
+export function orbScaleFor(count: number): number {
+  return ORB_SCALE_MIN + ORB_SCALE_PER_DECADE * Math.log10(Math.max(count, 1));
+}
+
 /** Pins fade out over this fraction of the visible cap's depth before the horizon. */
 export const HORIZON_FADE_FRACTION = 0.1;
 

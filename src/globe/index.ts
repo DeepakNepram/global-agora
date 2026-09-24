@@ -40,8 +40,22 @@ export type {
   OrbitGlobeControlsOptions,
   WheelInput,
 } from './camera/types';
-export { createPinLayer, type PinLayer, type PinLayerOptions } from './pins/pinLayer';
+export {
+  createPinLayer,
+  type PinLayer,
+  type PinLayerOptions,
+  type PresentOptions,
+  type PresentResult,
+} from './pins/pinLayer';
 export { PIN_HALF_SIZE_CSS_PX } from './pins/pinStyle';
+export { BADGE_CELL_ASPECT, BADGE_GLYPHS } from './pins/badgeGlyphs';
+export { BLOOM_SETTLE_SECONDS, bloomSeconds } from './pins/bloom';
+export {
+  altitudeKmAt,
+  clusterZoomFor,
+  nextClusterLevel,
+  LEVEL_HYSTERESIS,
+} from './pins/clusterZoom';
 export { MAX_ANISOTROPY } from './textureLoading';
 export { ATMOSPHERE_RADIUS } from './shaders/atmosphere.glsl';
 export { BLOOM_THRESHOLD, NIGHT_LIGHTS_GAIN, ATMOSPHERE_MAX_LUMINANCE } from './hdr';

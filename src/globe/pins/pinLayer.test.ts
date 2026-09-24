@@ -1,4 +1,5 @@
 import {
+  DataTexture,
   InstancedMesh,
   InterleavedBufferAttribute,
   ShaderMaterial,
@@ -6,8 +7,18 @@ import {
 } from 'three';
 import { describe, expect, it } from 'vitest';
 
-import { createNodeBuffer, fillMockNodes, type NodeBuffer } from '@/core';
+import {
+  createNodeBuffer,
+  fillMockNodes,
+  unclusteredLayout,
+  PETAL_LEVEL,
+  type NodeBuffer,
+} from '@/core';
+import { FIXTURE_EPOCH_SEC, stack, storyBuffer } from '@/core/cluster/cluster.fixture';
+import { clusterColumns } from '@/core/cluster/clusterClient';
+import { createClusterEngine } from '@/core/cluster/engine';
 
+import { bloomSeconds } from './bloom';
 import { createPinLayer, type PinLayer } from './pinLayer';
 import { PIN_STRIDE } from './pinInstances';
 import { PULSE_CLOCK_REBASE_SECONDS } from './pinStyle';
@@ -21,6 +32,10 @@ function mockNodes(count: number): NodeBuffer {
     windowHours: 24,
     seed: 3,
   });
+}
+
+function showAll(layer: PinLayer, nodes: NodeBuffer): void {
+  layer.present(nodes, unclusteredLayout(nodes, WINDOW_END_MS / 1000));
 }
 
 function instancedMeshes(layer: PinLayer): InstancedMesh[] {
@@ -37,23 +52,30 @@ function onlyMesh(layer: PinLayer): InstancedMesh {
   return mesh;
 }
 
+function uniform(layer: PinLayer, name: string): unknown {
+  const material = onlyMesh(layer).material;
+  if (!(material instanceof ShaderMaterial)) throw new Error('expected a ShaderMaterial');
+  return material.uniforms[name]?.value;
+}
+
 describe('createPinLayer', () => {
   it('draws every pin with exactly one InstancedMesh', () => {
     const layer = createPinLayer({ timeMs: WINDOW_END_MS });
-    layer.updateInstances(mockNodes(3000));
+    showAll(layer, mockNodes(3000));
     expect(instancedMeshes(layer)).toHaveLength(1);
     expect(onlyMesh(layer).count).toBe(3000);
     expect(onlyMesh(layer).frustumCulled).toBe(false);
   });
 
-  it('stores all eight instance attributes in one interleaved buffer', () => {
+  it('stores all five vec4 slot attributes in one interleaved buffer', () => {
     const layer = createPinLayer({ timeMs: WINDOW_END_MS });
     const geometry: BufferGeometry = onlyMesh(layer).geometry;
-    const names = ['aCenter', 'aColor', 'aScale', 'aAlpha', 'aPhase', 'aRate', 'aRecency', 'aHot'];
+    const names = ['aInner', 'aOuter', 'aOffsets', 'aSpring', 'aPulse'];
     const buffers = new Set(
       names.map((name) => {
         const attribute = geometry.getAttribute(name);
         expect(attribute).toBeInstanceOf(InterleavedBufferAttribute);
+        expect(attribute.itemSize).toBe(4);
         return (attribute as InterleavedBufferAttribute).data;
       }),
     );
@@ -61,15 +83,13 @@ describe('createPinLayer', () => {
     expect([...buffers][0]?.stride).toBe(PIN_STRIDE);
   });
 
-  it('rewrites the same array on every update and uploads only the live rows', () => {
+  it('rewrites the same array on every change and uploads only the slots in use', () => {
     const layer = createPinLayer({ timeMs: WINDOW_END_MS });
-    const attribute = onlyMesh(layer).geometry.getAttribute(
-      'aCenter',
-    ) as InterleavedBufferAttribute;
+    const attribute = onlyMesh(layer).geometry.getAttribute('aInner') as InterleavedBufferAttribute;
     const array = attribute.data.array;
     const version = attribute.data.version;
 
-    layer.updateInstances(mockNodes(3000));
+    showAll(layer, mockNodes(3000));
     layer.setTime(WINDOW_END_MS - 3_600_000);
     expect(attribute.data.array).toBe(array);
     expect(attribute.data.version).toBe(version + 2);
@@ -85,18 +105,18 @@ describe('createPinLayer', () => {
       disposed = true;
     });
 
-    layer.updateInstances(mockNodes(3000));
+    showAll(layer, mockNodes(3000));
     expect(layer.capacity).toBe(4096);
     expect(onlyMesh(layer)).not.toBe(small);
     expect(onlyMesh(layer).count).toBe(3000);
     expect(disposed).toBe(true);
   });
 
-  it('asks for frames only while pins pulse', () => {
+  it('asks for frames only while pins pulse or springs move', () => {
     const layer = createPinLayer({ timeMs: WINDOW_END_MS });
     expect(layer.advance(1 / 60)).toBe(false);
 
-    layer.updateInstances(mockNodes(100));
+    showAll(layer, mockNodes(100));
     expect(layer.advance(1 / 60)).toBe(true);
 
     layer.setMotion('reduced');
@@ -112,21 +132,64 @@ describe('createPinLayer', () => {
     expect(layer.advance(1 / 60)).toBe(false);
   });
 
-  it('rebases the pulse clock before float32 precision could show', () => {
+  it('plays a bloom to the end from its first frame, then stops asking for frames', () => {
+    const now = FIXTURE_EPOCH_SEC + 3600;
+    const nodes = storyBuffer(stack(120, 38.9, -77.04, 1));
+    const engine = createClusterEngine();
+    engine.load(1, clusterColumns(nodes));
+    const layer = createPinLayer({ timeMs: FIXTURE_EPOCH_SEC * 1000 - 1 });
+    layer.setVisible(false); // no pulse: only the springs keep it drawing
+
+    expect(layer.present(nodes, engine.layout(1, 8, now)).durationMs).toBe(0);
+    const bloom = layer.present(nodes, engine.layout(1, PETAL_LEVEL, now));
+    expect(bloom.moving).toBe(120);
+    expect(bloom.durationMs).toBeCloseTo(bloomSeconds(120) * 1000, 3);
+    expect(bloom.durationMs).toBeLessThan(600);
+
+    // An idle gap of seconds before the first frame must not skip the bloom.
+    layer.advance(4);
+    expect(layer.animationRemainingMs()).toBeGreaterThan(bloom.durationMs - 20);
+    let frames = 0;
+    while (layer.advance(1 / 60)) frames++;
+    expect(frames).toBeGreaterThan(30);
+    expect(frames).toBeLessThanOrEqual(36);
+    expect(layer.animationRemainingMs()).toBe(0);
+  });
+
+  it('lands a bloom at once under reduced motion, and cuts one short when it is switched on', () => {
+    const now = FIXTURE_EPOCH_SEC + 3600;
+    const nodes = storyBuffer(stack(10, 0, 0, 1));
+    const engine = createClusterEngine();
+    engine.load(1, clusterColumns(nodes));
+    const layer = createPinLayer({ timeMs: now * 1000 });
+    layer.present(nodes, engine.layout(1, 8, now));
+    expect(layer.present(nodes, engine.layout(1, PETAL_LEVEL, now)).durationMs).toBeGreaterThan(0);
+    layer.setMotion('reduced');
+    expect(layer.animationRemainingMs()).toBe(0);
+    expect(layer.present(nodes, engine.layout(1, 8, now)).durationMs).toBe(0);
+  });
+
+  it('draws a count only once the host hands it the glyphs', () => {
     const layer = createPinLayer({ timeMs: WINDOW_END_MS });
-    layer.updateInstances(mockNodes(100));
-    const material = onlyMesh(layer).material;
-    if (!(material instanceof ShaderMaterial)) throw new Error('expected a ShaderMaterial');
-    const time = (): unknown => material.uniforms.uTime?.value;
+    expect(uniform(layer, 'uHasBadges')).toBe(0);
+    const atlas = new DataTexture(new Uint8Array(4), 1, 1);
+    layer.setBadgeAtlas(atlas);
+    expect(uniform(layer, 'uHasBadges')).toBe(1);
+    expect(uniform(layer, 'uBadgeAtlas')).toBe(atlas);
+  });
+
+  it('rebases its clock before float32 precision could show', () => {
+    const layer = createPinLayer({ timeMs: WINDOW_END_MS });
+    showAll(layer, mockNodes(100));
     let steps = 0;
     let highest = 0;
     while (steps++ < 5000) {
       layer.advance(0.25);
-      highest = Math.max(highest, Number(time()));
+      highest = Math.max(highest, Number(uniform(layer, 'uTime')));
     }
     // 1250 s of pulse: without a rebase the clock would read 1250.
     expect(highest).toBeLessThanOrEqual(PULSE_CLOCK_REBASE_SECONDS + 0.25);
-    expect(Number(time())).toBeGreaterThanOrEqual(0);
+    expect(Number(uniform(layer, 'uTime'))).toBeGreaterThanOrEqual(0);
   });
 
   it('removes itself from the scene on dispose', () => {

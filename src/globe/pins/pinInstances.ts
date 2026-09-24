@@ -1,118 +1,166 @@
 import { NEWS_CATEGORIES, type NodeBuffer } from '@/core';
 
-import {
-  CATEGORY_COLORS,
-  colorGainFor,
-  hotFor,
-  pulsePhaseFor,
-  pulseRateFor,
-  recencyFor,
-  scaleForHeat,
-} from './pinStyle';
+import { pulsePhaseFor, pulseRateFor, recencyFor } from './pinStyle';
 
 /**
- * Per-instance layout of the pins' one interleaved buffer: twelve floats, a
- * round 48 bytes per pin.
+ * Per-slot layout of the pins' one interleaved buffer: twenty floats, five
+ * vec4 attributes, 80 bytes. A slot belongs to one story (keyed by story id,
+ * see pinSlots.ts) and draws it as a pin, as its cluster's orb, or nothing.
+ *
+ * Each slot holds a path between two ends, inner (the parent side: a cluster
+ * centre) and outer (the child side), and a spring that moves it along that
+ * path. The vertex shader evaluates both, so a bloom costs the CPU nothing per
+ * frame.
  */
-export const PIN_STRIDE = 12;
+export const PIN_STRIDE = 20;
 
 export const PIN_OFFSET = {
-  center: 0,
-  color: 3,
-  scale: 6,
-  alpha: 7,
-  phase: 8,
-  rate: 9,
-  recency: 10,
-  hot: 11,
+  /** Inner end: unit-sphere anchor xyz, then its look. */
+  inner: 0,
+  innerLook: 3,
+  /** Outer end: unit-sphere anchor xyz, then its look. */
+  outer: 4,
+  outerLook: 7,
+  /** Screen offsets at each end, CSS px, y up: petal positions. */
+  innerPx: 8,
+  outerPx: 10,
+  /** The spring: progress and velocity at t0, the clock time it starts, and its target (0 or 1). */
+  u0: 12,
+  v0: 13,
+  t0: 14,
+  target: 15,
+  /** The story's pulse, its recency (−1 before publication), and the path's twist. */
+  phase: 16,
+  rate: 17,
+  recency: 18,
+  twist: 19,
 } as const;
 
-const TAU = Math.PI * 2;
+/** What an end draws. Hidden ends keep the kind they fade from, so they shrink the right shape. */
+export const LOOK = {
+  hiddenPin: 0,
+  pin: 1,
+  orb: 2,
+  hiddenOrb: 3,
+} as const;
+
+export type LookKind = (typeof LOOK)[keyof typeof LOOK];
 
 /**
- * 'replace': the rows are new data; phases start from each publish time.
- * 'retime': the same rows at a new instant. Rates change with recency, so each
- * phase absorbs clock · (oldRate - newRate) and sin(clock·rate + phase) is
- * unchanged at this clock: the pulse carries on instead of jumping.
+ * One exact float per end (integers below 2^24 survive float32):
+ *   look = kind + 4 · category + 32 · value
+ * where value is the story's heat (0–255) for a pin and the member count for
+ * an orb.
  */
-export type InstanceWrite = 'replace' | 'retime';
+export function encodeLook(kind: LookKind, category: number, value: number): number {
+  const safeCategory = category >= 0 && category < NEWS_CATEGORIES.length ? category : 0;
+  return kind + 4 * safeCategory + 32 * Math.max(0, Math.min(Math.round(value), 0xffff));
+}
+
+export function lookKind(look: number): LookKind {
+  return (look % 4) as LookKind;
+}
+
+export function lookValue(look: number): number {
+  return Math.floor(look / 32);
+}
+
+export function isVisibleLook(look: number): boolean {
+  const kind = lookKind(look);
+  return kind === LOOK.pin || kind === LOOK.orb;
+}
+
+/** The same end, not drawn: what a pin or orb shrinks into and grows out of. */
+export function hiddenLook(look: number): number {
+  const kind = lookKind(look);
+  if (kind === LOOK.pin) return look - LOOK.pin + LOOK.hiddenPin;
+  if (kind === LOOK.orb) return look - LOOK.orb + LOOK.hiddenOrb;
+  return look;
+}
+
+/** Far past any spring's settling time; see rebaseClock. */
+const SETTLED_T0_FLOOR_SECONDS = 600;
 
 function wrapAngle(angle: number): number {
-  return angle - TAU * Math.floor(angle / TAU);
+  const tau = Math.PI * 2;
+  return angle - tau * Math.floor(angle / tau);
 }
 
 /**
- * Writes every live node into `array` in one pass and returns how many pins are
- * visible at `nowSeconds` (published at or before it). Reads nothing but typed
- * arrays and allocates nothing, so it can run on every scrubber tick.
+ * Writes every live row's pulse and recency into its slot and returns how many
+ * stories are published at `nowSeconds`. A slot flagged in `fresh` holds a new
+ * story, whose pulse starts from its publish time; every other slot keeps its
+ * pulse going: its phase absorbs clock · (oldRate − newRate), so
+ * sin(clock · rate + phase) does not jump when recency changes the rate.
+ * Allocates nothing, so it can run on every scrubber tick.
  */
-export function writeInstances(
+export function writeAppearance(
   nodes: NodeBuffer,
+  rowSlots: Int32Array,
   array: Float32Array,
   nowSeconds: number,
   clockSeconds: number,
-  mode: InstanceWrite,
+  fresh: Uint8Array | null,
 ): number {
-  const { count, epochSec, positions, publishedSec, categories, heat } = nodes;
-  if (array.length < count * PIN_STRIDE) {
-    throw new RangeError(`instance array holds ${array.length / PIN_STRIDE} pins, need ${count}`);
-  }
-
-  let visible = 0;
-  for (let i = 0; i < count; i++) {
-    const row = i * PIN_STRIDE;
-    const published = epochSec + (publishedSec[i] ?? 0);
-    const age = nowSeconds - published;
+  const { count, epochSec, publishedSec } = nodes;
+  let published = 0;
+  for (let row = 0; row < count; row++) {
+    const slot = rowSlots[row] ?? -1;
+    if (slot < 0) continue;
+    const at = slot * PIN_STRIDE;
+    const publishedAt = epochSec + (publishedSec[row] ?? 0);
+    const age = nowSeconds - publishedAt;
     const recency = recencyFor(age);
     // Rounded as the array will store it, so a later retime subtracts exactly
     // the rate the GPU has been using.
     const rate = Math.fround(pulseRateFor(recency));
-    const gain = colorGainFor(recency);
-    const category = categories[i] ?? 0;
-    const hue = (category < NEWS_CATEGORIES.length ? category : 0) * 3;
+    if (age >= 0) published++;
 
-    array[row + PIN_OFFSET.center] = positions[i * 3] ?? 0;
-    array[row + PIN_OFFSET.center + 1] = positions[i * 3 + 1] ?? 0;
-    array[row + PIN_OFFSET.center + 2] = positions[i * 3 + 2] ?? 0;
-    array[row + PIN_OFFSET.color] = (CATEGORY_COLORS[hue] ?? 0) * gain;
-    array[row + PIN_OFFSET.color + 1] = (CATEGORY_COLORS[hue + 1] ?? 0) * gain;
-    array[row + PIN_OFFSET.color + 2] = (CATEGORY_COLORS[hue + 2] ?? 0) * gain;
-    array[row + PIN_OFFSET.scale] = scaleForHeat(heat[i] ?? 0);
-
-    // Not yet published at the displayed instant: the story is not on the globe.
-    const shown = age >= 0;
-    array[row + PIN_OFFSET.alpha] = shown ? 1 : 0;
-    if (shown) visible++;
-
-    const previousRate = array[row + PIN_OFFSET.rate] ?? rate;
-    const previousPhase = array[row + PIN_OFFSET.phase] ?? 0;
-    array[row + PIN_OFFSET.phase] =
-      mode === 'retime'
-        ? wrapAngle(previousPhase + clockSeconds * (previousRate - rate))
-        : pulsePhaseFor(published);
-    array[row + PIN_OFFSET.rate] = rate;
-    array[row + PIN_OFFSET.recency] = recency;
-    array[row + PIN_OFFSET.hot] = hotFor(recency);
+    if (fresh?.[slot]) {
+      array[at + PIN_OFFSET.phase] = pulsePhaseFor(publishedAt);
+    } else {
+      const previousRate = array[at + PIN_OFFSET.rate] ?? rate;
+      const previousPhase = array[at + PIN_OFFSET.phase] ?? 0;
+      array[at + PIN_OFFSET.phase] = wrapAngle(
+        previousPhase + clockSeconds * (previousRate - rate),
+      );
+    }
+    array[at + PIN_OFFSET.rate] = rate;
+    array[at + PIN_OFFSET.recency] = age >= 0 ? recency : -1;
   }
-  return visible;
+  return published;
 }
 
 /**
- * Moves the pulse clock back by `bySeconds` without moving any pulse:
- * sin((clock - by)·rate + phase + by·rate) = sin(clock·rate + phase).
- * Returns the new clock.
+ * Moves the clock back by `bySeconds` without moving anything drawn: every
+ * pulse keeps sin((clock − by)·rate + phase + by·rate), and every spring its
+ * start time t0 − by. Returns the new clock.
  */
-export function rebasePulseClock(
+export function rebaseClock(
   array: Float32Array,
-  count: number,
+  slots: number,
   clockSeconds: number,
   bySeconds: number,
 ): number {
-  for (let i = 0; i < count; i++) {
-    const row = i * PIN_STRIDE;
-    const rate = array[row + PIN_OFFSET.rate] ?? 0;
-    const phase = array[row + PIN_OFFSET.phase] ?? 0;
-    array[row + PIN_OFFSET.phase] = wrapAngle(phase + bySeconds * rate);
+  for (let slot = 0; slot < slots; slot++) {
+    const at = slot * PIN_STRIDE;
+    const rate = array[at + PIN_OFFSET.rate] ?? 0;
+    const phase = array[at + PIN_OFFSET.phase] ?? 0;
+    array[at + PIN_OFFSET.phase] = wrapAngle(phase + bySeconds * rate);
+    // A spring that started this long ago has settled, and stays settled at
+    // any older start; the floor keeps t0 where float32 is still fine-grained.
+    const t0 = (array[at + PIN_OFFSET.t0] ?? 0) - bySeconds;
+    array[at + PIN_OFFSET.t0] = Math.max(t0, -SETTLED_T0_FLOOR_SECONDS);
   }
   return clockSeconds - bySeconds;
+}
+
+/** Lands the first `slots` springs where they are heading, at `clockSeconds`. */
+export function landSprings(array: Float32Array, slots: number, clockSeconds: number): void {
+  for (let slot = 0; slot < slots; slot++) {
+    const at = slot * PIN_STRIDE;
+    array[at + PIN_OFFSET.u0] = array[at + PIN_OFFSET.target] ?? 1;
+    array[at + PIN_OFFSET.v0] = 0;
+    array[at + PIN_OFFSET.t0] = clockSeconds;
+  }
 }

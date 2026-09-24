@@ -7,7 +7,7 @@ import {
   SCATTER_FRAG,
 } from './shaders/atmosphere.glsl';
 import { CLOUD_FRAG, CLOUD_VERT } from './shaders/cloud.glsl';
-import { PIN_FRAG } from './pins/pins.glsl';
+import { PIN_FRAG } from './pins/pinFragment.glsl';
 import { EARTH_CHANNEL_INDEX, EARTH_FRAG, EARTH_VERT } from './shaders/earth.glsl';
 
 /** Strips comments so a name mentioned only in a comment cannot pass. */

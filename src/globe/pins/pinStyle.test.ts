@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { NEWS_CATEGORIES } from '@/core';
 
 import { BLOOM_THRESHOLD } from '../hdr';
-import { PIN_FRAG, PIN_VERT } from './pins.glsl';
+import { PIN_FRAG } from './pinFragment.glsl';
+import { PIN_VERT } from './pinVertex.glsl';
 import {
   CATEGORY_COLORS,
   COLOR_GAIN_NEW,
@@ -148,6 +149,14 @@ describe('horizonVisibility', () => {
 });
 
 describe('pin shaders', () => {
+  it('runs the bloom spring and lands it exactly once settled', () => {
+    expect(PIN_VERT).toMatch(/const float OMEGA = 33\.0;/);
+    expect(PIN_VERT).toContain(
+      'float u = clamp(aSpring.w + (delta + (aSpring.y + OMEGA * delta) * tau) * exp(-OMEGA * tau), 0.0, 1.0);',
+    );
+    expect(PIN_VERT).toContain('if (tau >= SETTLE) u = aSpring.w;');
+  });
+
   it('has every TypeScript constant interpolated in the vertex shader', () => {
     expect(PIN_VERT).not.toMatch(/=\s*(undefined|NaN);/);
     expect(PIN_VERT).toMatch(/const float PULSE_AMPLITUDE = 0\.15;/);
@@ -155,8 +164,9 @@ describe('pin shaders', () => {
   });
 
   it('implements the prompt pulse and horizon expressions', () => {
+    // Pins pulse; orbs, and pins mid-way to becoming one, hold still in proportion.
     expect(PIN_VERT).toContain(
-      'float pulse = 1.0 + PULSE_AMPLITUDE * sin(uTime * aRate + aPhase) * aRecency * uPulse;',
+      'float pulse = 1.0 + PULSE_AMPLITUDE * sin(uTime * aPulse.y + aPulse.x) * recency * uPulse * (1.0 - orbness);',
     );
     expect(PIN_VERT).toContain('float horizon = GLOBE_RADIUS / cameraDistance;');
     expect(PIN_VERT).toContain(
@@ -168,7 +178,7 @@ describe('pin shaders', () => {
     expect(PIN_FRAG).toContain('gl_FragColor = vec4(color, coverage) * vAlpha;');
     // Halos weighted by the view angle to the ground, so the limb does not ring.
     expect(PIN_VERT).toContain(
-      'vHaloWeight = max(dot(normalize(aCenter), normalize(uCameraLocal - aCenter)), 0.0);',
+      'vHaloWeight = max(dot(centre, normalize(uCameraLocal - centre)), 0.0);',
     );
     expect(PIN_FRAG).toContain('float halo = HALO_PEAK * vHaloWeight * fall * fall;');
     // Comments stripped: the shader explains why it avoids the keyword.
