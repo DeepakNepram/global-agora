@@ -21,7 +21,11 @@
     "verify": "npm run typecheck && npm run lint && npm run format:check && npm run test",
     "textures:fetch": "node --experimental-strip-types scripts/fetch-textures.ts",
     "textures:build": "node --experimental-strip-types scripts/process-textures.ts",
-    "textures": "npm run textures:fetch && npm run textures:build"
+    "textures": "npm run textures:fetch && npm run textures:build",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:test": "supabase test db"
   },
   "dependencies": {
     "@react-three/fiber": "^9.7.0",
@@ -46,6 +50,7 @@
     "globals": "^17.12.0",
     "prettier": "^3.9.6",
     "sharp": "^0.35.4",
+    "supabase": "^2.117.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.70.0",
