@@ -10,6 +10,7 @@ truth; the original design is the build plan's §3
 | `20260924100000_news.sql`        | `stories`, `articles` (+ PostGIS, deny-by-default grants) |
 | `20260924100100_accounts.sql`    | `profiles`, `feature_flags`                               |
 | `20260924100200_discussions.sql` | `discussions`, `posts`, `votes`, `reports`, `blocks`      |
+| `20260924120000_ingest.sql`      | `story_signals`, `ingest_runs`, the ingest functions      |
 
 Each table ships with its RLS policies and grants in the same file: a table and
 its access rules are one change. Migrations are timestamped and forward-only.
@@ -21,8 +22,10 @@ its access rules are one change. Migrations are timestamped and forward-only.
 - **Deny by default.** The first migration removes Supabase's habit of granting
   every new table to `anon` and `authenticated`. Each table grants exactly what
   its policies allow, so there are two locks, and a table added later without
-  grants is closed rather than open. The same applies to functions, because
-  PostgREST exposes them as RPC endpoints.
+  grants is closed rather than open. Functions are closed too, because
+  PostgREST exposes them as RPC endpoints: the ingest migration revokes
+  PUBLIC's EXECUTE by default and on each function by name, and a pgTAP test
+  fails if a client role can call any function in `public`.
 - **Only the service role writes news.** The ingest Worker holds the service
   key and bypasses RLS (CLAUDE.md #9). No client role can write any table yet.
 - **No precise user location, ever.** No coordinates on any user-written table.
@@ -49,6 +52,8 @@ Grants and policies agree; `npm run db:test` checks both.
 | `votes`         | none       | your own votes                          | none yet (Prompt 4.2)            |
 | `blocks`        | none       | blocks you made                         | none yet (Prompt 4.3)            |
 | `reports`       | none       | none (explicit restrictive deny)        | service role only                |
+| `story_signals` | none       | none (explicit restrictive deny)        | service role (ingest Worker)     |
+| `ingest_runs`   | none       | none (explicit restrictive deny)        | service role (ingest Worker)     |
 
 Open questions left for the prompts that own them:
 
@@ -101,6 +106,42 @@ profile and, through it, that user's posts, votes and blocks (Prompt 4.1:
 deletion that actually deletes). `tier` is the monetization hook, unused in v1.
 
 **`feature_flags`**: `key`, `enabled`, an optional `value` payload.
+
+## Ingest (Prompt 2.2)
+
+The ingest Worker (`workers/ingest/`) is the only writer of news. It calls
+these functions with the service key; no client role may execute them.
+
+- **`ingest_claim`, `ingest_finish`:** take and close a 15-minute GDELT slot
+  in `ingest_runs`, which is the cursor, the lock and the audit log. A slot
+  that fails three times is skipped.
+- **`ingest_known_urls`:** which of a batch's URLs are already stored.
+- **`ingest_candidates`:** stored stories sharing event keys with each batch
+  cluster, up to three per cluster, from the last 24 hours.
+- **`ingest_apply`:** one transaction writes a slot's stories, signals and
+  articles and marks the slot done. Replays change nothing. A queued, open or
+  closed story keeps its title and place; heat only rises; the state only
+  moves `none` → `queued`.
+- **`ingest_prune`:** stories whose `published_at` is past retention (48 h)
+  go, **except any with a discussion** (the RESTRICT key above). Signals go
+  after the 24-hour match window, run rows after 7 days.
+
+**`story_signals`**: the evidence a story's title, place, category and heat are
+derived from: write-ups, outlets, countries, place votes and category scores.
+It is versioned JSON beside the event `keys`. It is kept apart from `stories`
+so public reads never carry it.
+
+What ingest writes on `stories`:
+
+- `place_source` is `gdelt`;
+- `title_hash` is the lead write-up's 64-bit simhash;
+- `heat` is the peak score;
+- `sentiment` is GDELT's tone × 10;
+- `source_count` is distinct outlets.
+
+`summary` and `snippet` stay null: GDELT gives no text, and nothing fetches
+pages. See [`DECISIONS.md`](DECISIONS.md) for the heat formula and grouping
+rules.
 
 ## Seed data
 

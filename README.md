@@ -54,6 +54,9 @@ npm run textures
 | `npm run db:types`         | Regenerate `src/core/db/types.ts` from the schema |
 | `npm run db:seed:generate` | Regenerate `supabase/seed.sql`                    |
 | `npm run db:stop`          | Stop local Supabase                               |
+| `npm run ingest:dev`       | Run the ingest Worker locally (see Ingest)        |
+| `npm run ingest:replay`    | Replay real GDELT slots in memory, print stats    |
+| `npm run ingest:data`      | Regenerate the FIPS and outlet-country tables     |
 
 ## Database
 
@@ -81,6 +84,65 @@ npx supabase db push
 ```
 
 `db push` leaves the fictional seed out unless you pass `--include-seed`.
+
+## Ingest
+
+`workers/ingest/` is a Cloudflare Worker that reads GDELT's 15-minute GKG file,
+groups articles into stories, scores heat, and writes them to Supabase. How it
+works and why: [`docs/DECISIONS.md`](docs/DECISIONS.md) (the heat formula is
+there) and [`docs/DATA_SCHEMA.md`](docs/DATA_SCHEMA.md).
+
+Run it locally against local Supabase (`npm run db:start` first):
+
+```bash
+cp workers/ingest/.dev.vars.example workers/ingest/.dev.vars
+```
+
+Fill in `.dev.vars` (gitignored):
+
+- `SUPABASE_SERVICE_ROLE_KEY`: the `SECRET_KEY` from `npx supabase status`;
+- `INGEST_TRIGGER_SECRET`: any string of 32 or more characters.
+
+Then:
+
+```bash
+npm run ingest:dev
+```
+
+Trigger a run on demand, from a second terminal:
+
+```bash
+curl -X POST -H "Authorization: Bearer $INGEST_TRIGGER_SECRET" http://127.0.0.1:8787/run
+```
+
+Options on `/run`:
+
+- `?slot=20260924084500` processes one slot;
+- `?dry=1` computes everything and writes nothing.
+
+The JSON reply lists each slot with its counts and hottest stories.
+`http://127.0.0.1:8787/__scheduled` fires the cron path.
+
+To try heat or queue settings without a database:
+
+```bash
+npm run ingest:replay -- --slots 16 --saturation 49,15,30 --queue-heat 215
+```
+
+**Deploying needs the Workers Paid plan.** A slot takes 80–280 ms of CPU, and
+the free plan allows 10 ms per cron run. Push the migration, set the three
+secrets, and deploy. The `wrangler` commands prompt for each value, so none
+end up in your shell history or in chat:
+
+```bash
+npx supabase db push
+npx wrangler secret put SUPABASE_URL -c workers/ingest/wrangler.jsonc
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY -c workers/ingest/wrangler.jsonc
+npx wrangler secret put INGEST_TRIGGER_SECRET -c workers/ingest/wrangler.jsonc
+npx wrangler deploy -c workers/ingest/wrangler.jsonc
+```
+
+Logs are one JSON line per step (Workers Logs is enabled in `wrangler.jsonc`).
 
 ## Layout
 
@@ -176,6 +238,7 @@ Full rules: [`CLAUDE.md`](CLAUDE.md). Product plan:
 ## CI
 
 `.github/workflows/ci.yml` runs typecheck, lint, format check, test and build on
-every push and pull request. A second job, alongside the first, starts
+every push and pull request. The tests include the ingest Worker's, which run
+on real GDELT rows kept as a fixture, so CI never calls GDELT. A second job, alongside the first, starts
 Postgres with every migration and the seed, runs the pgTAP tests, and checks
 that `src/core/db/types.ts` matches the schema.

@@ -30,7 +30,10 @@ ui ──> state ──> core
 
 ## Data flow (target, Phase 3)
 
-1. Worker cron pulls GDELT every 15 min, dedupes, scores heat, writes `stories`.
+1. The ingest Worker (`workers/ingest/`, Prompt 2.2) reads each 15-minute
+   GDELT GKG file, de-duplicates it into stories, scores heat and writes them
+   through one transactional RPC. Workers may import `src/core` only, and
+   `src/` never imports `workers/` (ESLint plus `tests/boundaries.test.ts`).
 2. Worker serves one compact columnar payload for the whole 24h window,
    edge-cached. Under 150KB compressed.
 3. Client loads it once into typed arrays. The time scrubber is then pure

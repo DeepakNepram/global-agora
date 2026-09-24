@@ -6,6 +6,169 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-09-24 — Ingest: the GKG file feed, grouped by event, heat from independent sources
+
+Prompt 2.2's Worker lives in `workers/ingest/`. Every number below was
+measured on the live feed on 2026-09-24 (`npm run ingest:replay` reproduces
+the calibration).
+
+**The GEO 2.0 API is gone, so the source is the GKG 2.1 file feed.** Every
+documented GEO 2.0 example URL returns 404 (checked five variants, including
+the ones in GDELT's own launch post). The DOC API still answers but has no
+coordinates and rate-limits to one request per 5 s. The prompt's fallback,
+the GKG file feed, has everything we need, per article:
+
+- the URL and outlet;
+- the page title and often the publish time, in the extras XML;
+- GDELT's coordinates for every place mentioned;
+- people, organisations, themes and tone.
+
+A file every 15 minutes is ~4.5 MB zipped, 14 MB inflated, ~950 rows. Two
+properties of the feed shape the design:
+
+- `lastupdate.txt` names each file about an hour before it downloads. The
+  Worker walks forward from its own ledger (`ingest_runs`) and treats a 404 as
+  "not yet", never as an error. A slot still missing after 3 hours is skipped.
+- GDELT locations use FIPS 10-4 country codes, not ISO (`AS` is Australia,
+  `AU` Austria). They are converted with a table generated from GeoNames
+  (CC BY 4.0).
+
+**It needs the Workers Paid plan.** Worker CPU per slot is 80–280 ms. That
+is process CPU in Node, minus database time, over 16 real slots. The free
+plan allows 10 ms per cron run, and inflating the file alone takes ~30 ms.
+The paid plan allows 30 s.
+**Cost:** $5 a month, decided before building.
+
+**English feed only.** The translated feed would add ~2,900 rows per slot in
+65 languages. Their titles stay in the original language, and it would triple
+CPU and storage. It uses the same file format, so adding it later changes
+which files the Worker fetches, not the parser.
+
+**Gaps are skipped and counted, never geocoded.** 16% of rows have no location.
+
+- An unplaced article still joins a story another article placed: the
+  Newsquest copies of a story carry no location of their own.
+- A group with no placed article is dropped, and the run logs how many.
+- Stale re-crawls, pages titled with the site's name, wire digests ("AP News
+  Summary at 3:30 a.m.") and sub-3-word titles are skipped by reason, with
+  sample URLs in the log.
+
+**De-duplication, in three layers:**
+
+1. **URL.** Canonical form: no tracking parameters, fragment or default port
+   (asiaone.com appeared with and without `:443`). The key also ignores
+   `www.`. Known shorteners are followed with HEAD, within a per-run budget.
+   URLs already stored are dropped.
+2. **Write-ups.** A 64-bit simhash over the title's character trigrams; within
+   3 bits means one write-up. One PA story ran on 42 Newsquest papers. A second
+   copy on the same outlet is dropped, in the batch and across batches.
+3. **Events.** The same event runs under many headlines: the White House
+   press-access ruling had ~25. Each write-up gets event keys from four
+   sources:
+   - people, as first initial plus surname;
+   - organisations;
+   - the city-level place;
+   - headline words.
+
+   The merge rule: **two distinctive headline words plus one shared person,
+   organisation or place.** Body entities alone glued unrelated AAP stories
+   together through the boilerplate "Australian Associated Press".
+   Keys carried by ≥1% of write-ups are ignored. That list has 53 keys,
+   sampled every 3 hours over a week. A four-hour sample let that day's
+   biggest story leak its own judge's name into it.
+   A cluster's signature keeps only keys a quarter of its write-ups share, so
+   members cannot chain in unrelated stories.
+
+   On one real hour this rule made the ruling one story of 97 articles and kept
+   the Trump–Xi summit separate. Some broad topic clusters remain (Asian Games
+   results). Over-merging was judged worse than a duplicate pin.
+
+**Heat, 0–255:**
+
+```
+I = min(W, O) + 0.25 · max(0, O − W)      W write-ups, O outlets
+C = distinct known source countries        V = outlets first seen in the last hour
+sat(x, k) = min(1, ln(1 + x) / ln(1 + k))
+heat = round(255 · (0.5·sat(I − 1, 49) + 0.3·sat(C − 1, 15) + 0.2·sat(V, 30)))
+```
+
+- **Independent sources, not outlets:** syndicated copies count a quarter,
+  so one wire story on 42 papers ranks below ten separate newsrooms.
+- **Source country:** GDELT's domain list for generic TLDs (95,630 domains,
+  covering 99% of those rows), then the country-code TLD. 99.1% of ingested
+  articles get one.
+- **Velocity** uses GDELT's seen time. Publish times are missing on 46% of
+  rows and lag by a median 1.4 h where present.
+- **Heat is the story's peak.** Decaying stories that get no new coverage would
+  mean re-reading thousands of rows every 15 minutes. ingest_apply only lets
+  it rise.
+- **Calibration:** a first guess of 19/7/15 pinned seven stories at 255 and
+  queued ~140 a day. 49/15/30 queues six in four real hours (~36 a day, inside
+  the build plan's 20–60), and those six are the day's genuine stories.
+  A lone article scores 10. The queue threshold stays 215, matching the seed.
+  Weights, saturation points and the threshold are config (`src/config.ts`).
+
+**Categories:**
+
+- Themes map to our eight categories through a table of themes seen in the
+  live feed. Each theme is weighted 1–3 and counted at most its weight in
+  mentions, so weak themes cannot add up.
+- On 17 hand-labelled real headlines it agrees on 14. The three misses are
+  named in the test: GDELT gave the telescope story no science theme.
+- 54% of stories are `world`, the fallback, because much of GKG is local
+  news with no clear category.
+
+**Stories evolve until they are queued.**
+
+- Title, place and category are re-derived from all the evidence each run.
+  The first article alone often places a story badly.
+- They freeze once the story is queued, so the admin sees a stable story.
+  `ingest_apply` enforces this too.
+- **Known limit:** GDELT's own location errors remain. The OpenAI breach of an
+  Australian website was placed in New York. The build plan's "why this
+  location" line and manual correction are the answer.
+
+**Database side:**
+
+- **`story_signals` holds the grouping state beside `stories`**, so public
+  reads never carry it.
+- **One transactional `ingest_apply`** per slot writes stories, signals and
+  articles and marks the slot done. A failure leaves nothing half-written.
+- **`ingest_candidates` hash-joins keys instead of using a GIN index.** It
+  took 32 ms where GIN probes took 4.3 s on 3,600 real stories, and a GIN
+  index was half the table's storage.
+- **Signals are pruned after the 24-hour match window**, since nothing reads
+  them later. Stories stay 48 hours.
+- **PostgREST returns at most 1,000 rows and says nothing when it cuts.** The
+  first real run silently lost candidate matches, so calls are chunked, and a
+  full page is an error.
+
+**2.1's function lock-down did not work, and was fixed here.** New functions
+get EXECUTE for PUBLIC from a global default. A per-schema `alter default
+privileges … revoke` cannot remove a global default. It never mattered
+because no function existed until 2.2. The existing pgTAP guard caught it on
+the first function. The fix is a global default revoke plus explicit revokes
+per function.
+
+**Storage, projected** from measured row sizes and replayed volume (about
+34,000 stories and 68,000 articles a day):
+
+- stories: 476 B each, about 33 MB for 48 h;
+- articles: 657 B each, about 90 MB;
+- signals: 1.76 KB each, 24 h only, about 60 MB.
+
+That is roughly 180 MB steady, inside Supabase's free 500 MB but worth
+watching.
+
+**Smaller choices:**
+
+- **No supabase-js in the Worker.** It makes seven calls over typed `fetch`.
+- **No `@cloudflare/workers-types`.** The code uses standard Web APIs, and the
+  one Cloudflare-specific type it needs, the cron controller, is declared in
+  `index.ts`. So one tsconfig covers the Worker, and tests run in Node.
+
+---
+
 ## 2026-09-24 — Database: deny by default, reads only, writes wait for their prompts
 
 **The schema is the build plan's §3**, applied in three migrations (news,
@@ -20,6 +183,8 @@ matrix. Changes from §3, and why:
   because PostgREST serves them as RPC.
   **Cost:** any future function a client calls, including helpers used inside
   policies, needs an explicit `grant execute`.
+  **Corrected in Prompt 2.2:** the per-schema revoke did not reach functions,
+  because PUBLIC's EXECUTE is a global default. See the ingest entry above.
 - **No client writes yet.** Prompt 2.1 says what signed-out users may not do
   but does not define what signed-in users may write. The rules for that
   belong to 4.1–4.3: rules accepted, open discussions only, rate limits, no

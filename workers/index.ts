@@ -1,11 +1,7 @@
 /**
- * Cloudflare Worker entry: cron ingest + API edge.
- *
- * Phase 2 fills this in (GDELT pull every 15 minutes, dedupe, heat scoring, and
- * the columnar payload endpoint). Service keys live here and never in the client.
- *
- * This stub typechecks against the app tsconfig; it gets its own tsconfig and
- * @cloudflare/workers-types when the real handler lands.
+ * Placeholder for the API Worker (Prompt 2.3: the columnar payload endpoint).
+ * The ingest Worker is in workers/ingest/. Service keys live in Workers and
+ * never in the client.
  */
 export default {
   fetch(_request: Request): Response {
