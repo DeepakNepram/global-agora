@@ -2,7 +2,8 @@ import { NEWS_CATEGORIES, nodeBufferCapacity, type NodeBuffer } from './nodeBuff
 import { mulberry32 } from './random';
 
 /**
- * Placeholder stories until Prompt 2.3 serves real ones.
+ * Placeholder stories: the dev panel's mock loads and the pin benchmark.
+ * Real stories come from GET /api/nodes (src/core/data/nodes.ts).
  *
  * Seeded, so a benchmark run draws exactly the same pins every time and two
  * measurements differ only in what was changed.
@@ -57,6 +58,14 @@ export function fillMockNodes(buffer: NodeBuffer, options: MockNodeOptions): Nod
     );
     const u = random();
     heat[i] = Math.floor(255 * u * u * u);
+
+    // Derived without drawing, so the same seed still gives the same pins as
+    // every earlier benchmark.
+    buffer.ids[i] = i + 1;
+    buffer.sourceCounts[i] = 1 + ((heat[i] ?? 0) >> 4);
+    buffer.discussionOpen[i] = 0;
+    buffer.headlines[i] = `Placeholder story ${i + 1}`;
+    buffer.places[i] = '';
   }
   return buffer;
 }

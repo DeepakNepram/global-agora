@@ -1,10 +1,10 @@
 /**
  * The story nodes the globe draws, as columns of typed arrays.
  *
- * This is the in-memory shape of the build plan's columnar payload (§3): Prompt
- * 2.3 decodes the payload straight into it, and the pin renderer reads it
- * without an intermediate object per story. Arrays are sized by capacity and
- * `count` says how many rows are live, so a refresh can reuse the same memory.
+ * This is the in-memory shape of the build plan's columnar payload (§3):
+ * src/core/data/nodes.ts decodes the payload straight into it, and the pin
+ * renderer reads it without an intermediate object per story. Arrays are sized
+ * by capacity and `count` says how many rows are live.
  */
 
 /**
@@ -40,6 +40,16 @@ export interface NodeBuffer {
   readonly categories: Uint8Array;
   /** 0–255 per node (build plan: source count, diversity, velocity). */
   readonly heat: Uint8Array;
+  /** Story id per node (stories.seq), for GET /api/story/:id. */
+  readonly ids: Uint32Array;
+  /** Distinct outlets covering each story. */
+  readonly sourceCounts: Uint16Array;
+  /** 1 where the story's discussion is open. */
+  readonly discussionOpen: Uint8Array;
+  /** Headline per node: a column of strings, not an object per story. */
+  readonly headlines: string[];
+  /** Place name per node, empty when unknown. */
+  readonly places: string[];
 }
 
 export function nodeBufferCapacity(buffer: NodeBuffer): number {
@@ -57,5 +67,10 @@ export function createNodeBuffer(capacity: number): NodeBuffer {
     publishedSec: new Int32Array(capacity),
     categories: new Uint8Array(capacity),
     heat: new Uint8Array(capacity),
+    ids: new Uint32Array(capacity),
+    sourceCounts: new Uint16Array(capacity),
+    discussionOpen: new Uint8Array(capacity),
+    headlines: new Array<string>(capacity).fill(''),
+    places: new Array<string>(capacity).fill(''),
   };
 }

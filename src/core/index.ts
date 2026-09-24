@@ -44,6 +44,20 @@ export type { NewsCategory, NodeBuffer } from './nodeBuffer';
 export { fillMockNodes } from './mockNodes';
 export type { MockNodeOptions } from './mockNodes';
 
+export { decodeNodes, fetchNodes, nodesUrl, NodesFetchError } from './data/nodes';
+export type { FetchLike, FetchNodesOptions, FetchNodesResult } from './data/nodes';
+export {
+  dequantizeLat,
+  dequantizeLon,
+  parseNodesPayload,
+  quantizeLat,
+  quantizeLon,
+  COORD_SCALE,
+  PAYLOAD_VERSION,
+  PayloadError,
+} from './data/payload';
+export type { NodeColumns, NodesPayload } from './data/payload';
+
 export { equationOfTimeMinutes, julianDay, subsolarPoint, sunDirection } from './sun';
 
 export { createFrameStats, percentile } from './frameStats';
