@@ -47,6 +47,23 @@ export type { MockNodeOptions } from './mockNodes';
 export { decodeNodes, fetchNodes, nodesUrl, NodesFetchError } from './data/nodes';
 export type { FetchLike, FetchNodesOptions, FetchNodesResult } from './data/nodes';
 export { retryDelayMs, startNodesFeed } from './data/nodesFeed';
+
+// The cluster engine (./cluster/engine) is deliberately absent: it pulls in
+// supercluster, which belongs in the worker chunk. The worker imports it directly.
+export {
+  CLUSTER_DEBOUNCE_MS,
+  CLUSTER_MAX_ZOOM,
+  CLUSTER_RADIUS_PX,
+  CLUSTER_REFERENCE_LAT_DEG,
+  CLUSTER_TILE_PX,
+  PETAL_LEVEL,
+  UNCLUSTERED_LEVEL,
+} from './cluster/constants';
+export { CLUSTER_ROLE, countVisible, unclusteredLayout } from './cluster/layout';
+export type { ClusterLayout, ClusterRole } from './cluster/layout';
+export { clusterColumns, createClusterClient } from './cluster/clusterClient';
+export type { ClusterClient, ClusterClientOptions } from './cluster/clusterClient';
+export type { ClusterColumns, ClusterReply, ClusterRequest } from './cluster/protocol';
 export type { NodesFeed, NodesFeedCallbacks, NodesFeedOptions, Timers } from './data/nodesFeed';
 export {
   dequantizeLat,
