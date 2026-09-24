@@ -19,6 +19,12 @@
       "runtimeArgs": ["run", "preview", "--", "--mode", "lan", "--port", "4173", "--strictPort"],
       "port": 4173,
       "url": "https://localhost:4173"
+    },
+    {
+      "name": "ingest-worker",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "ingest:dev", "--", "--port", "8787"],
+      "port": 8787
     }
   ]
 }

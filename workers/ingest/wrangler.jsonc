@@ -1,0 +1,23 @@
+// The ingest Worker. Deploy: npx wrangler deploy -c workers/ingest/wrangler.jsonc
+// Secrets (npx wrangler secret put NAME -c workers/ingest/wrangler.jsonc):
+//   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, INGEST_TRIGGER_SECRET
+// Locally they come from workers/ingest/.dev.vars (see .dev.vars.example).
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "global-agora-ingest",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  // GDELT publishes a GKG file every 15 minutes. Needs the Workers Paid plan:
+  // a batch takes ~100 ms of CPU, and the free plan allows 10 ms per cron run.
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "observability": { "enabled": true },
+  // The outlet -> country list is a text module, bundled as a string.
+  "rules": [{ "type": "Text", "globs": ["**/*.txt"], "fallthrough": true }],
+  // Tuning; every value here is also the default in src/config.ts.
+  "vars": {
+    "GDELT_BASE_URL": "https://data.gdeltproject.org/gdeltv2",
+    "INGEST_QUEUE_HEAT": "215",
+    "INGEST_RETENTION_HOURS": "48",
+    "INGEST_MAX_SLOTS_PER_RUN": "2",
+  },
+}

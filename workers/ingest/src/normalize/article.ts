@@ -10,7 +10,11 @@ import type { OutletCountry } from './outlets.ts';
 import { cleanTitle } from './title.ts';
 import { canonicalUrl, urlKey } from './url.ts';
 
-/** GDELT re-crawls old pages; seen more than this long after publishing is not news. */
+/**
+ * GDELT re-crawls old pages; seen more than this long after publishing is not
+ * news. The pipeline passes retention minus the feed's lag instead, so no
+ * story is written only to be pruned in the same run.
+ */
 export const MAX_ARTICLE_AGE_SEC = 48 * 3600;
 /** Clock skew allowed on a publish time that claims to be after GDELT saw the page. */
 const FUTURE_TOLERANCE_SEC = 15 * 60;
@@ -47,13 +51,15 @@ export type Normalized =
 
 export interface NormalizeContext {
   readonly outletCountry: OutletCountry;
+  /** Oldest publish time accepted, as seconds before GDELT saw the page. */
+  readonly maxAgeSec?: number;
 }
 
 /** The page's own publish time when plausible, else when GDELT saw it. */
-function publishTime(record: GkgRecord): number | 'stale' {
+function publishTime(record: GkgRecord, maxAgeSec: number): number | 'stale' {
   const published = record.publishedAt;
   if (published === null || published > record.seenAt + FUTURE_TOLERANCE_SEC) return record.seenAt;
-  if (record.seenAt - published > MAX_ARTICLE_AGE_SEC) return 'stale';
+  if (record.seenAt - published > maxAgeSec) return 'stale';
   return published;
 }
 
@@ -69,7 +75,7 @@ export function normalizeRecord(record: GkgRecord, context: NormalizeContext): N
   const title = cleanTitle(record.title, record.domain);
   if (!title.ok) return skip(title.reason);
 
-  const publishedAt = publishTime(record);
+  const publishedAt = publishTime(record, context.maxAgeSec ?? MAX_ARTICLE_AGE_SEC);
   if (publishedAt === 'stale') return skip('stale');
 
   const image = record.imageUrl === null ? null : canonicalUrl(record.imageUrl);

@@ -1,0 +1,8 @@
+# Copy to workers/ingest/.dev.vars for `npm run ingest:dev` (gitignored).
+# Local Supabase values come from `npx supabase status`: the API URL and the
+# secret (service role) key. Never put a hosted project's key in a file that
+# could be committed; in production these are `wrangler secret put` secrets.
+SUPABASE_URL=http://127.0.0.1:54321
+SUPABASE_SERVICE_ROLE_KEY=
+# At least 32 characters, e.g. from: node -e "console.log(crypto.randomUUID()+crypto.randomUUID())"
+INGEST_TRIGGER_SECRET=
