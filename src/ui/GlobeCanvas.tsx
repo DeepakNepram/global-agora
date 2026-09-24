@@ -14,7 +14,7 @@ import {
 
 import { CameraDebugControls } from './globe/CameraDebugControls';
 import { CameraOverlay } from './globe/CameraOverlay';
-import { PIN_COUNTS, type PinCount } from './globe/debugControls';
+import type { PinSource } from './globe/debugControls';
 import { createFrameProbe } from './globe/frameProbe';
 import { FrameTimeOverlay } from './globe/FrameTimeOverlay';
 import { GlobeDebugPanel } from './globe/GlobeDebugPanel';
@@ -26,13 +26,14 @@ import { RenderDebugControls } from './globe/RenderDebugControls';
 import { TierDebugControls } from './globe/TierDebugControls';
 import { useGlobeControls, type GlobeControlsOptions } from './globe/useGlobeControls';
 import { useLiveClock } from './globe/useLiveClock';
+import { usePinNodes } from './globe/usePinNodes';
 import { usePrefersReducedMotion } from './globe/usePrefersReducedMotion';
 import { useRenderPipeline, type RenderPipelineOptions } from './globe/useRenderPipeline';
 import { vignetteCssGradient } from './globe/vignette';
 
 export interface GlobeCanvasProps {
   readonly tier: QualityTier;
-  /** AppConfig.historyWindowHours: the placeholder stories span this window. */
+  /** AppConfig.historyWindowHours: the dev panel's mock stories span this window. */
   readonly historyWindowHours: number;
 }
 
@@ -83,7 +84,8 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
   const reducedMotionPreferred = usePrefersReducedMotion();
   const [fullMotion, setFullMotion] = useState(false);
   const [pinsVisible, setPinsVisible] = useState(true);
-  const [pinCount, setPinCount] = useState<PinCount>(PIN_COUNTS[0]);
+  const [pinSource, setPinSource] = useState<PinSource>('live');
+  const pinNodes = usePinNodes(pinSource, historyWindowHours);
   // Set while the pin benchmark runs. The dev overlays hide meanwhile: their
   // backdrop blur is recomposited over the canvas every frame, which costs a
   // phone real time and which production never pays.
@@ -149,12 +151,7 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
           cloudsVisible={cloudsVisible}
           atmosphere={atmosphere}
         />
-        <PinScene
-          count={pinCount}
-          visible={pinsVisible}
-          motion={motion}
-          windowHours={historyWindowHours}
-        />
+        <PinScene nodes={pinNodes} visible={pinsVisible} motion={motion} />
         <ControlsHost motion={motion} onReady={setControls} />
         <PipelineHost settings={settings} bloomEnabled={bloomEnabled} probe={probe} />
       </Canvas>
@@ -186,8 +183,8 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
           <PinDebugControls
             visible={pinsVisible}
             onVisibleChange={setPinsVisible}
-            count={pinCount}
-            onCountChange={setPinCount}
+            source={pinSource}
+            onSourceChange={setPinSource}
           />
           {probe && (
             <PinBenchmark
@@ -195,9 +192,9 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
               tier={tier}
               controls={controls}
               pinsVisible={pinsVisible}
-              pinCount={pinCount}
+              pinSource={pinSource}
               onPinsVisibleChange={setPinsVisible}
-              onPinCountChange={setPinCount}
+              onPinSourceChange={setPinSource}
               onRunningChange={setBenchmarking}
             />
           )}

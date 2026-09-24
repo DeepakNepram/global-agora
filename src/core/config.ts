@@ -22,6 +22,11 @@ export interface AppConfig {
   readonly maxPostLength: number;
   /** Base URL of the Workers API that serves the columnar payload. */
   readonly apiBaseUrl: string;
+  /**
+   * How often the globe re-checks the payload. Ingest writes every 15 minutes
+   * and the API caches for 60 s; an unchanged check is a bodiless 304.
+   */
+  readonly payloadRefreshSeconds: number;
 }
 
 export type EnvBag = Readonly<Record<string, string | undefined>>;
@@ -32,6 +37,7 @@ export const FREE_TIER_DEFAULTS: AppConfig = {
   alertLimit: 5,
   maxPostLength: 500,
   apiBaseUrl: '/api',
+  payloadRefreshSeconds: 120,
 };
 
 function readInt(env: EnvBag, key: string, fallback: number): number {
@@ -58,5 +64,10 @@ export function resolveConfig(env: EnvBag): AppConfig {
     alertLimit: readInt(env, 'VITE_ALERT_LIMIT', FREE_TIER_DEFAULTS.alertLimit),
     maxPostLength: readInt(env, 'VITE_MAX_POST_LENGTH', FREE_TIER_DEFAULTS.maxPostLength),
     apiBaseUrl: readString(env, 'VITE_API_BASE_URL', FREE_TIER_DEFAULTS.apiBaseUrl),
+    payloadRefreshSeconds: readInt(
+      env,
+      'VITE_PAYLOAD_REFRESH_SECONDS',
+      FREE_TIER_DEFAULTS.payloadRefreshSeconds,
+    ),
   };
 }

@@ -12,14 +12,14 @@ import {
   type BenchRow,
   type PairedSummary,
 } from './benchReport';
-import { DEBUG_BUTTON, PIN_COUNTS, type PinCount } from './debugControls';
+import { DEBUG_BUTTON, PIN_COUNTS, type PinCount, type PinSource } from './debugControls';
 import type { FrameProbe } from './frameProbe';
 
 /** Lets a state change reach the scene and its first frames draw before measuring. */
 const SETTLE_MS = 400;
 const POLL_MS = 250;
 const PAIRS = 3;
-/** Prompt 1.5's acceptance load. */
+/** Prompt 1.5's acceptance load, always the seeded mock so runs stay comparable. */
 const PIN_LOAD: PinCount = PIN_COUNTS[0];
 
 export interface PinBenchmarkProps {
@@ -27,9 +27,9 @@ export interface PinBenchmarkProps {
   readonly tier: QualityTier;
   readonly controls: OrbitGlobeControls | null;
   readonly pinsVisible: boolean;
-  readonly pinCount: PinCount;
+  readonly pinSource: PinSource;
   readonly onPinsVisibleChange: (visible: boolean) => void;
-  readonly onPinCountChange: (count: PinCount) => void;
+  readonly onPinSourceChange: (source: PinSource) => void;
   /** The host hides its dev overlays while a run is in progress. */
   readonly onRunningChange: (running: boolean) => void;
 }
@@ -80,8 +80,8 @@ function formatSummary(summary: PairedSummary): string {
  * .bench/results.jsonl on the development machine.
  */
 export function PinBenchmark(props: PinBenchmarkProps): JSX.Element {
-  const { probe, tier, controls, pinsVisible, pinCount } = props;
-  const { onPinsVisibleChange, onPinCountChange, onRunningChange } = props;
+  const { probe, tier, controls, pinsVisible, pinSource } = props;
+  const { onPinsVisibleChange, onPinSourceChange, onRunningChange } = props;
   const [running, setRunning] = useState(false);
   const [rows, setRows] = useState<readonly BenchRow[]>([]);
   const [status, setStatus] = useState('');
@@ -103,7 +103,7 @@ export function PinBenchmark(props: PinBenchmarkProps): JSX.Element {
     try {
       for (const step of pairedSchedule(PAIRS, PIN_LOAD)) {
         onPinsVisibleChange(step.pins > 0);
-        onPinCountChange(PIN_LOAD);
+        onPinSourceChange(PIN_LOAD);
         await wait(SETTLE_MS);
         page.hiddenDuringRun = document.visibilityState !== 'visible';
         probe.startBenchmark();
@@ -117,7 +117,7 @@ export function PinBenchmark(props: PinBenchmarkProps): JSX.Element {
       document.removeEventListener('visibilitychange', onVisibility);
       release?.();
       onPinsVisibleChange(pinsVisible);
-      onPinCountChange(pinCount);
+      onPinSourceChange(pinSource);
       onRunningChange(false);
     }
 

@@ -6,19 +6,19 @@ import {
   PIN_COUNTS,
   PINS_KEY,
   isTypingTarget,
-  type PinCount,
+  type PinSource,
 } from './debugControls';
 
 export interface PinDebugControlsProps {
   readonly visible: boolean;
   readonly onVisibleChange: (visible: boolean) => void;
-  readonly count: PinCount;
-  readonly onCountChange: (count: PinCount) => void;
+  readonly source: PinSource;
+  readonly onSourceChange: (source: PinSource) => void;
 }
 
-/** Shows or hides the pins and switches between the acceptance and stress loads. */
+/** Shows or hides the pins and switches between live news and the mock loads. */
 export function PinDebugControls(props: PinDebugControlsProps): JSX.Element {
-  const { visible, onVisibleChange, count, onCountChange } = props;
+  const { visible, onVisibleChange, source, onSourceChange } = props;
   const labelId = useId();
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export function PinDebugControls(props: PinDebugControlsProps): JSX.Element {
   return (
     <div role="group" aria-labelledby={labelId} className="flex flex-col gap-1">
       <p id={labelId} className="text-[11px] uppercase tracking-wide text-muted">
-        Pins (placeholder data)
+        Pins
       </p>
       <button
         type="button"
@@ -46,15 +46,23 @@ export function PinDebugControls(props: PinDebugControlsProps): JSX.Element {
         <kbd className={DEBUG_KBD}>{PINS_KEY.toUpperCase()}</kbd>
         Show pins
       </button>
+      <button
+        type="button"
+        className={DEBUG_BUTTON}
+        aria-pressed={source === 'live'}
+        onClick={() => onSourceChange('live')}
+      >
+        Live news
+      </button>
       {PIN_COUNTS.map((option) => (
         <button
           key={option}
           type="button"
           className={DEBUG_BUTTON}
-          aria-pressed={count === option}
-          onClick={() => onCountChange(option)}
+          aria-pressed={source === option}
+          onClick={() => onSourceChange(option)}
         >
-          {option.toLocaleString('en-GB')} stories
+          {option.toLocaleString('en-GB')} mock stories
         </button>
       ))}
     </div>

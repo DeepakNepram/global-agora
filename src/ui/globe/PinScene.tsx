@@ -1,20 +1,15 @@
 import { useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useMemo, useState, type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 
-import { createNodeBuffer, fillMockNodes } from '@/core';
+import type { NodeBuffer } from '@/core';
 import { createPinLayer, type MotionPreference, type PinLayer } from '@/globe';
 import { timeStore } from '@/state';
 
-/** Fixed, so every load and every benchmark draws the same placeholder pins. */
-const MOCK_SEED = 1;
-
 export interface PinSceneProps {
-  /** Placeholder stories to draw until Prompt 2.3 serves real ones. */
-  readonly count: number;
+  /** The stories to draw (usePinNodes); null until the first payload arrives. */
+  readonly nodes: NodeBuffer | null;
   readonly visible: boolean;
   readonly motion: MotionPreference;
-  /** AppConfig.historyWindowHours: how far back the placeholder stories reach. */
-  readonly windowHours: number;
 }
 
 /**
@@ -23,12 +18,7 @@ export interface PinSceneProps {
  * globe draws at display rate; under reduced motion the pins hold still and
  * render-on-demand idles as before.
  */
-export function PinScene({
-  count,
-  visible,
-  motion,
-  windowHours,
-}: PinSceneProps): JSX.Element | null {
+export function PinScene({ nodes, visible, motion }: PinSceneProps): JSX.Element | null {
   const gl = useThree((state) => state.gl);
   const invalidate = useThree((state) => state.invalidate);
   const width = useThree((state) => state.size.width);
@@ -46,21 +36,9 @@ export function PinScene({
     };
   }, []);
 
-  // The window ends at the instant shown when the stories are generated, so
-  // live mode then ages them in real time and a scrub back hides the newest.
-  const nodes = useMemo(
-    () =>
-      fillMockNodes(createNodeBuffer(count), {
-        count,
-        windowEndMs: timeStore.getState().timeMs,
-        windowHours,
-        seed: MOCK_SEED,
-      }),
-    [count, windowHours],
-  );
-
+  // Each payload is a new NodeBuffer, so this runs once per real change.
   useEffect(() => {
-    if (!layer) return;
+    if (!layer || !nodes) return;
     layer.updateInstances(nodes);
     invalidate();
   }, [layer, nodes, invalidate]);

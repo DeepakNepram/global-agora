@@ -32,6 +32,25 @@ function lanServer(mode: string): ServerOptions {
   return { host: '0.0.0.0', https: { key: readFileSync(DEV_KEY), cert: readFileSync(DEV_CERT) } };
 }
 
+/**
+ * /api goes to the API Worker (`npm run api:dev`), so the app calls it
+ * same-origin in development as it will in production. API_PROXY_TARGET, a
+ * shell variable (Vite does not load .env files into process.env), overrides
+ * the address; it is never shipped to the client.
+ *
+ * Accept-Encoding is set to "br, gzip" because wrangler's local stand-in for
+ * Cloudflare's edge re-encodes to the client's first-listed coding, and
+ * browsers list gzip first. The real edge keeps the Worker's Brotli, so
+ * without this the dev payload would be 157 KB of gzip, not the 131 KB served.
+ */
+const apiProxy = {
+  '/api': {
+    target: process.env['API_PROXY_TARGET'] ?? 'http://127.0.0.1:8788',
+    changeOrigin: true,
+    headers: { 'accept-encoding': 'br, gzip' },
+  },
+};
+
 export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss(), devReports()],
   resolve: {
@@ -39,8 +58,8 @@ export default defineConfig(({ mode }) => ({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
-  server: lanServer(mode),
-  preview: lanServer(mode),
+  server: { ...lanServer(mode), proxy: apiProxy },
+  preview: { ...lanServer(mode), proxy: apiProxy },
   build: {
     // Source maps ship so Sentry can symbolicate the first Android white-screen.
     sourcemap: true,

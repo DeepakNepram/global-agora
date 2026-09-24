@@ -11,10 +11,12 @@ describe('resolveConfig', () => {
     const config = resolveConfig({
       VITE_HISTORY_WINDOW_HOURS: '168',
       VITE_API_BASE_URL: 'https://api.example.com',
+      VITE_PAYLOAD_REFRESH_SECONDS: '300',
     });
 
     expect(config.historyWindowHours).toBe(168);
     expect(config.apiBaseUrl).toBe('https://api.example.com');
+    expect(config.payloadRefreshSeconds).toBe(300);
     // Unset keys keep their defaults rather than becoming NaN/undefined.
     expect(config.maxPostLength).toBe(500);
   });

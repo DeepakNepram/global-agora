@@ -46,6 +46,8 @@ export type { MockNodeOptions } from './mockNodes';
 
 export { decodeNodes, fetchNodes, nodesUrl, NodesFetchError } from './data/nodes';
 export type { FetchLike, FetchNodesOptions, FetchNodesResult } from './data/nodes';
+export { retryDelayMs, startNodesFeed } from './data/nodesFeed';
+export type { NodesFeed, NodesFeedCallbacks, NodesFeedOptions, Timers } from './data/nodesFeed';
 export {
   dequantizeLat,
   dequantizeLon,

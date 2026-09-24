@@ -2,7 +2,9 @@ import { useMemo, type JSX } from 'react';
 
 import type { AppConfig } from '@/core';
 
+import { useNodesFeed } from './data/useNodesFeed';
 import { GlobeCanvas } from './GlobeCanvas';
+import { NewsStatus } from './NewsStatus';
 import { resolveQuality } from './platform/capabilities';
 
 export interface AppProps {
@@ -17,6 +19,11 @@ export interface AppProps {
 export function App({ config }: AppProps): JSX.Element {
   // Probing creates and discards a GL context, so do it once per mount.
   const quality = useMemo(() => resolveQuality(), []);
+  useNodesFeed({
+    baseUrl: config.apiBaseUrl,
+    hours: config.historyWindowHours,
+    refreshSeconds: config.payloadRefreshSeconds,
+  });
 
   return (
     <div className="flex h-full flex-col bg-void text-ink">
@@ -27,11 +34,10 @@ export function App({ config }: AppProps): JSX.Element {
         Skip to globe
       </a>
 
-      <header className="flex items-baseline gap-3 px-6 py-4">
+      <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-6 py-4">
         <h1 className="text-lg font-semibold tracking-tight">Global Agora</h1>
-        <p className="text-sm text-muted">
-          Phase 1 preview. Pins are random placeholder data, not real news.
-        </p>
+        <p className="text-sm text-muted">Preview. Pins are news stories from GDELT.</p>
+        <NewsStatus />
       </header>
 
       <main id="globe" tabIndex={-1} aria-label="News globe" className="relative min-h-0 flex-1">

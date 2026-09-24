@@ -80,6 +80,9 @@ export const PINS_KEY = 'p';
 export const PIN_COUNTS = [3000, 10_000] as const;
 export type PinCount = (typeof PIN_COUNTS)[number];
 
+/** What the pins show: the live payload, or a seeded mock load of that many stories. */
+export type PinSource = 'live' | PinCount;
+
 /** Single-key shortcuts must not fire while someone is typing into a field. */
 export function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
