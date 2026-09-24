@@ -48,7 +48,11 @@ browser <──Brotli, ETag, SWR── API Worker <─────────�
 3. The client (`src/core/data/`) decodes the payload straight into a
    `NodeBuffer` of typed arrays and re-checks it every two minutes; an
    unchanged payload is a 304. The pin layer draws the buffer as it is.
-4. Phase 3: the time scrubber filters those arrays client-side, with no
+4. A Web Worker clusters the buffer with supercluster (`src/core/cluster/`,
+   Prompt 3.1). The pin scene asks it for the layout at the camera's zoom
+   level, and the pin layer animates each change on the GPU: orbs bloom into
+   their children, and stacked stories into a sunflower.
+5. Phase 3: the time scrubber filters those arrays client-side, with no
    network calls, and moves pin visibility, brightness and the sun together.
 
 The wire format is defined once, in `src/core/data/payload.ts`, and both the
@@ -56,11 +60,16 @@ Worker and the client validate against it.
 
 ## Render rules
 
-- One `InstancedMesh` for all pins. Never one mesh per pin.
+- One `InstancedMesh` for all pins, cluster orbs included. Never one mesh per pin.
+- Pin slots are keyed by story id, never by row.
+- Animations are springs the vertex shader evaluates; the CPU writes a
+  transition once, not every frame.
 - Render on demand: stop the loop when nothing is moving.
 - Frame-rate-independent smoothing only — see `src/globe/smoothing.ts`.
 
 ## Open questions
 
 - Quality tiers: how to detect a mid-range Android without a benchmark frame.
-- Cluster bloom animation: instanced or a second pass?
+
+Resolved: the cluster bloom is instanced, in the pins' own mesh and vertex
+shader (DECISIONS, 2026-09-24).

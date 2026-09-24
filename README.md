@@ -7,9 +7,10 @@ discussions.
 Web first. Native mobile is a later phase, so the code stays portable — see
 [the boundary](#the-boundary-that-matters).
 
-**Status: Phase 2.** The globe shows real news from GDELT: ingested every 15
-minutes, grouped into stories, served as one compact payload. No scrubber,
-story sheet or discussions yet.
+**Status: Phase 3 in progress.** The globe shows real news from GDELT:
+ingested every 15 minutes, grouped into stories, served as one compact
+payload, clustered in a Web Worker, and opened with an animated bloom as you
+zoom in. No scrubber, story sheet or discussions yet.
 
 ## Requirements
 

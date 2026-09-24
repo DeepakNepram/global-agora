@@ -6,6 +6,109 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-09-24 — Clustering: supercluster in a worker, slots keyed by story id, the bloom on the GPU
+
+Prompt 3.1 clusters the pins and animates clusters opening ("the bloom").
+
+**Stacks are the normal case, so the last level is a sunflower.** In the real
+top 3,000, 2,306 stories share an exact location with another: GDELT pins
+stories to city and country centres (Washington 177, London 95, "Britain" 83).
+Such stories never separate at any zoom. So levels 0–8 are ordinary
+supercluster levels (radius 44 px, tile 512), and level 9 fans every level-8
+cluster out as petals around its centre: angle `i · 137.507°`, radius
+`8 px · √i`, hottest story at the centre, as the product owner chose. Every
+story is reachable on the globe.
+**Cost:** a level-8 cluster can hold stories up to ~10 km apart, which then sit
+in the flower rather than at their own spots: up to ~88 px off when it blooms.
+In the real data the stacks are exact duplicates, so this is 0 there.
+
+**Camera to level.** Level = `floor(zoom)` with ±0.1 hysteresis, where
+`zoom = log2(2π · P · cos 45° / 512)` and `P` is the screen pixels per ground
+radian at the view centre (`viewport height / radiansPerScreenHeight`). World
+view is about zoom 2, a 600 km city view about 7. At 50 km it is at least 9.3,
+even on a 360 px landscape phone, which is why the deepest cluster level is 8.
+Web Mercator shrinks a cluster by cos(lat) on a globe. So we calibrate at 45°,
+where most news is: clusters are 44 px there, ~62 px at the equator and ~31 px
+at 60°. Using the view centre's latitude would re-cluster the whole visible
+hemisphere as you pan.
+
+**supercluster runs in a Web Worker.** The engine
+(`src/core/cluster/engine.ts`) is kept out of core's barrel, so supercluster
+and kdbush ship only in the worker chunk: 13.1 KB raw, 5.3 KB gzip.
+
+- The client (`clusterClient.ts`) sends each payload's columns once.
+- It asks for a layout when the level changes, debounced 150 ms. A zoom
+  gesture crosses levels quickly, and only where it stops matters.
+- It also asks when the displayed instant changes the set of published stories.
+- It uses only the answer to its latest question.
+- Layouts come back as transferable typed arrays.
+
+**Slots are keyed by story id.** A story that survives a payload refresh keeps
+its slot, pulse and animation. A new story takes a free slot. A departed
+story's slot is held until its fade-out has played, so no slot ever draws two
+stories. A cluster is drawn by the slot of its member with the lowest id.
+Ids only grow, so a cluster keeps its drawing slot across refreshes, and the
+child cluster that contains that member inherits the slot: the orb visibly
+travels to it.
+
+**The bloom runs in the vertex shader, one instanced mesh.** This answers the
+open question in ARCHITECTURE.md.
+
+- Each slot holds a path between two ends (parent and child) and a critically
+  damped spring along it, in 20 floats. The shader evaluates
+  `u = target + (Δ + (v0 + ωΔ)τ)e^(−ωτ)`.
+- With ω = 33/s it settles to 0.1 % in 280 ms without overshoot, then lands
+  exactly. Landing exactly matters: a hidden slot left at alpha 0.0001 would
+  still rasterise its quad.
+- The path spirals about the parent by `(1 − u) · 60°`.
+- The CPU plans a transition once, in O(slots), and a frame of the bloom costs
+  one uniform.
+- Siblings leave `min(18 ms, 300 ms ÷ (n − 1))` apart, as the product owner
+  chose: the prompt's `i · 18 ms` alone is 1.8 s for 100 children. So any
+  bloom ends within 580 ms.
+- Zooming back out reverses along the same path, even halfway through. The
+  planner retargets a slot along its current path whenever the new resting
+  state is one of its ends, carrying its velocity. It starts a new path only
+  when it must, and then from where the slot is drawn now (a CPU mirror of the
+  shader).
+- Under reduced motion every change lands at once (5.1: no bloom animation).
+
+**Count badges** come from a one-row glyph atlas that `src/ui` draws with
+canvas 2D in the app's font. The globe gets only a texture. The count is
+formatted in the vertex shader and rounds down (`1.2k`), so a badge never
+claims more stories than there are.
+
+**Measured** with the dev panel's Bloom benchmark:
+
+- the 3,000 mock stories plus 120 stacked on Washington, each run 5 blooms and
+  5 collapses with 124 slots moving;
+- headless Chrome on the Iris Xe, on mains power, at a 144 Hz frame pace;
+- 1424 × 750 CSS px at 1.25.
+
+| Tier   | Direction | Frames | Interval p50 / p95 / max | Slower than 60 fps | GPU p95 | CPU p95 |
+| ------ | --------- | ------ | ------------------------ | ------------------ | ------- | ------- |
+| HIGH   | bloom     | 418    | 6.9 / 7.4 / 7.7 ms       | 0                  | 6.3 ms  | 0.8 ms  |
+| HIGH   | collapse  | 419    | 6.9 / 7.3 / 8.8 ms       | 0                  | 6.4 ms  | 0.8 ms  |
+| MEDIUM | bloom     | 417    | 6.9 / 7.2 / 9.5 ms       | 0                  | 5.2 ms  | 0.3 ms  |
+| MEDIUM | collapse  | 419    | 6.9 / 7.2 / 8.4 ms       | 0                  | 5.5 ms  | 0.5 ms  |
+
+The live payload's Washington (177 stories), over 3 bloom and collapse cycles,
+held 143–144 frames a second with a worst frame of 7.4 ms.
+
+**Costs and limits:**
+
+- **Planning a transition** (3,120 slots) takes 1.6 ms p50 on the laptop,
+  6–7 ms the first time (JIT) and 4.3 ms for a seven-level jump. A mid-range
+  phone is perhaps 4–5× slower, so a big first transition may cost it one
+  frame.
+- **Size:** the main chunk grew 7.7 KB gzip, 7.0 KB of it the new globe and
+  core code. A slot is 80 bytes, up from 48.
+- **Not yet:** tapping or tabbing to a cluster (3.3's peek card, 5.1's
+  keyboard path). Following a scrubber drag with clusters is left to 3.2; for
+  now the time filter re-clusters after the debounce.
+
+---
+
 ## 2026-09-24 — Payload API: short ids, Brotli 11, and a cache that asks "changed?"
 
 Prompt 2.3's Worker lives in `workers/api/`. It serves `GET /api/nodes` (the
