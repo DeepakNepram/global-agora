@@ -4,6 +4,8 @@
 --
 -- Fixture ids: stories ...71 and ...72 arrive through ingest_apply; ...73 (old,
 -- with a discussion), ...74 (old) and ...75 (recent) are inserted directly.
+-- Fixed slot times are in 2100, so a local database holding real ingest runs
+-- and signals cannot collide with them.
 begin;
 create extension if not exists pgtap with schema extensions;
 select plan(40);
@@ -34,18 +36,18 @@ select ok(has_function_privilege('service_role', 'public.ingest_apply(jsonb)', '
 -- ---------------------------------------------------------------------------
 -- The slot lock.
 -- ---------------------------------------------------------------------------
-select ok(public.ingest_claim('2026-09-24 08:45:00+00'), 'a new slot can be claimed');
-select ok(not public.ingest_claim('2026-09-24 08:45:00+00'), 'a running slot cannot be claimed twice');
-select is(public.ingest_finish('2026-09-24 08:45:00+00', 'failed', null, 'boom'), 'failed',
+select ok(public.ingest_claim('2100-09-24 08:45:00+00'), 'a new slot can be claimed');
+select ok(not public.ingest_claim('2100-09-24 08:45:00+00'), 'a running slot cannot be claimed twice');
+select is(public.ingest_finish('2100-09-24 08:45:00+00', 'failed', null, 'boom'), 'failed',
   'a failed slot is recorded as failed');
-select ok(public.ingest_claim('2026-09-24 08:45:00+00'), 'a failed slot can be claimed again');
-select is((select attempts from public.ingest_runs where slot = '2026-09-24 08:45:00+00'), 2::smallint,
+select ok(public.ingest_claim('2100-09-24 08:45:00+00'), 'a failed slot can be claimed again');
+select is((select attempts from public.ingest_runs where slot = '2100-09-24 08:45:00+00'), 2::smallint,
   'the retry counts as a second attempt');
 
 update public.ingest_runs set started_at = now() - interval '11 minutes'
- where slot = '2026-09-24 08:45:00+00';
-select ok(public.ingest_claim('2026-09-24 08:45:00+00'), 'a claim stuck in running for 10 minutes is taken over');
-select is(public.ingest_finish('2026-09-24 08:45:00+00', 'failed', null, 'boom again'), 'skipped',
+ where slot = '2100-09-24 08:45:00+00';
+select ok(public.ingest_claim('2100-09-24 08:45:00+00'), 'a claim stuck in running for 10 minutes is taken over');
+select is(public.ingest_finish('2100-09-24 08:45:00+00', 'failed', null, 'boom again'), 'skipped',
   'the third failure skips the slot, so the cursor moves on');
 select throws_ok($$select public.ingest_finish(now(), 'done')$$, 'P0001', null,
   'only ingest_apply marks a slot done');
@@ -54,36 +56,36 @@ select throws_ok($$select public.ingest_finish(now(), 'done')$$, 'P0001', null,
 -- ingest_apply writes a batch atomically, and replaying it changes nothing.
 -- ---------------------------------------------------------------------------
 create temporary table batch as select $json${
-  "slot": "2026-09-24T09:00:00Z",
+  "slot": "2100-09-24T09:00:00Z",
   "counts": {"rows": 3},
   "stories": [
     {"id": "00000000-0000-4000-8000-000000000071", "title": "Judge blocks media ban",
      "category": 2, "lat": 38.8977, "lon": -77.0365, "place_name": "White House, District of Columbia",
      "place_conf": 80, "country_code": "US", "heat": 120, "sentiment": -15, "source_count": 2,
-     "published_at": "2026-09-24T08:10:00Z", "first_seen_at": "2026-09-24T09:00:00Z",
+     "published_at": "2100-09-24T08:10:00Z", "first_seen_at": "2100-09-24T09:00:00Z",
      "title_hash": "-1234567890123456789", "discussion_state": "none"},
     {"id": "00000000-0000-4000-8000-000000000072", "title": "Ferry capsizes off East Java",
      "category": 0, "lat": -7.25, "lon": 112.75, "place_name": "Surabaya, Indonesia",
      "place_conf": 60, "country_code": "ID", "heat": 20, "sentiment": -40, "source_count": 1,
-     "published_at": "2026-09-24T07:30:00Z", "first_seen_at": "2026-09-24T09:00:00Z",
+     "published_at": "2100-09-24T07:30:00Z", "first_seen_at": "2100-09-24T09:00:00Z",
      "title_hash": "42", "discussion_state": "none"}
   ],
   "signals": [
     {"story_id": "00000000-0000-4000-8000-000000000071", "keys": ["p:t kelly", "o:cnn", "w:politico"],
-     "state": {"v": 1}, "last_seen_at": "2026-09-24T09:00:00Z"},
+     "state": {"v": 1}, "last_seen_at": "2100-09-24T09:00:00Z"},
     {"story_id": "00000000-0000-4000-8000-000000000072", "keys": ["l:-2703300", "w:capsized"],
-     "state": {"v": 1}, "last_seen_at": "2026-09-24T09:00:00Z"}
+     "state": {"v": 1}, "last_seen_at": "2100-09-24T09:00:00Z"}
   ],
   "articles": [
     {"story_id": "00000000-0000-4000-8000-000000000071", "url": "https://one.example/ban",
      "outlet": "one.example", "outlet_country": "US", "headline": "Judge blocks media ban",
-     "image_url": null, "published_at": "2026-09-24T08:10:00Z", "lang": "en"},
+     "image_url": null, "published_at": "2100-09-24T08:10:00Z", "lang": "en"},
     {"story_id": "00000000-0000-4000-8000-000000000071", "url": "https://two.example/ban",
      "outlet": "two.example", "outlet_country": "GB", "headline": "Judge lifts White House ban",
-     "image_url": "https://two.example/i.jpg", "published_at": "2026-09-24T08:20:00Z", "lang": "en"},
+     "image_url": "https://two.example/i.jpg", "published_at": "2100-09-24T08:20:00Z", "lang": "en"},
     {"story_id": "00000000-0000-4000-8000-000000000072", "url": "https://three.example/ferry",
      "outlet": "three.example", "outlet_country": "SG", "headline": "Ferry capsizes off East Java",
-     "image_url": null, "published_at": "2026-09-24T07:30:00Z", "lang": "en"}
+     "image_url": null, "published_at": "2100-09-24T07:30:00Z", "lang": "en"}
   ]
 }$json$::jsonb as b;
 
@@ -96,9 +98,9 @@ select is((select place_source from public.stories where id = '00000000-0000-400
   'gdelt', 'ingested places are marked as GDELT''s');
 select is((select keys from public.story_signals where story_id = '00000000-0000-4000-8000-000000000071'),
   array['p:t kelly', 'o:cnn', 'w:politico'], 'signals are stored beside the story');
-select is((select status from public.ingest_runs where slot = '2026-09-24 09:00:00+00'), 'done',
+select is((select status from public.ingest_runs where slot = '2100-09-24 09:00:00+00'), 'done',
   'the slot is marked done in the same transaction');
-select ok(not public.ingest_claim('2026-09-24 09:00:00+00'), 'a done slot cannot be claimed');
+select ok(not public.ingest_claim('2100-09-24 09:00:00+00'), 'a done slot cannot be claimed');
 
 select is(public.ingest_apply((select b from batch)),
   '{"stories_new": 0, "stories_updated": 2, "articles_new": 0}'::jsonb,
@@ -133,11 +135,11 @@ select results_eq(
 
 -- One bad row fails the whole batch: nothing from it is written.
 select throws_ok(
-  $$select public.ingest_apply('{"slot": "2026-09-24T09:15:00Z",
+  $$select public.ingest_apply('{"slot": "2100-09-24T09:15:00Z",
      "stories": [{"id": "00000000-0000-4000-8000-000000000079", "title": "Half a batch", "category": 0,
        "lat": 0, "lon": 0, "place_name": null, "place_conf": 10, "country_code": null, "heat": 1,
-       "sentiment": 0, "source_count": 1, "published_at": "2026-09-24T09:00:00Z",
-       "first_seen_at": "2026-09-24T09:15:00Z", "title_hash": "1", "discussion_state": "none"}],
+       "sentiment": 0, "source_count": 1, "published_at": "2100-09-24T09:00:00Z",
+       "first_seen_at": "2100-09-24T09:15:00Z", "title_hash": "1", "discussion_state": "none"}],
      "signals": [],
      "articles": [{"story_id": "00000000-0000-4000-8000-000000000079", "url": "javascript:alert(1)",
        "outlet": "x.example", "outlet_country": null, "headline": "x", "image_url": null,
@@ -145,7 +147,7 @@ select throws_ok(
   '23514', null, 'a batch with an invalid article is refused');
 select ok(not exists (select 1 from public.stories where id = '00000000-0000-4000-8000-000000000079'),
   'and none of that batch is written');
-select ok(not exists (select 1 from public.ingest_runs where slot = '2026-09-24 09:15:00+00'),
+select ok(not exists (select 1 from public.ingest_runs where slot = '2100-09-24 09:15:00+00'),
   'nor is its slot marked done');
 
 -- ---------------------------------------------------------------------------
@@ -154,12 +156,12 @@ select ok(not exists (select 1 from public.ingest_runs where slot = '2026-09-24 
 select results_eq(
   $$select cluster, story_id, overlap from public.ingest_candidates(
       '[{"i": 0, "keys": ["p:t kelly", "o:cnn", "w:judge"]}, {"i": 1, "keys": ["w:capsized", "w:ferry"]}]',
-      '2026-09-24 00:00:00+00', 2)$$,
+      '2100-09-24 00:00:00+00', 2)$$,
   $$values (0, '00000000-0000-4000-8000-000000000071'::uuid, 2)$$,
   'a cluster sharing two keys finds its story; one sharing a single key does not');
 select is_empty(
   $$select * from public.ingest_candidates('[{"i": 0, "keys": ["p:t kelly", "o:cnn"]}]',
-      '2026-09-25 00:00:00+00', 2)$$,
+      '2100-09-25 00:00:00+00', 2)$$,
   'stories not seen since the cutoff are not candidates');
 
 -- ---------------------------------------------------------------------------
