@@ -60,6 +60,9 @@ export default defineConfig(({ mode }) => ({
   },
   server: { ...lanServer(mode), proxy: apiProxy },
   preview: { ...lanServer(mode), proxy: apiProxy },
+  // The clustering worker is an ES module (src/ui/data/cluster.worker.ts); the
+  // default iife format cannot split a module worker's imports.
+  worker: { format: 'es' as const },
   build: {
     // Source maps ship so Sentry can symbolicate the first Android white-screen.
     sourcemap: true,

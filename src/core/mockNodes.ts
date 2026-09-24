@@ -1,3 +1,4 @@
+import { latLonToVec3 } from './geo';
 import { NEWS_CATEGORIES, nodeBufferCapacity, type NodeBuffer } from './nodeBuffer';
 import { mulberry32 } from './random';
 
@@ -16,6 +17,18 @@ export interface MockNodeOptions {
   /** From AppConfig.historyWindowHours: the window is a tier limit, not a constant. */
   readonly windowHours: number;
   readonly seed: number;
+  /**
+   * Moves the last `count` stories onto one place, the way GDELT pins many
+   * stories to one city centre: the cluster bloom's benchmark load. Applied
+   * after every draw, so the other stories match a load without it.
+   */
+  readonly stack?: MockStack;
+}
+
+export interface MockStack {
+  readonly count: number;
+  readonly lat: number;
+  readonly lon: number;
 }
 
 /**
@@ -66,6 +79,16 @@ export function fillMockNodes(buffer: NodeBuffer, options: MockNodeOptions): Nod
     buffer.discussionOpen[i] = 0;
     buffer.headlines[i] = `Placeholder story ${i + 1}`;
     buffer.places[i] = '';
+  }
+
+  const { stack } = options;
+  if (stack) {
+    const at = latLonToVec3({ lat: stack.lat, lon: stack.lon });
+    for (let i = Math.max(0, count - stack.count); i < count; i++) {
+      positions[i * 3] = at.x;
+      positions[i * 3 + 1] = at.y;
+      positions[i * 3 + 2] = at.z;
+    }
   }
   return buffer;
 }

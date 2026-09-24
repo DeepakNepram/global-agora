@@ -42,7 +42,7 @@ export { angularDistance, antipodalTangent, interpolateGreatCircle } from './gre
 export { createNodeBuffer, nodeBufferCapacity, NEWS_CATEGORIES } from './nodeBuffer';
 export type { NewsCategory, NodeBuffer } from './nodeBuffer';
 export { fillMockNodes } from './mockNodes';
-export type { MockNodeOptions } from './mockNodes';
+export type { MockNodeOptions, MockStack } from './mockNodes';
 
 export { decodeNodes, fetchNodes, nodesUrl, NodesFetchError } from './data/nodes';
 export type { FetchLike, FetchNodesOptions, FetchNodesResult } from './data/nodes';

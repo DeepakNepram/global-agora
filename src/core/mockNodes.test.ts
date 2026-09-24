@@ -85,4 +85,21 @@ describe('fillMockNodes', () => {
       RangeError,
     );
   });
+
+  it('stacks the last stories on one place without changing any other story', () => {
+    const plain = fillMockNodes(createNodeBuffer(3120), { ...OPTIONS, count: 3120 });
+    const stacked = fillMockNodes(createNodeBuffer(3120), {
+      ...OPTIONS,
+      count: 3120,
+      stack: { count: 120, lat: 38.9, lon: -77 },
+    });
+    expect(Array.from(stacked.positions.subarray(0, 3000 * 3))).toEqual(
+      Array.from(plain.positions.subarray(0, 3000 * 3)),
+    );
+    expect(Array.from(stacked.heat)).toEqual(Array.from(plain.heat));
+    const first = Array.from(stacked.positions.subarray(3000 * 3, 3001 * 3));
+    for (let i = 3000; i < 3120; i++) {
+      expect(Array.from(stacked.positions.subarray(i * 3, i * 3 + 3))).toEqual(first);
+    }
+  });
 });

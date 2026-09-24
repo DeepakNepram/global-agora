@@ -74,14 +74,26 @@ export const CHANNEL_OPTIONS: readonly ChannelOption[] = [
 export const CLOUDS_KEY = 'c';
 export const ATMOSPHERE_KEY = 'a';
 export const BLOOM_KEY = 'b';
+
 export const PINS_KEY = 'p';
+export const CLUSTERS_KEY = 'g';
 
 /** Prompt 1.5's acceptance load, and a stress load to show the headroom above it. */
 export const PIN_COUNTS = [3000, 10_000] as const;
 export type PinCount = (typeof PIN_COUNTS)[number];
 
-/** What the pins show: the live payload, or a seeded mock load of that many stories. */
-export type PinSource = 'live' | PinCount;
+/**
+ * Prompt 3.1's acceptance load: the 3,000 mock stories plus 120 more stacked
+ * on Washington, the way GDELT pins its stories to a city centre (the real
+ * payload had 177 there).
+ */
+export const STACK_LOAD = {
+  base: 3000,
+  stack: { count: 120, lat: 38.9072, lon: -77.0369 },
+} as const;
+
+/** What the pins show: the live payload, a seeded mock load, or the mock plus a stack. */
+export type PinSource = 'live' | PinCount | 'stack';
 
 /** Single-key shortcuts must not fire while someone is typing into a field. */
 export function isTypingTarget(target: EventTarget | null): boolean {

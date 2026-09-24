@@ -56,7 +56,8 @@ function ControlsHost(props: GlobeControlsOptions): null {
 const CAMERA = { fov: CAMERA_FOV_DEG } as const;
 
 const GLOBE_LABEL =
-  'Globe of Earth. Drag to rotate, scroll or pinch to zoom. When focused, arrow keys rotate and plus or minus zoom.';
+  'Globe of Earth with news stories as pins, grouped into numbered clusters that open as you zoom in. ' +
+  'Drag to rotate, scroll or pinch to zoom. When focused, arrow keys rotate and plus or minus zoom.';
 
 /**
  * The one <Canvas> in the app.
@@ -85,6 +86,7 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
   const [fullMotion, setFullMotion] = useState(false);
   const [pinsVisible, setPinsVisible] = useState(true);
   const [pinSource, setPinSource] = useState<PinSource>('live');
+  const [clustering, setClustering] = useState(true);
   const pinNodes = usePinNodes(pinSource, historyWindowHours);
   // Set while the pin benchmark runs. The dev overlays hide meanwhile: their
   // backdrop blur is recomposited over the canvas every frame, which costs a
@@ -151,7 +153,13 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
           cloudsVisible={cloudsVisible}
           atmosphere={atmosphere}
         />
-        <PinScene nodes={pinNodes} visible={pinsVisible} motion={motion} />
+        <PinScene
+          nodes={pinNodes}
+          sourceKey={String(pinSource)}
+          visible={pinsVisible}
+          motion={motion}
+          clustering={clustering}
+        />
         <ControlsHost motion={motion} onReady={setControls} />
         <PipelineHost settings={settings} bloomEnabled={bloomEnabled} probe={probe} />
       </Canvas>
@@ -185,6 +193,8 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
             onVisibleChange={setPinsVisible}
             source={pinSource}
             onSourceChange={setPinSource}
+            clustering={clustering}
+            onClusteringChange={setClustering}
           />
           {probe && (
             <PinBenchmark
@@ -193,8 +203,10 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
               controls={controls}
               pinsVisible={pinsVisible}
               pinSource={pinSource}
+              clustering={clustering}
               onPinsVisibleChange={setPinsVisible}
               onPinSourceChange={setPinSource}
+              onClusteringChange={setClustering}
               onRunningChange={setBenchmarking}
             />
           )}

@@ -9,7 +9,7 @@
 export const BADGE_GLYPHS = '0123456789.k';
 
 /** Width / height of one atlas cell. Every glyph gets the same advance. */
-export const BADGE_CELL_ASPECT = 0.625;
+export const BADGE_CELL_ASPECT = 0.5;
 
 const DOT = BADGE_GLYPHS.indexOf('.');
 const K = BADGE_GLYPHS.indexOf('k');

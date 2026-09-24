@@ -28,8 +28,11 @@ export interface PinBenchmarkProps {
   readonly controls: OrbitGlobeControls | null;
   readonly pinsVisible: boolean;
   readonly pinSource: PinSource;
+  readonly clustering: boolean;
   readonly onPinsVisibleChange: (visible: boolean) => void;
   readonly onPinSourceChange: (source: PinSource) => void;
+  /** The run draws every pin unclustered, as 1.5 measured, and restores this after. */
+  readonly onClusteringChange: (clustering: boolean) => void;
   /** The host hides its dev overlays while a run is in progress. */
   readonly onRunningChange: (running: boolean) => void;
 }
@@ -70,7 +73,8 @@ function formatSummary(summary: PairedSummary): string {
 /**
  * Prompt 1.5's acceptance run in one tap, at the current camera pose: a warm-up,
  * then three pairs of the 300-frame benchmark with pins off and with 3000 pins,
- * alternating which goes first. The paired difference is the pins' own cost,
+ * alternating which goes first. Clustering is off for the run, so all 3000 draw
+ * as they did when 1.5 was measured. The paired difference is the pins' own cost,
  * separated from the rest of the frame and from a phone heating up.
  *
  * The host hides its dev overlays for the duration (their backdrop blur costs a
@@ -80,8 +84,8 @@ function formatSummary(summary: PairedSummary): string {
  * .bench/results.jsonl on the development machine.
  */
 export function PinBenchmark(props: PinBenchmarkProps): JSX.Element {
-  const { probe, tier, controls, pinsVisible, pinSource } = props;
-  const { onPinsVisibleChange, onPinSourceChange, onRunningChange } = props;
+  const { probe, tier, controls, pinsVisible, pinSource, clustering } = props;
+  const { onPinsVisibleChange, onPinSourceChange, onClusteringChange, onRunningChange } = props;
   const [running, setRunning] = useState(false);
   const [rows, setRows] = useState<readonly BenchRow[]>([]);
   const [status, setStatus] = useState('');
@@ -104,6 +108,7 @@ export function PinBenchmark(props: PinBenchmarkProps): JSX.Element {
       for (const step of pairedSchedule(PAIRS, PIN_LOAD)) {
         onPinsVisibleChange(step.pins > 0);
         onPinSourceChange(PIN_LOAD);
+        onClusteringChange(false);
         await wait(SETTLE_MS);
         page.hiddenDuringRun = document.visibilityState !== 'visible';
         probe.startBenchmark();
@@ -118,6 +123,7 @@ export function PinBenchmark(props: PinBenchmarkProps): JSX.Element {
       release?.();
       onPinsVisibleChange(pinsVisible);
       onPinSourceChange(pinSource);
+      onClusteringChange(clustering);
       onRunningChange(false);
     }
 
