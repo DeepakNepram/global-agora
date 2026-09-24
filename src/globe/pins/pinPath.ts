@@ -1,4 +1,4 @@
-import { springAt, type SpringState } from './bloom';
+import { BLOOM_SETTLE_SECONDS, springAt, type SpringState } from './bloom';
 import { PIN_OFFSET, PIN_STRIDE, hiddenLook, isVisibleLook } from './pinInstances';
 
 /**
@@ -122,6 +122,16 @@ export function drawnState(
   const outer = readEnd(array, slot, 'outer', scratchOuter);
   const heading = (array[at + PIN_OFFSET.target] ?? 0) >= 0.5 ? outer : inner;
   const other = heading === outer ? inner : outer;
+
+  // Settled, as nearly every slot is: exactly at the end it was heading to.
+  if (clock - (array[at + PIN_OFFSET.t0] ?? 0) >= BLOOM_SETTLE_SECONDS) {
+    Object.assign(out, heading);
+    out.u = heading === outer ? 1 : 0;
+    out.v = 0;
+    out.alpha = pathAlpha(inner.look, outer.look, out.u);
+    out.look = lookOf(out, heading.look, other.look);
+    return out;
+  }
 
   const spring = springAt(
     array[at + PIN_OFFSET.u0] ?? 0,

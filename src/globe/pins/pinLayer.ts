@@ -159,9 +159,13 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
       const instant = reset || nodes === null || reducedMotion;
       const { rowSlots: assigned, departed, fresh } = slots.assign(next.ids, next.count);
       ensureCapacity(slots.highWater);
+      // A level change re-presents the same stories: their pulse and recency
+      // already match the displayed time (setTime keeps them so).
+      if (next !== nodes || reset) {
+        published = writeAppearance(next, assigned, pins.array, nowSeconds, clock, fresh);
+      }
       nodes = next;
       rowSlots = assigned;
-      published = writeAppearance(next, rowSlots, pins.array, nowSeconds, clock, fresh);
 
       const plan = planTransitions({
         array: pins.array,

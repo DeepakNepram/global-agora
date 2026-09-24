@@ -3,7 +3,15 @@ import { CLUSTER_ROLE, type ClusterLayout, type NodeBuffer } from '@/core';
 import { BLOOM_TWIST_RAD, petalOffset, type Offset } from './bloom';
 import { createPathWriter, endAt, isAtRest, schedule } from './pathWriter';
 import { LOOK, encodeLook, hiddenLook, isVisibleLook } from './pinInstances';
-import { createEnd, drawnState, sameEnd, samePlace, type DrawnState, type PinEnd } from './pinPath';
+import {
+  createDrawn,
+  createEnd,
+  drawnState,
+  sameEnd,
+  samePlace,
+  type DrawnState,
+  type PinEnd,
+} from './pinPath';
 
 /**
  * The transition planner: given where every slot is drawn now and what the new
@@ -45,6 +53,12 @@ export interface PlanResult {
   readonly endsAt: number;
 }
 
+/**
+ * Reused between plans: a level change would otherwise allocate one object per
+ * slot. Nothing keeps a reference past the plan that filled it.
+ */
+const drawnPool: DrawnState[] = [];
+
 export function planTransitions(input: PlanInput): PlanResult {
   const { array, slotCount, nodes, layout, rowSlots, fresh, groupSlot, clock, direction } = input;
 
@@ -53,7 +67,7 @@ export function planTransitions(input: PlanInput): PlanResult {
   const drawn: (DrawnState | null)[] = new Array<DrawnState | null>(slotCount).fill(null);
   for (let slot = 0; slot < slotCount; slot++) {
     if (fresh[slot]) continue;
-    drawn[slot] = drawnState(array, slot, clock, { ...createEnd(), u: 0, v: 0, alpha: 0 });
+    drawn[slot] = drawnState(array, slot, clock, (drawnPool[slot] ??= createDrawn()));
   }
 
   const writer = createPathWriter(array, clock);
