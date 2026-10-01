@@ -1,12 +1,14 @@
 /**
  * The API Worker's routes, free of Worker globals so tests can drive them.
  *
- *   GET|HEAD /api/nodes?hours=N     the columnar payload (docs/DATA_SCHEMA.md)
- *   GET|HEAD /api/story/:id         one story in full; :id is the payload's id or the UUID
- *   GET      /api/health            200 when configured
+ *   GET|HEAD /api/nodes?hours=N                  the columnar payload (docs/DATA_SCHEMA.md)
+ *   GET|HEAD /api/story/:id                      one story in full; :id is the payload's id or the UUID
+ *   POST     /api/story/:id/location-report      one "wrong location" report: 204, or 404
+ *   GET      /api/health                         200 when configured
  *
- * Wrong methods get 405, anything else 404. Responses carry an ETag and
- * Cache-Control with stale-while-revalidate, and come from the SWR cache.
+ * Wrong methods get 405, anything else 404. Reads carry an ETag and
+ * Cache-Control with stale-while-revalidate, and come from the SWR cache; the
+ * report is never cached.
  */
 
 import { errorFields, type Logger } from '../../shared/log.ts';
@@ -33,6 +35,7 @@ export interface ApiDeps {
 }
 
 const STORY_PATH = /^\/api\/story\/([^/]+)$/;
+const REPORT_PATH = /^\/api\/story\/([^/]+)\/location-report$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SEQ = /^[1-9]\d{0,15}$/;
 
@@ -109,8 +112,37 @@ async function story(request: Request, raw: string, deps: ApiDeps, db: ApiDb): P
   }
 }
 
+/**
+ * A reader says the pin is in the wrong place. No body and nothing about the
+ * reader is read or stored: the database adds one to the story's count.
+ */
+async function reportLocation(
+  request: Request,
+  raw: string,
+  deps: ApiDeps,
+  db: ApiDb,
+): Promise<Response> {
+  const cors = corsHeaders(request, deps.config.allowedOrigins);
+  const ref = parseStoryRef(raw);
+  if (ref === null) return jsonError(400, 'story id must be a payload id or a UUID', cors);
+  if (!(await db.reportLocation(ref))) return jsonError(404, 'no such story', cors);
+  return new Response(null, { status: 204, headers: { 'cache-control': 'no-store', ...cors } });
+}
+
 async function route(request: Request, url: URL, deps: ApiDeps): Promise<Response> {
   const { pathname } = url;
+  const report = REPORT_PATH.exec(pathname);
+  if (report) {
+    if (request.method === 'OPTIONS') {
+      return preflight(request, deps.config.allowedOrigins, 'POST, OPTIONS');
+    }
+    if (request.method !== 'POST') {
+      return jsonError(405, 'method not allowed', { allow: 'POST, OPTIONS' });
+    }
+    if (deps.db === null) return jsonError(503, 'API not configured');
+    return reportLocation(request, report[1] ?? '', deps, deps.db);
+  }
+
   const readable = request.method === 'GET' || request.method === 'HEAD';
   const known =
     pathname === '/api/nodes' || pathname === '/api/health' || STORY_PATH.test(pathname);

@@ -1,10 +1,11 @@
 /**
- * The API Worker's database access: two read-only RPCs over PostgREST with the
- * publishable (anon) key. They run as the anon role under RLS, so this Worker
- * holds no key that can read or write anything a signed-out visitor cannot.
+ * The API Worker's database access: RPCs over PostgREST with the publishable
+ * (anon) key. They run as the anon role, so this Worker holds no key that can
+ * read or write anything a signed-out visitor cannot: two reads under RLS, and
+ * the location report, which can only add one to a counter.
  *
- * No supabase-js here, as in the ingest Worker: two calls need no auth session,
- * realtime or storage client.
+ * No supabase-js here, as in the ingest Worker: three calls need no auth
+ * session, realtime or storage client.
  */
 
 import type { Database } from '../../../src/core/db/types.ts';
@@ -27,6 +28,8 @@ export interface ApiDb {
   nodes(hours: number, limit: number, known: string | null): Promise<NodesResult>;
   /** The story as api_story builds it, or null when there is none. */
   story(ref: StoryRef, articleLimit: number): Promise<unknown>;
+  /** One "wrong location" report; false when there is no such story. */
+  reportLocation(ref: StoryRef): Promise<boolean>;
 }
 
 export class DbError extends Error {
@@ -72,5 +75,14 @@ export function createAnonDb(url: string, anonKey: string, fetchFn: Fetch = fetc
         ...('seq' in ref ? { p_seq: ref.seq } : { p_id: ref.id }),
         p_article_limit: articleLimit,
       }),
+
+    async reportLocation(ref): Promise<boolean> {
+      const result = await call(
+        'api_report_location',
+        'seq' in ref ? { p_seq: ref.seq } : { p_id: ref.id },
+      );
+      if (typeof result !== 'boolean') throw new DbError('api_report_location: not a boolean');
+      return result;
+    },
   };
 }

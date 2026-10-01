@@ -46,6 +46,7 @@ const STORY = {
 /** A database whose data version the test controls, counting calls like api_nodes would see them. */
 function fakeDb(state = { version: 'h1', heat: [200, 150] }) {
   const calls: { hours: number; known: string | null }[] = [];
+  const reports: StoryRef[] = [];
   const db: ApiDb = {
     async nodes(hours, _limit, known) {
       calls.push({ hours, known });
@@ -56,8 +57,12 @@ function fakeDb(state = { version: 'h1', heat: [200, 150] }) {
     async story(ref: StoryRef) {
       return ('seq' in ref ? ref.seq === 7 : ref.id === STORY.id) ? STORY : null;
     },
+    async reportLocation(ref: StoryRef) {
+      reports.push(ref);
+      return 'seq' in ref ? ref.seq === 7 : ref.id === STORY.id;
+    },
   };
-  return { db, calls, state };
+  return { db, calls, state, reports };
 }
 
 function deps(overrides: Partial<ApiDeps> = {}, config: Partial<ApiConfig> = {}) {
@@ -174,6 +179,7 @@ describe('GET /api/nodes', () => {
         throw new DbError('down');
       },
       story: async () => null,
+      reportLocation: async () => false,
     };
     const { d, lines } = deps({ db: failing });
     const response = await handleFetch(get('/api/nodes'), d);
@@ -186,6 +192,7 @@ describe('GET /api/nodes', () => {
     const broken: ApiDb = {
       nodes: async () => ({ hash: 'x', payload: { generated_at: 1, window_hours: 24, nodes: {} } }),
       story: async () => null,
+      reportLocation: async () => false,
     };
     expect((await handleFetch(get('/api/nodes'), deps({ db: broken }).d)).status).toBe(502);
   });
@@ -210,6 +217,48 @@ describe('GET /api/story/:id', () => {
     expect((await handleFetch(get('/api/story/8'), d)).status).toBe(404);
     expect((await handleFetch(get('/api/story/abc'), d)).status).toBe(400);
     expect((await handleFetch(get('/api/story/0'), d)).status).toBe(400);
+  });
+});
+
+describe('POST /api/story/:id/location-report', () => {
+  it('counts a report by payload id or UUID, uncached and bodiless', async () => {
+    const fake = fakeDb();
+    const { d } = deps({ db: fake.db });
+    for (const id of ['7', STORY.id]) {
+      const response = await handleFetch(get(`/api/story/${id}/location-report`, {}, 'POST'), d);
+      expect(response.status).toBe(204);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(await response.text()).toBe('');
+    }
+    expect(fake.reports).toEqual([{ seq: 7 }, { id: STORY.id }]);
+  });
+
+  it('is 404 for an unknown story, 400 for a malformed id and 405 for a read', async () => {
+    const fake = fakeDb();
+    const { d } = deps({ db: fake.db });
+    const post = (id: string): Request => get(`/api/story/${id}/location-report`, {}, 'POST');
+    expect((await handleFetch(post('8'), d)).status).toBe(404);
+    expect((await handleFetch(post('abc'), d)).status).toBe(400);
+    const read = await handleFetch(get('/api/story/7/location-report'), d);
+    expect(read.status).toBe(405);
+    expect(read.headers.get('allow')).toBe('POST, OPTIONS');
+    expect(fake.reports).toEqual([{ seq: 8 }]);
+  });
+
+  it('is 503 when the API is not configured', async () => {
+    const { d } = deps({ db: null });
+    const response = await handleFetch(get('/api/story/7/location-report', {}, 'POST'), d);
+    expect(response.status).toBe(503);
+  });
+
+  it('lets an allowed origin preflight a POST', async () => {
+    const { d } = deps({}, { allowedOrigins: ['https://app.example'] });
+    const pre = await handleFetch(
+      get('/api/story/7/location-report', { origin: 'https://app.example' }, 'OPTIONS'),
+      d,
+    );
+    expect(pre.status).toBe(204);
+    expect(pre.headers.get('access-control-allow-methods')).toBe('POST, OPTIONS');
   });
 });
 
@@ -291,6 +340,16 @@ describe('anon database client', () => {
     });
   });
 
+  it('reports a location through api_report_location', async () => {
+    const sent: string[] = [];
+    const db = createAnonDb('http://db.example', 'sb_publishable_xyz', async (url, init) => {
+      sent.push(`${url} ${String(init?.body)}`);
+      return new Response('true');
+    });
+    expect(await db.reportLocation({ seq: 7 })).toBe(true);
+    expect(sent).toEqual(['http://db.example/rest/v1/rpc/api_report_location {"p_seq":7}']);
+  });
+
   it('sends a legacy JWT as the bearer too, and raises on HTTP errors', async () => {
     let auth: string | undefined;
     const db = createAnonDb('http://db.example', 'eyJhbGciOi.legacy', async (_url, init) => {
@@ -298,6 +357,7 @@ describe('anon database client', () => {
       return new Response('{"message":"boom"}', { status: 500 });
     });
     await expect(db.story({ seq: 1 }, 1000)).rejects.toBeInstanceOf(DbError);
+    await expect(db.reportLocation({ seq: 1 })).rejects.toBeInstanceOf(DbError);
     expect(auth).toBe('Bearer eyJhbGciOi.legacy');
   });
 });

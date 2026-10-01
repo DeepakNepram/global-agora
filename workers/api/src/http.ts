@@ -34,7 +34,11 @@ export function corsHeaders(
   };
 }
 
-export function preflight(request: Request, allowedOrigins: readonly string[]): Response {
+export function preflight(
+  request: Request,
+  allowedOrigins: readonly string[],
+  methods = 'GET, HEAD, OPTIONS',
+): Response {
   const cors = corsHeaders(request, allowedOrigins);
   return new Response(null, {
     status: 204,
@@ -42,7 +46,7 @@ export function preflight(request: Request, allowedOrigins: readonly string[]): 
       ...cors,
       ...(Object.keys(cors).length > 0
         ? {
-            'access-control-allow-methods': 'GET, HEAD, OPTIONS',
+            'access-control-allow-methods': methods,
             'access-control-allow-headers': 'If-None-Match',
           }
         : {}),
