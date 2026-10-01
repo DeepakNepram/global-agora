@@ -70,7 +70,7 @@ export function FrameTimeOverlay({
   return (
     <section
       aria-label="Frame time"
-      className="absolute bottom-4 left-4 w-72 rounded-lg bg-void/80 p-3 font-mono text-[11px] text-ink backdrop-blur"
+      className="absolute bottom-32 left-4 w-72 rounded-lg bg-void/80 p-3 font-mono text-[11px] text-ink backdrop-blur"
     >
       <p className="mb-1 uppercase tracking-wide text-muted">Frame time (mean / p95 ms)</p>
       {/* aria-live off: a 4Hz readout would drown a screen reader. */}

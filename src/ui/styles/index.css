@@ -26,6 +26,59 @@ body {
   overscroll-behavior: none;
 }
 
+/* The time scrubber's range input: an invisible track over the histogram and a
+   glowing playhead. Native, so keyboards and mobile screen readers can drive it. */
+.scrubber-range {
+  --playhead-w: 0.4rem;
+  --playhead-glow: 0 0 0 2px rgb(77 163 255 / 0.45), 0 0 12px 3px rgb(77 163 255 / 0.5);
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  /* Horizontal drags belong to the scrubber, not the page. */
+  touch-action: none;
+}
+.scrubber-range[data-playing='true'] {
+  --playhead-glow: 0 0 0 3px rgb(77 163 255 / 0.65), 0 0 22px 7px rgb(77 163 255 / 0.7);
+}
+.scrubber-range::-webkit-slider-runnable-track {
+  height: 100%;
+  background: transparent;
+}
+.scrubber-range::-moz-range-track {
+  height: 100%;
+  background: transparent;
+}
+.scrubber-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: var(--playhead-w);
+  height: 100%;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--color-ink);
+  box-shadow: var(--playhead-glow);
+}
+.scrubber-range::-moz-range-thumb {
+  width: var(--playhead-w);
+  height: 100%;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--color-ink);
+  box-shadow: var(--playhead-glow);
+}
+.scrubber-range:focus {
+  outline: none;
+}
+.scrubber-range:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+.scrubber-range:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
 /* Honour the OS setting from day one rather than bolting it on in Phase 5. */
 @media (prefers-reduced-motion: reduce) {
   *,

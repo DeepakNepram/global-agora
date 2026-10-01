@@ -8,7 +8,11 @@ import {
   type ClusterReply,
   type NodeBuffer,
 } from '@/core';
-import { timeStore } from '@/state';
+import { timeStore, type TimeMotion } from '@/state';
+
+function isTimeMoving(motion: TimeMotion): boolean {
+  return motion !== 'still';
+}
 
 export interface ClusterFeedOptions {
   /** The stories to cluster; null while clustering is off or nothing has loaded. */
@@ -27,8 +31,10 @@ export interface ClusterFeed {
 
 /**
  * Runs the clustering Web Worker while there are stories to cluster, and
- * connects it to the cluster client: new payloads and the displayed instant
- * go in, layouts come back through onLayout.
+ * connects it to the cluster client: new payloads, the displayed instant and
+ * whether the time is moving go in, layouts come back through onLayout. While
+ * a drag or Play moves the time the clusters stay open, so every story shows
+ * its own appearance and the worker is asked nothing (DECISIONS, 3.2).
  */
 export function useClusterFeed({ nodes, initialLevel, onLayout }: ClusterFeedOptions): ClusterFeed {
   const clientRef = useRef<ClusterClient | null>(null);
@@ -68,6 +74,7 @@ export function useClusterFeed({ nodes, initialLevel, onLayout }: ClusterFeedOpt
       setFailed(true);
     };
     clientRef.current = client;
+    client.setOpen(isTimeMoving(timeStore.getState().motion));
     return () => {
       clientRef.current = null;
       client.dispose();
@@ -79,12 +86,16 @@ export function useClusterFeed({ nodes, initialLevel, onLayout }: ClusterFeedOpt
     if (nodes && active) clientRef.current?.load(nodes, timeStore.getState().timeMs / 1000);
   }, [nodes, active]);
 
-  // Outside React, like the pins' own retime: a scrub asks for a new layout
-  // only when a story crosses its publish time.
+  // Outside React, like the pins' own uniform: at rest a time step asks for a
+  // new layout only when a story crosses its publish time; a drag or Play
+  // opens the clusters and asks nothing until it stops.
   useEffect(
     () =>
       timeStore.subscribe((state, previous) => {
-        if (state.timeMs !== previous.timeMs) clientRef.current?.setTime(state.timeMs / 1000);
+        const client = clientRef.current;
+        if (!client) return;
+        if (state.timeMs !== previous.timeMs) client.setTime(state.timeMs / 1000);
+        if (state.motion !== previous.motion) client.setOpen(isTimeMoving(state.motion));
       }),
     [],
   );

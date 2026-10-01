@@ -51,7 +51,7 @@ export function GlobeDebugPanel(props: GlobeDebugPanelProps): JSX.Element {
     <aside
       hidden={hidden}
       aria-label="Globe inspection controls"
-      className="absolute right-4 top-4 flex max-h-[calc(100%-2rem)] w-52 flex-col gap-3 overflow-y-auto rounded-lg bg-void/80 p-3 backdrop-blur"
+      className="absolute right-4 top-4 flex max-h-[calc(100%-10rem)] w-52 flex-col gap-3 overflow-y-auto rounded-lg bg-void/80 p-3 backdrop-blur"
     >
       {children}
 

@@ -3,38 +3,25 @@ import { useMemo, useState, type JSX } from 'react';
 import { Color } from 'three';
 
 import { previewTextureSet, textureSetForTier, type QualityTier } from '@/core';
-import {
-  CAMERA_FOV_DEG,
-  renderSettingsForTier,
-  VIGNETTE,
-  type AtmosphereMode,
-  type EarthChannel,
-  type OrbitGlobeControls,
-} from '@/globe';
+import { CAMERA_FOV_DEG, renderSettingsForTier, VIGNETTE, type OrbitGlobeControls } from '@/globe';
 
-import { BloomBenchmark } from './globe/BloomBenchmark';
 import { createPresentLog } from './globe/bloomReport';
-import { CameraDebugControls } from './globe/CameraDebugControls';
-import { CameraOverlay } from './globe/CameraOverlay';
 import { ControlsHost, PipelineHost } from './globe/canvasHosts';
-import type { PinSource } from './globe/debugControls';
 import { createFrameProbe } from './globe/frameProbe';
-import { FrameTimeOverlay } from './globe/FrameTimeOverlay';
-import { GlobeDebugPanel } from './globe/GlobeDebugPanel';
+import { GlobeDevTools } from './globe/GlobeDevTools';
 import { GlobeScene } from './globe/GlobeScene';
-import { PinBenchmark } from './globe/PinBenchmark';
-import { PinDebugControls } from './globe/PinDebugControls';
 import { PinScene } from './globe/PinScene';
-import { RenderDebugControls } from './globe/RenderDebugControls';
-import { TierDebugControls } from './globe/TierDebugControls';
+import { useDevSettings } from './globe/useDevSettings';
 import { useLiveClock } from './globe/useLiveClock';
 import { usePinNodes } from './globe/usePinNodes';
 import { usePrefersReducedMotion } from './globe/usePrefersReducedMotion';
 import { vignetteCssGradient } from './globe/vignette';
+import { TimeDriver } from './scrubber/TimeDriver';
+import { TimeScrubber } from './scrubber/TimeScrubber';
 
 export interface GlobeCanvasProps {
   readonly tier: QualityTier;
-  /** AppConfig.historyWindowHours: the dev panel's mock stories span this window. */
+  /** AppConfig.historyWindowHours: the scrubber's reach, and the window mock stories span. */
   readonly historyWindowHours: number;
 }
 
@@ -68,22 +55,11 @@ const GLOBE_LABEL =
  */
 export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX.Element {
   const settings = renderSettingsForTier(tier);
-  const [channel, setChannel] = useState<EarthChannel>('lit');
-  const [cloudsVisible, setCloudsVisible] = useState(true);
-  const [atmosphere, setAtmosphere] = useState<AtmosphereMode>(settings.atmosphere);
-  const [bloomEnabled, setBloomEnabled] = useState(settings.bloom);
+  const dev = useDevSettings(settings);
   const [controls, setControls] = useState<OrbitGlobeControls | null>(null);
   const reducedMotionPreferred = usePrefersReducedMotion();
-  const [fullMotion, setFullMotion] = useState(false);
-  const [pinsVisible, setPinsVisible] = useState(true);
-  const [pinSource, setPinSource] = useState<PinSource>('live');
-  const [clustering, setClustering] = useState(true);
-  const pinNodes = usePinNodes(pinSource, historyWindowHours);
-  // Set while the pin benchmark runs. The dev overlays hide meanwhile: their
-  // backdrop blur is recomposited over the canvas every frame, which costs a
-  // phone real time and which production never pays.
-  const [benchmarking, setBenchmarking] = useState(false);
-  const motion = reducedMotionPreferred && !fullMotion ? 'reduced' : 'full';
+  const pinNodes = usePinNodes(dev.pinSource, historyWindowHours);
+  const motion = reducedMotionPreferred && !dev.fullMotion ? 'reduced' : 'full';
   useLiveClock();
 
   // Timing is dev tooling; production draws without queries or bookkeeping.
@@ -141,20 +117,21 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
         <GlobeScene
           textures={textures}
           previewTextures={previewTextures}
-          channel={channel}
-          cloudsVisible={cloudsVisible}
-          atmosphere={atmosphere}
+          channel={dev.channel}
+          cloudsVisible={dev.cloudsVisible}
+          atmosphere={dev.atmosphere}
         />
+        <TimeDriver historyHours={historyWindowHours} motion={motion} />
         <PinScene
           nodes={pinNodes}
-          sourceKey={String(pinSource)}
-          visible={pinsVisible}
+          sourceKey={String(dev.pinSource)}
+          visible={dev.pinsVisible}
           motion={motion}
-          clustering={clustering}
+          clustering={dev.clustering}
           {...(presentLog ? { onPresent: presentLog.push } : {})}
         />
         <ControlsHost motion={motion} onReady={setControls} />
-        <PipelineHost settings={settings} bloomEnabled={bloomEnabled} probe={probe} />
+        <PipelineHost settings={settings} bloomEnabled={dev.bloomEnabled} probe={probe} />
       </Canvas>
 
       {!settings.postprocessing && (
@@ -166,89 +143,19 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
         />
       )}
 
+      <TimeScrubber nodes={pinNodes} historyHours={historyWindowHours} />
+
       {/* Inspection tooling only; compiled out of production builds. */}
       {import.meta.env.DEV && (
-        <GlobeDebugPanel
-          hidden={benchmarking}
-          channel={channel}
-          onChannelChange={setChannel}
-          cloudsVisible={cloudsVisible}
-          onCloudsVisibleChange={setCloudsVisible}
-        >
-          <CameraDebugControls
-            controls={controls}
-            reducedMotionPreferred={reducedMotionPreferred}
-            fullMotion={fullMotion}
-            onFullMotionChange={setFullMotion}
-          />
-          <PinDebugControls
-            visible={pinsVisible}
-            onVisibleChange={setPinsVisible}
-            source={pinSource}
-            onSourceChange={setPinSource}
-            clustering={clustering}
-            onClusteringChange={setClustering}
-          />
-          {probe && (
-            <PinBenchmark
-              probe={probe}
-              tier={tier}
-              controls={controls}
-              pinsVisible={pinsVisible}
-              pinSource={pinSource}
-              clustering={clustering}
-              onPinsVisibleChange={setPinsVisible}
-              onPinSourceChange={setPinSource}
-              onClusteringChange={setClustering}
-              onRunningChange={setBenchmarking}
-            />
-          )}
-          {probe && presentLog && (
-            <BloomBenchmark
-              probe={probe}
-              log={presentLog}
-              tier={tier}
-              controls={controls}
-              pinSource={pinSource}
-              clustering={clustering}
-              fullMotion={fullMotion}
-              onPinSourceChange={setPinSource}
-              onClusteringChange={setClustering}
-              onFullMotionChange={setFullMotion}
-              onRunningChange={setBenchmarking}
-            />
-          )}
-          <RenderDebugControls
-            atmosphere={atmosphere}
-            onAtmosphereChange={setAtmosphere}
-            bloomEnabled={bloomEnabled}
-            onBloomEnabledChange={setBloomEnabled}
-            bloomAvailable={settings.postprocessing}
-          />
-          <TierDebugControls tier={tier} />
-        </GlobeDebugPanel>
-      )}
-      {import.meta.env.DEV && (
-        <div hidden={benchmarking}>
-          {controls && <CameraOverlay controls={controls} />}
-          {probe && (
-            <FrameTimeOverlay
-              probe={probe}
-              tier={tier}
-              atmosphere={atmosphere}
-              bloomEnabled={settings.postprocessing && bloomEnabled}
-            />
-          )}
-        </div>
-      )}
-      {benchmarking && (
-        // Plain, not blurred, so it costs the same with pins off and on.
-        <p
-          role="status"
-          className="absolute left-4 top-4 rounded bg-void px-2 py-1 text-xs text-ink"
-        >
-          Pin benchmark running, about 2 minutes. Keep this page in front.
-        </p>
+        <GlobeDevTools
+          dev={dev}
+          tier={tier}
+          settings={settings}
+          probe={probe}
+          presentLog={presentLog}
+          controls={controls}
+          reducedMotionPreferred={reducedMotionPreferred}
+        />
       )}
     </div>
   );
