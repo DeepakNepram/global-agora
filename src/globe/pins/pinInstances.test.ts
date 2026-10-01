@@ -14,10 +14,12 @@ import {
   rebaseClock,
   writeAppearance,
 } from './pinInstances';
-import { pulsePhaseFor, recencyFor } from './pinStyle';
+import { freshnessFor, pulsePhaseFor, pulseRateFor } from './pinStyle';
 
 const WINDOW_END_MS = Date.UTC(2026, 8, 17, 12, 0, 0);
 const NOW = WINDOW_END_MS / 1000;
+/** The layer's time origin in these tests: an hour before the window ends. */
+const ORIGIN = NOW - 3600;
 
 function mockNodes(count = 3000): NodeBuffer {
   return fillMockNodes(createNodeBuffer(count), {
@@ -68,22 +70,21 @@ describe('look', () => {
 });
 
 describe('writeAppearance', () => {
-  it('writes recency, and −1 for stories not yet published, and counts the rest', () => {
+  it('writes publish times from the origin and rates for the shown instant, and counts the published', () => {
     const nodes = mockNodes();
     const array = new Float32Array(nodes.count * PIN_STRIDE);
     const halfway = nodes.epochSec + 12 * 3600;
     const fresh = new Uint8Array(nodes.count).fill(1);
-    const published = writeAppearance(nodes, identitySlots(nodes.count), array, halfway, 0, fresh);
+    const slots = identitySlots(nodes.count);
+    const published = writeAppearance(nodes, slots, array, halfway, ORIGIN, 0, fresh);
 
     let expected = 0;
     for (let i = 0; i < nodes.count; i++) {
       const at = nodes.epochSec + (nodes.publishedSec[i] ?? 0);
-      if (at <= halfway) {
-        expected++;
-        expect(read(array, i, 'recency')).toBeCloseTo(recencyFor(halfway - at), 6);
-      } else {
-        expect(read(array, i, 'recency')).toBe(-1);
-      }
+      if (at <= halfway) expected++;
+      // Whole seconds within a day of the origin: exact in float32.
+      expect(read(array, i, 'published')).toBe(at - ORIGIN);
+      expect(read(array, i, 'rate')).toBeCloseTo(pulseRateFor(freshnessFor(halfway - at)), 5);
       expect(read(array, i, 'phase')).toBeCloseTo(pulsePhaseFor(at), 5);
     }
     expect(published).toBe(expected);
@@ -93,7 +94,7 @@ describe('writeAppearance', () => {
   it('writes each row into the slot it was given, not its row', () => {
     const nodes = mockNodes(3);
     const array = new Float32Array(8 * PIN_STRIDE);
-    writeAppearance(nodes, Int32Array.from([7, 2, 5]), array, NOW, 0, null);
+    writeAppearance(nodes, Int32Array.from([7, 2, 5]), array, NOW, ORIGIN, 0, null);
     expect(read(array, 7, 'rate')).toBeGreaterThan(0);
     expect(read(array, 0, 'rate')).toBe(0);
   });
@@ -108,6 +109,7 @@ describe('writeAppearance', () => {
       slots,
       array,
       NOW - 6 * 3600,
+      ORIGIN,
       clock,
       new Uint8Array(nodes.count).fill(1),
     );
@@ -117,10 +119,9 @@ describe('writeAppearance', () => {
     // A live sync (30 s) and a scrub (5 h) both change the rate of every pin on
     // the globe, so continuity here comes from the phase compensation.
     for (const now of [NOW - 6 * 3600 + 30, NOW - 3600]) {
-      writeAppearance(nodes, slots, array, now, clock, null);
+      writeAppearance(nodes, slots, array, now, ORIGIN, clock, null);
       let changed = 0;
       for (let i = 0; i < nodes.count; i++) {
-        if (read(array, i, 'recency') < 0) continue;
         if (read(array, i, 'rate') !== ratesBefore[i]) changed++;
         expect(Math.abs(pulseWave(array, i, clock) - (before[i] ?? NaN))).toBeLessThan(1e-5);
       }
@@ -138,6 +139,7 @@ describe('rebaseClock', () => {
       identitySlots(nodes.count),
       array,
       NOW,
+      ORIGIN,
       0,
       new Uint8Array(nodes.count).fill(1),
     );

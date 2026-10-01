@@ -53,7 +53,7 @@ function stage() {
     const layout = typeof layoutLevel === 'number' ? layoutFor(nodes, layoutLevel) : layoutLevel;
     const assigned = slots.assign(nodes.ids, nodes.count);
     rowSlots = assigned.rowSlots;
-    writeAppearance(nodes, rowSlots, array, NOW, clock, assigned.fresh);
+    writeAppearance(nodes, rowSlots, array, NOW, NOW, clock, assigned.fresh);
     const plan = planTransitions({
       array,
       slotCount: slots.highWater,

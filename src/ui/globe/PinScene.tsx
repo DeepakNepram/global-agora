@@ -145,7 +145,7 @@ export function PinScene(props: PinSceneProps): JSX.Element | null {
       invalidate();
     };
     show(timeStore.getState().timeMs);
-    // Outside React, like the sun: a scrub re-derives recency in one pass and
+    // Outside React, like the sun: a scrub moves one uniform and
     // schedules one frame, with no re-render in between.
     return timeStore.subscribe((state, previous) => {
       if (state.timeMs !== previous.timeMs) show(state.timeMs);

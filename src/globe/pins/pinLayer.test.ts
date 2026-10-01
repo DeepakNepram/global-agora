@@ -90,10 +90,29 @@ describe('createPinLayer', () => {
     const version = attribute.data.version;
 
     showAll(layer, mockNodes(3000));
-    layer.setTime(WINDOW_END_MS - 3_600_000);
     expect(attribute.data.array).toBe(array);
-    expect(attribute.data.version).toBe(version + 2);
+    expect(attribute.data.version).toBe(version + 1);
     expect(attribute.data.updateRanges).toEqual([{ start: 0, count: 3000 * PIN_STRIDE }]);
+  });
+
+  it('moves only a uniform while the displayed time moves, and retimes pulses once it rests', () => {
+    const layer = createPinLayer({ timeMs: WINDOW_END_MS });
+    const mesh = onlyMesh(layer);
+    const attribute = mesh.geometry.getAttribute('aInner') as InterleavedBufferAttribute;
+    const uNow = (mesh.material as ShaderMaterial).uniforms.uNow;
+    showAll(layer, mockNodes(3000));
+    const version = attribute.data.version;
+
+    // A minute of story time per frame for a second: a drag.
+    for (let frame = 1; frame <= 60; frame++) {
+      layer.setTime(WINDOW_END_MS - frame * 60_000);
+      layer.advance(1 / 60);
+    }
+    expect(attribute.data.version).toBe(version);
+    expect(uNow?.value).toBe(-3600);
+
+    for (let frame = 0; frame < 20; frame++) layer.advance(1 / 60);
+    expect(attribute.data.version).toBe(version + 1);
   });
 
   it('grows by replacing its mesh, so there is still one, and disposes the old', () => {

@@ -1,8 +1,7 @@
-import { Group, type Object3D, type Texture } from 'three';
+import { Group } from 'three';
 
-import type { ClusterLayout, NodeBuffer } from '@/core';
+import { countVisible, type NodeBuffer } from '@/core';
 
-import type { MotionPreference } from '../camera/types';
 import { earthTiltQuaternion } from '../views';
 import {
   createPinMaterial,
@@ -14,6 +13,7 @@ import {
   type PinMesh,
 } from './pinMesh';
 import { landSprings, rebaseClock, writeAppearance } from './pinInstances';
+import type { PinLayer, PinLayerOptions } from './pinLayerTypes';
 import { createSlotMap } from './pinSlots';
 import { PIN_HALF_SIZE_CSS_PX, PULSE_CLOCK_REBASE_SECONDS } from './pinStyle';
 import { planTransitions } from './transitions';
@@ -31,53 +31,14 @@ const MAX_STEP_SECONDS = 0.25;
  */
 const RESUME_STEP_SECONDS = 1 / 60;
 
-export interface PinLayerOptions {
-  /**
-   * The instant the pins depict (epoch ms), required so the first frame shows
-   * the right recency rather than a placeholder one.
-   */
-  readonly timeMs: number;
-  /** Initial slot capacity; grows on demand. */
-  readonly capacity?: number;
-}
+/**
+ * Pulse rates follow the displayed time once it has rested this long. A scrub
+ * moves only uNow; re-deriving every rate on the CPU each tick would cost a
+ * pass and a buffer upload per frame for a frequency nobody can judge mid-drag.
+ */
+const RETIME_REST_SECONDS = 0.25;
 
-export interface PresentOptions {
-  /** A different set of stories (dev pin sources): forget every slot and place without animating. */
-  readonly reset?: boolean;
-}
-
-export interface PresentResult {
-  /** Slots set moving. */
-  readonly moving: number;
-  /** Until the last of them settles, 0 when nothing moves. */
-  readonly durationMs: number;
-}
-
-export interface PinLayer {
-  /** Add this to the scene. Carries the axial tilt, like the Earth layer. */
-  readonly object3d: Object3D;
-  /** Slots that can be drawn without growing. */
-  readonly capacity: number;
-  /**
-   * Shows `nodes` as `layout` arranges them. Slots are keyed by story id, so a
-   * story present before keeps its slot, and every change animates from where
-   * it is drawn now (instantly under reduced motion, and on the first call).
-   */
-  present(nodes: NodeBuffer, layout: ClusterLayout, options?: PresentOptions): PresentResult;
-  /** The displayed instant (epoch ms). Re-derives recency for the current nodes. */
-  setTime(timeMs: number): void;
-  /** Drawing-buffer size and device pixel ratio, for constant on-screen size. */
-  setViewport(bufferWidth: number, bufferHeight: number, pixelRatio: number): void;
-  setMotion(motion: MotionPreference): void;
-  setVisible(visible: boolean): void;
-  /** The count glyphs (see badgeGlyphs.ts); null draws orbs without a count. The host owns it. */
-  setBadgeAtlas(atlas: Texture | null): void;
-  /** Milliseconds until every slot has settled; 0 when nothing moves. */
-  animationRemainingMs(): number;
-  /** Advances pulses and springs. Returns true while either moves, so the host keeps drawing. */
-  advance(dtSeconds: number): boolean;
-  dispose(): void;
-}
+export type { PinLayer, PinLayerOptions, PresentOptions, PresentResult } from './pinLayerTypes';
 
 /**
  * The news pins: one InstancedMesh (see pinMesh.ts) whose slots are keyed by
@@ -112,6 +73,10 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
   let rowSlots: Int32Array = new Int32Array(0);
   let level: number | null = null;
   let nowSeconds = options.timeMs / 1000;
+  const originSeconds = Math.floor(nowSeconds);
+  uniforms.uNow.value = nowSeconds - originSeconds;
+  let ratesDue = false;
+  let restSeconds = 0;
   let clock = 0;
   let settlesAt = 0;
   let releases: { at: number; slots: readonly number[] }[] = [];
@@ -159,10 +124,19 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
       const instant = reset || nodes === null || reducedMotion;
       const { rowSlots: assigned, departed, fresh } = slots.assign(next.ids, next.count);
       ensureCapacity(slots.highWater);
-      // A level change re-presents the same stories: their pulse and recency
-      // already match the displayed time (setTime keeps them so).
+      // A level change re-presents the same stories, whose publish times are
+      // already written and whose freshness the shader derives.
       if (next !== nodes || reset) {
-        published = writeAppearance(next, assigned, pins.array, nowSeconds, clock, fresh);
+        published = writeAppearance(
+          next,
+          assigned,
+          pins.array,
+          nowSeconds,
+          originSeconds,
+          clock,
+          fresh,
+        );
+        ratesDue = false;
       }
       nodes = next;
       rowSlots = assigned;
@@ -194,9 +168,11 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
     setTime(timeMs) {
       if (!Number.isFinite(timeMs)) return;
       nowSeconds = timeMs / 1000;
+      uniforms.uNow.value = nowSeconds - originSeconds;
       if (!nodes) return;
-      published = writeAppearance(nodes, rowSlots, pins.array, nowSeconds, clock, null);
-      uploadSlots(pins, slots.highWater);
+      published = countVisible(nodes, nowSeconds);
+      ratesDue = true;
+      restSeconds = 0;
     },
 
     setViewport(bufferWidth, bufferHeight, pixelRatio) {
@@ -229,7 +205,8 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
         wasActive = false;
         return false;
       }
-      clock += Math.min(dtSeconds, wasActive ? MAX_STEP_SECONDS : RESUME_STEP_SECONDS);
+      const step = Math.min(dtSeconds, wasActive ? MAX_STEP_SECONDS : RESUME_STEP_SECONDS);
+      clock += step;
       wasActive = true;
 
       if (clock > PULSE_CLOCK_REBASE_SECONDS) {
@@ -240,6 +217,13 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
         uploadSlots(pins, slots.highWater);
       }
       uniforms.uTime.value = clock;
+
+      restSeconds += step;
+      if (ratesDue && nodes && restSeconds >= RETIME_REST_SECONDS) {
+        writeAppearance(nodes, rowSlots, pins.array, nowSeconds, originSeconds, clock, null);
+        uploadSlots(pins, slots.highWater);
+        ratesDue = false;
+      }
 
       // Slots whose stories left are reusable once their fade-out has played.
       const due = releases.filter((release) => release.at <= clock);

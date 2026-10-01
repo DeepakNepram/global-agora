@@ -23,6 +23,8 @@ import { PIN_VERT } from './pinVertex.glsl';
 export interface PinUniforms {
   readonly uCameraLocal: { value: Vector3 };
   readonly uTime: { value: number };
+  /** The displayed instant, seconds after the layer's time origin. */
+  readonly uNow: { value: number };
   readonly uPulse: { value: number };
   readonly uViewport: { value: Vector2 };
   readonly uHalfSizePx: { value: number };
@@ -36,6 +38,7 @@ export function createPinUniforms(): PinUniforms {
   return {
     uCameraLocal: { value: new Vector3(0, 0, 4) },
     uTime: { value: 0 },
+    uNow: { value: 0 },
     uPulse: { value: 1 },
     uViewport: { value: new Vector2(1, 1) },
     uHalfSizePx: { value: PIN_HALF_SIZE_CSS_PX },

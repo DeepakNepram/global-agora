@@ -1,6 +1,6 @@
 import { NEWS_CATEGORIES, type NodeBuffer } from '@/core';
 
-import { pulsePhaseFor, pulseRateFor, recencyFor } from './pinStyle';
+import { freshnessFor, pulsePhaseFor, pulseRateFor } from './pinStyle';
 
 /**
  * Per-slot layout of the pins' one interleaved buffer: twenty floats, five
@@ -29,10 +29,13 @@ export const PIN_OFFSET = {
   v0: 13,
   t0: 14,
   target: 15,
-  /** The story's pulse, its recency (−1 before publication), and the path's twist. */
+  /**
+   * The story's pulse, its publish time (seconds after the layer's time
+   * origin: the shader ages it against uNow), and the path's twist.
+   */
   phase: 16,
   rate: 17,
-  recency: 18,
+  published: 18,
   twist: 19,
 } as const;
 
@@ -87,18 +90,20 @@ function wrapAngle(angle: number): number {
 }
 
 /**
- * Writes every live row's pulse and recency into its slot and returns how many
- * stories are published at `nowSeconds`. A slot flagged in `fresh` holds a new
- * story, whose pulse starts from its publish time; every other slot keeps its
- * pulse going: its phase absorbs clock · (oldRate − newRate), so
- * sin(clock · rate + phase) does not jump when recency changes the rate.
- * Allocates nothing, so it can run on every scrubber tick.
+ * Writes every live row's publish time and pulse into its slot and returns how
+ * many stories are published at `nowSeconds`. Publish times are seconds after
+ * `originSeconds`, the layer's fixed time origin, so they stay exact in
+ * float32. A slot flagged in `fresh` holds a new story, whose pulse starts
+ * from its publish time; every other slot keeps its pulse going: its phase
+ * absorbs clock · (oldRate − newRate), so sin(clock · rate + phase) does not
+ * jump when freshness changes the rate. Allocates nothing.
  */
 export function writeAppearance(
   nodes: NodeBuffer,
   rowSlots: Int32Array,
   array: Float32Array,
   nowSeconds: number,
+  originSeconds: number,
   clockSeconds: number,
   fresh: Uint8Array | null,
 ): number {
@@ -110,10 +115,9 @@ export function writeAppearance(
     const at = slot * PIN_STRIDE;
     const publishedAt = epochSec + (publishedSec[row] ?? 0);
     const age = nowSeconds - publishedAt;
-    const recency = recencyFor(age);
     // Rounded as the array will store it, so a later retime subtracts exactly
     // the rate the GPU has been using.
-    const rate = Math.fround(pulseRateFor(recency));
+    const rate = Math.fround(pulseRateFor(freshnessFor(age)));
     if (age >= 0) published++;
 
     if (fresh?.[slot]) {
@@ -126,7 +130,7 @@ export function writeAppearance(
       );
     }
     array[at + PIN_OFFSET.rate] = rate;
-    array[at + PIN_OFFSET.recency] = age >= 0 ? recency : -1;
+    array[at + PIN_OFFSET.published] = publishedAt - originSeconds;
   }
   return published;
 }

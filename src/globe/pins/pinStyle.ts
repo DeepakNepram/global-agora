@@ -4,16 +4,30 @@ import { GLOBE_RADIUS, NEWS_CATEGORIES } from '@/core';
 
 /**
  * How a story becomes a pin: colour from category, brightness and pulse from
- * recency, size from heat. Shaders interpolate these constants, and the CPU
+ * freshness, size from heat. Shaders interpolate these constants, and the CPU
  * mirrors below exist so tests can check the maths the GPU runs.
  */
 
 const TAU = Math.PI * 2;
 
-/** Recency = exp(-age / τ): 1 when published, 0.37 after τ, 0.02 after 4τ. */
-export const RECENCY_TIME_CONSTANT_SECONDS = 6 * 3600;
+/**
+ * The prompt's life of a pin, in story time (age = displayed instant − publish
+ * time), evaluated on the GPU so a scrub costs one uniform:
+ *   birth      grows in over FRESH_BIRTH_SECONDS, with a small pop
+ *   freshness  f = 1 for FRESH_PEAK_SECONDS ("brightest for ~30 minutes"),
+ *              then f = e^(−(age − peak) / FRESH_FADE_SECONDS) ("fades over the following hours")
+ * During Play (a day in 20 s) the birth lasts about four frames and the peak
+ * about 0.4 s, so each story sparks, glows and dims as the day passes.
+ */
+export const FRESH_BIRTH_SECONDS = 5 * 60;
+export const FRESH_PEAK_SECONDS = 30 * 60;
+export const FRESH_FADE_SECONDS = 3 * 3600;
+/** The birth's overshoot: scale peaks about 18 % above full at 70 % of the way in. */
+export const BIRTH_POP = 0.5;
+/** A fresh pin draws this much larger, so the newest news reads from orbit. */
+export const FRESH_SCALE_BOOST = 0.15;
 
-/** The prompt's pulse: scale = base · (1 + PULSE_AMPLITUDE · sin(t·rate + phase) · recency). */
+/** The prompt's pulse: scale = base · (1 + PULSE_AMPLITUDE · sin(t·rate + phase) · freshness). */
 export const PULSE_AMPLITUDE = 0.15;
 /** Pulse frequency of the oldest and the newest story, in Hz. */
 export const PULSE_HZ_OLD = 0.25;
@@ -29,11 +43,11 @@ export const COLOR_GAIN_NEW = 1.0;
 
 /**
  * Fresh stories get a white-hot centre on top of their colour, and that is what
- * blooms: 0 until recency passes HOT_RECENCY_START (about 4.8 hours old), then
- * rising to HOT_CORE_MAX at publication. The colour stays in the dot's rim and
- * the halo, the way a bright light photographs.
+ * blooms: HOT_CORE_MAX through the peak, falling to 0 as freshness drops to
+ * HOT_FRESHNESS_START (about 2.9 hours old). The colour stays in the dot's rim
+ * and the halo, the way a bright light photographs.
  */
-export const HOT_RECENCY_START = 0.45;
+export const HOT_FRESHNESS_START = 0.45;
 export const HOT_CORE_MAX = 1.5;
 
 /** Halo brightness at the dot's edge, relative to the colour. At most 0.3 < threshold. */
@@ -71,7 +85,7 @@ export const ORB_CORE_RADIUS = 0.6;
 export const ORB_SHADOW_RADIUS = 0.78;
 /** How much an orb's rim darkens, giving the disc an edge on bright ground. */
 export const ORB_RIM_DARKEN = 0.35;
-/** Orbs keep one brightness, not their stories' recency, so the count stays readable. */
+/** Orbs keep one brightness, not their stories' freshness, so the count stays readable. */
 export const ORB_COLOR_GAIN = 0.9;
 /** A hidden end draws this small, so a pin grows out of an orb rather than popping. */
 export const HIDDEN_SCALE = 0.25;
@@ -138,22 +152,46 @@ export const CATEGORY_COLORS: Float32Array = (() => {
   return colors;
 })();
 
-export function recencyFor(ageSeconds: number): number {
-  return ageSeconds < 0 ? 0 : Math.exp(-ageSeconds / RECENCY_TIME_CONSTANT_SECONDS);
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(Math.max((x - edge0) / (edge1 - edge0), 0), 1);
+  return t * t * (3 - 2 * t);
+}
+
+/** 1 through the peak, then fading over hours; 0 before publication. */
+export function freshnessFor(ageSeconds: number): number {
+  if (ageSeconds < 0) return 0;
+  if (ageSeconds <= FRESH_PEAK_SECONDS) return 1;
+  return Math.exp(-(ageSeconds - FRESH_PEAK_SECONDS) / FRESH_FADE_SECONDS);
+}
+
+/** How far a story has grown in: 0 before publication, 1 from FRESH_BIRTH_SECONDS on. */
+export function birthFor(ageSeconds: number): number {
+  return smoothstep(0, FRESH_BIRTH_SECONDS, ageSeconds);
+}
+
+/**
+ * A pin's scale through its birth and peak:
+ *   (HIDDEN_SCALE + (1 − HIDDEN_SCALE)·b + BIRTH_POP·sin(π·b)) · (1 + FRESH_SCALE_BOOST·f)
+ * growing from a hidden end's size with a pop, then easing to its heat's size as it ages.
+ */
+export function lifeScaleFor(ageSeconds: number): number {
+  const b = birthFor(ageSeconds);
+  const grow = HIDDEN_SCALE + (1 - HIDDEN_SCALE) * b + BIRTH_POP * Math.sin(Math.PI * b);
+  return grow * (1 + FRESH_SCALE_BOOST * freshnessFor(ageSeconds));
 }
 
 /** Angular pulse rate in rad/s. */
-export function pulseRateFor(recency: number): number {
-  return TAU * (PULSE_HZ_OLD + (PULSE_HZ_NEW - PULSE_HZ_OLD) * recency);
+export function pulseRateFor(freshness: number): number {
+  return TAU * (PULSE_HZ_OLD + (PULSE_HZ_NEW - PULSE_HZ_OLD) * freshness);
 }
 
-export function colorGainFor(recency: number): number {
-  return COLOR_GAIN_OLD + (COLOR_GAIN_NEW - COLOR_GAIN_OLD) * recency;
+export function colorGainFor(freshness: number): number {
+  return COLOR_GAIN_OLD + (COLOR_GAIN_NEW - COLOR_GAIN_OLD) * freshness;
 }
 
-/** White added at the dot's centre: 0 for older stories, HOT_CORE_MAX when brand new. */
-export function hotFor(recency: number): number {
-  const t = (recency - HOT_RECENCY_START) / (1 - HOT_RECENCY_START);
+/** White added at the dot's centre: HOT_CORE_MAX through the peak, 0 for older stories. */
+export function hotFor(freshness: number): number {
+  const t = (freshness - HOT_FRESHNESS_START) / (1 - HOT_FRESHNESS_START);
   return HOT_CORE_MAX * Math.min(Math.max(t, 0), 1);
 }
 
@@ -177,9 +215,9 @@ export function pulseScale(
   timeSeconds: number,
   rate: number,
   phase: number,
-  recency: number,
+  freshness: number,
 ): number {
-  return base * (1 + PULSE_AMPLITUDE * Math.sin(timeSeconds * rate + phase) * recency);
+  return base * (1 + PULSE_AMPLITUDE * Math.sin(timeSeconds * rate + phase) * freshness);
 }
 
 /**

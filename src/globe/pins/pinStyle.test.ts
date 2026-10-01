@@ -8,19 +8,26 @@ import { PIN_VERT } from './pinVertex.glsl';
 import {
   CATEGORY_COLORS,
   COLOR_GAIN_NEW,
+  COLOR_GAIN_OLD,
+  FRESH_BIRTH_SECONDS,
+  FRESH_FADE_SECONDS,
+  FRESH_PEAK_SECONDS,
+  FRESH_SCALE_BOOST,
   HALO_PEAK,
+  HIDDEN_SCALE,
   PULSE_HZ_NEW,
   PULSE_HZ_OLD,
-  RECENCY_TIME_CONSTANT_SECONDS,
   SCALE_MAX,
   SCALE_MIN,
+  birthFor,
   colorGainFor,
+  freshnessFor,
   horizonVisibility,
   hotFor,
+  lifeScaleFor,
   luminance,
   pulsePhaseFor,
   pulseRateFor,
-  recencyFor,
   scaleForHeat,
 } from './pinStyle';
 
@@ -36,28 +43,53 @@ function hue(index: number): [number, number, number] {
   ];
 }
 
-describe('recency', () => {
-  it('decays exponentially from 1 at publication', () => {
-    expect(recencyFor(0)).toBe(1);
-    expect(recencyFor(RECENCY_TIME_CONSTANT_SECONDS)).toBeCloseTo(Math.exp(-1), 12);
-    expect(recencyFor(24 * HOUR)).toBeCloseTo(Math.exp(-4), 12);
+describe("a pin's life", () => {
+  it('is brightest for the first half hour, as the prompt asks', () => {
+    expect(FRESH_PEAK_SECONDS).toBe(30 * 60);
+    expect(freshnessFor(0)).toBe(1);
+    expect(freshnessFor(FRESH_PEAK_SECONDS)).toBe(1);
+    expect(freshnessFor(FRESH_PEAK_SECONDS + 1)).toBeLessThan(1);
   });
 
-  it('is 0 for a story not yet published', () => {
-    expect(recencyFor(-1)).toBe(0);
+  it('then fades over the following hours, never below the old colour', () => {
+    expect(freshnessFor(FRESH_PEAK_SECONDS + FRESH_FADE_SECONDS)).toBeCloseTo(Math.exp(-1), 12);
+    expect(freshnessFor(12 * HOUR)).toBeLessThan(0.05);
+    expect(colorGainFor(freshnessFor(20 * HOUR))).toBeCloseTo(COLOR_GAIN_OLD, 2);
+    let previous = 1;
+    for (let age = 0; age < 30 * HOUR; age += 600) {
+      expect(freshnessFor(age)).toBeLessThanOrEqual(previous);
+      previous = freshnessFor(age);
+    }
+  });
+
+  it('is nothing before publication', () => {
+    expect(freshnessFor(-1)).toBe(0);
+    expect(birthFor(-1)).toBe(0);
+    expect(birthFor(0)).toBe(0);
+  });
+
+  it('grows in with a pop over the first minutes and then holds its size', () => {
+    expect(birthFor(FRESH_BIRTH_SECONDS)).toBe(1);
+    expect(lifeScaleFor(0)).toBeCloseTo(HIDDEN_SCALE * (1 + FRESH_SCALE_BOOST), 12);
+    const peak = Math.max(
+      ...Array.from({ length: 50 }, (_, i) => lifeScaleFor((i / 49) * FRESH_BIRTH_SECONDS)),
+    );
+    expect(peak).toBeGreaterThan(1.1 * (1 + FRESH_SCALE_BOOST));
+    expect(lifeScaleFor(FRESH_BIRTH_SECONDS)).toBeCloseTo(1 + FRESH_SCALE_BOOST, 12);
+    expect(lifeScaleFor(20 * HOUR)).toBeCloseTo(1, 2);
   });
 
   it('makes newer stories pulse faster', () => {
     expect(pulseRateFor(1)).toBeCloseTo(2 * Math.PI * PULSE_HZ_NEW, 12);
     expect(pulseRateFor(0)).toBeCloseTo(2 * Math.PI * PULSE_HZ_OLD, 12);
-    expect(pulseRateFor(recencyFor(HOUR))).toBeGreaterThan(pulseRateFor(recencyFor(5 * HOUR)));
+    expect(pulseRateFor(freshnessFor(HOUR))).toBeGreaterThan(pulseRateFor(freshnessFor(5 * HOUR)));
   });
 });
 
 describe('brightness budget', () => {
   /** Luminance at the dot's centre, as the fragment shader builds it. */
-  const centre = (category: number, recency: number): number =>
-    luminance(...hue(category)) * colorGainFor(recency) + hotFor(recency);
+  const centre = (category: number, freshness: number): number =>
+    luminance(...hue(category)) * colorGainFor(freshness) + hotFor(freshness);
 
   it('keeps every hue at full intensity without leaving the 0..1 range', () => {
     NEWS_CATEGORIES.forEach((_, i) => {
@@ -75,10 +107,11 @@ describe('brightness budget', () => {
   it('never blooms from colour alone, so older stories stay below the threshold', () => {
     NEWS_CATEGORIES.forEach((_, i) => {
       expect(luminance(...hue(i)) * COLOR_GAIN_NEW).toBeLessThan(BLOOM_THRESHOLD);
-      expect(centre(i, recencyFor(5 * HOUR))).toBeLessThan(BLOOM_THRESHOLD);
+      expect(centre(i, freshnessFor(3 * HOUR))).toBeLessThan(BLOOM_THRESHOLD);
     });
-    expect(hotFor(recencyFor(5 * HOUR))).toBe(0);
-    expect(hotFor(recencyFor(4.5 * HOUR))).toBeGreaterThan(0);
+    // The white-hot core lasts about 2.9 hours.
+    expect(hotFor(freshnessFor(3 * HOUR))).toBe(0);
+    expect(hotFor(freshnessFor(2.75 * HOUR))).toBeGreaterThan(0);
   });
 
   it('keeps a single halo below the bloom threshold', () => {
@@ -149,6 +182,16 @@ describe('horizonVisibility', () => {
 });
 
 describe('pin shaders', () => {
+  it('ages every pin against the displayed instant, so a scrub moves one uniform', () => {
+    expect(PIN_VERT).toContain('uniform float uNow;');
+    expect(PIN_VERT).toContain('float age = uNow - aPulse.z;');
+    expect(PIN_VERT).toContain('float birth = smoothstep(0.0, FRESH_BIRTH, age);');
+    expect(PIN_VERT).toContain(
+      'float freshness = step(0.0, age) * (age <= FRESH_PEAK ? 1.0 : exp(-(age - FRESH_PEAK) / FRESH_FADE));',
+    );
+    expect(PIN_VERT).toMatch(/const float FRESH_PEAK = 1800\.0;/);
+  });
+
   it('runs the bloom spring and lands it exactly once settled', () => {
     expect(PIN_VERT).toMatch(/const float OMEGA = 33\.0;/);
     expect(PIN_VERT).toContain(
@@ -166,7 +209,7 @@ describe('pin shaders', () => {
   it('implements the prompt pulse and horizon expressions', () => {
     // Pins pulse; orbs, and pins mid-way to becoming one, hold still in proportion.
     expect(PIN_VERT).toContain(
-      'float pulse = 1.0 + PULSE_AMPLITUDE * sin(uTime * aPulse.y + aPulse.x) * recency * uPulse * (1.0 - orbness);',
+      'float pulse = 1.0 + PULSE_AMPLITUDE * sin(uTime * aPulse.y + aPulse.x) * freshness * uPulse * (1.0 - orbness);',
     );
     expect(PIN_VERT).toContain('float horizon = GLOBE_RADIUS / cameraDistance;');
     expect(PIN_VERT).toContain(

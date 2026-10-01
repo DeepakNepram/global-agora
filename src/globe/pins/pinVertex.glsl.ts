@@ -17,12 +17,17 @@ import { glslFloat } from '../hdr';
 import { BADGE_CODE_GLSL } from './badgeGlyphs';
 import { BLOOM_OMEGA, BLOOM_SETTLE_SECONDS } from './bloom';
 import {
+  BIRTH_POP,
   COLOR_GAIN_NEW,
   COLOR_GAIN_OLD,
+  FRESH_BIRTH_SECONDS,
+  FRESH_FADE_SECONDS,
+  FRESH_PEAK_SECONDS,
+  FRESH_SCALE_BOOST,
   HIDDEN_SCALE,
   HORIZON_FADE_FRACTION,
   HOT_CORE_MAX,
-  HOT_RECENCY_START,
+  HOT_FRESHNESS_START,
   ORB_COLOR_GAIN,
   ORB_SCALE_MIN,
   ORB_SCALE_PER_DECADE,
@@ -40,13 +45,15 @@ attribute vec4 aOuter;
 attribute vec4 aOffsets;
 /** Spring: u0, v0, t0, target. */
 attribute vec4 aSpring;
-/** Pulse phase, pulse rate, recency (−1 before publication), path twist. */
+/** Pulse phase, pulse rate, publish time (s after the time origin), path twist. */
 attribute vec4 aPulse;
 
 /** Camera position in the Earth-fixed frame, updated before every draw. */
 uniform vec3 uCameraLocal;
 /** Clock, seconds: drives both the pulse and the springs. */
 uniform float uTime;
+/** The displayed instant, seconds after the time origin: the scrubber moves only this. */
+uniform float uNow;
 /** 1 pulses, 0 holds still (reduced motion). */
 uniform float uPulse;
 /** Drawing-buffer size in pixels. */
@@ -80,9 +87,15 @@ const float HIDDEN_SCALE = ${glslFloat(HIDDEN_SCALE)};
 const float COLOR_GAIN_OLD = ${glslFloat(COLOR_GAIN_OLD)};
 const float COLOR_GAIN_NEW = ${glslFloat(COLOR_GAIN_NEW)};
 const float ORB_COLOR_GAIN = ${glslFloat(ORB_COLOR_GAIN)};
-const float HOT_RECENCY_START = ${glslFloat(HOT_RECENCY_START)};
+const float HOT_FRESHNESS_START = ${glslFloat(HOT_FRESHNESS_START)};
 const float HOT_CORE_MAX = ${glslFloat(HOT_CORE_MAX)};
+const float FRESH_BIRTH = ${glslFloat(FRESH_BIRTH_SECONDS)};
+const float FRESH_PEAK = ${glslFloat(FRESH_PEAK_SECONDS)};
+const float FRESH_FADE = ${glslFloat(FRESH_FADE_SECONDS)};
+const float BIRTH_POP = ${glslFloat(BIRTH_POP)};
+const float FRESH_SCALE_BOOST = ${glslFloat(FRESH_SCALE_BOOST)};
 const float LOG10_2 = 0.30103;
+const float PI = 3.14159265;
 
 ${BADGE_CODE_GLSL}
 
@@ -104,13 +117,13 @@ float endScale(float look) {
   return mix(pin, orb, isOrb(kind)) * mix(HIDDEN_SCALE, 1.0, isShown(kind));
 }
 
-// Colour of one end: the category hue, scaled by recency for a pin
-//   gain = COLOR_GAIN_OLD + (COLOR_GAIN_NEW − COLOR_GAIN_OLD) · recency
+// Colour of one end: the category hue, scaled by freshness for a pin
+//   gain = COLOR_GAIN_OLD + (COLOR_GAIN_NEW − COLOR_GAIN_OLD) · freshness
 // and held at ORB_COLOR_GAIN for an orb.
-vec3 endColor(float look, float recency) {
+vec3 endColor(float look, float freshness) {
   float kind = lookKind(look);
   int category = int(mod(floor(look / 4.0), 8.0) + 0.5);
-  float gain = mix(COLOR_GAIN_OLD + (COLOR_GAIN_NEW - COLOR_GAIN_OLD) * recency, ORB_COLOR_GAIN, isOrb(kind));
+  float gain = mix(COLOR_GAIN_OLD + (COLOR_GAIN_NEW - COLOR_GAIN_OLD) * freshness, ORB_COLOR_GAIN, isOrb(kind));
   return uPalette[category] * gain;
 }
 
@@ -141,15 +154,22 @@ void main() {
   vec2 way = (aOffsets.zw - aOffsets.xy) * u;
   vec2 offset = (aOffsets.xy + vec2(way.x * c - way.y * s, way.x * s + way.y * c)) * uPixelRatio;
 
+  // The story's life, in story time (pinStyle.ts), so a scrub moves one uniform:
+  //   age = uNow − published
+  //   birth = smoothstep(0, FRESH_BIRTH, age)                   0 before publication
+  //   freshness = age ≤ FRESH_PEAK ? 1 : e^(−(age − FRESH_PEAK) / FRESH_FADE)
+  float age = uNow - aPulse.z;
+  float birth = smoothstep(0.0, FRESH_BIRTH, age);
+  float freshness = step(0.0, age) * (age <= FRESH_PEAK ? 1.0 : exp(-(age - FRESH_PEAK) / FRESH_FADE));
+
   // Opacity: the visible end dominates, so a child is whole within the first
   // 30 % of its way out and fades in the last 30 % of its way back:
   //   w = shownOuter ≥ shownInner ? smoothstep(0, 0.3, u) : smoothstep(0.7, 1, u)
-  // A pin end also waits for its story's publish time (recency ≥ 0).
+  // A pin end also fades in with its story's birth; an orb is never time-gated.
   float innerKind = lookKind(aInner.w);
   float outerKind = lookKind(aOuter.w);
-  float published = step(0.0, aPulse.z);
-  float shownInner = isShown(innerKind) * max(published, isOrb(innerKind));
-  float shownOuter = isShown(outerKind) * max(published, isOrb(outerKind));
+  float shownInner = isShown(innerKind) * max(birth, isOrb(innerKind));
+  float shownOuter = isShown(outerKind) * max(birth, isOrb(outerKind));
   float w = shownOuter >= shownInner ? smoothstep(0.0, 0.3, u) : smoothstep(0.7, 1.0, u);
   float shown = mix(shownInner, shownOuter, w);
 
@@ -162,12 +182,11 @@ void main() {
   float facing = dot(centre, uCameraLocal / cameraDistance);
   float visibility = smoothstep(horizon, horizon + HORIZON_FADE * (1.0 - horizon), facing) * shown;
 
-  float recency = max(aPulse.z, 0.0);
   float orbness = mix(isOrb(innerKind), isOrb(outerKind), u);
   vCorner = position.xy;
-  vColor = mix(endColor(aInner.w, recency), endColor(aOuter.w, recency), u);
-  //   hot = HOT_CORE_MAX · clamp((recency − start) / (1 − start), 0, 1), pins only
-  vHot = HOT_CORE_MAX * clamp((recency - HOT_RECENCY_START) / (1.0 - HOT_RECENCY_START), 0.0, 1.0) * (1.0 - orbness);
+  vColor = mix(endColor(aInner.w, freshness), endColor(aOuter.w, freshness), u);
+  //   hot = HOT_CORE_MAX · clamp((freshness − start) / (1 − start), 0, 1), pins only
+  vHot = HOT_CORE_MAX * clamp((freshness - HOT_FRESHNESS_START) / (1.0 - HOT_FRESHNESS_START), 0.0, 1.0) * (1.0 - orbness);
   vOrb = vec4(
     orbness,
     badgeCode(isOrb(innerKind) * lookValue(aInner.w)),
@@ -192,9 +211,12 @@ void main() {
   // mu keeps the glow per unit of screen even across the disc; dots stay whole.
   vHaloWeight = max(dot(centre, normalize(uCameraLocal - centre)), 0.0);
 
-  //   scale = base * (1 + PULSE_AMPLITUDE * sin(time * rate + phase) * recency)   pins only
-  float pulse = 1.0 + PULSE_AMPLITUDE * sin(uTime * aPulse.y + aPulse.x) * recency * uPulse * (1.0 - orbness);
-  vHalfSizePx = uHalfSizePx * mix(endScale(aInner.w), endScale(aOuter.w), u) * pulse;
+  //   scale = base * (1 + PULSE_AMPLITUDE * sin(time * rate + phase) * freshness)   pins only
+  float pulse = 1.0 + PULSE_AMPLITUDE * sin(uTime * aPulse.y + aPulse.x) * freshness * uPulse * (1.0 - orbness);
+  // A pin grows in with a pop and draws a little larger while fresh:
+  //   life = (HIDDEN_SCALE + (1 − HIDDEN_SCALE)·birth + BIRTH_POP·sin(π·birth)) · (1 + FRESH_SCALE_BOOST·freshness)
+  float life = (HIDDEN_SCALE + (1.0 - HIDDEN_SCALE) * birth + BIRTH_POP * sin(PI * birth)) * (1.0 + FRESH_SCALE_BOOST * freshness);
+  vHalfSizePx = uHalfSizePx * mix(endScale(aInner.w), endScale(aOuter.w), u) * mix(life, 1.0, orbness) * pulse;
 
   // Billboard in clip space: offsetting xy by (pixels * 2 / viewport) * w moves
   // the corner that many pixels after the perspective divide, so the quad
