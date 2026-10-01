@@ -158,6 +158,10 @@ export {
 } from './filters';
 export type { StoryFilter } from './filters';
 
+export { fetchPlaces, parsePlaces, PlacesError, PLACES_PATH } from './data/places';
+export type { City, Country, Gazetteer } from './data/places';
+export { cityLabel, nearestCity, surfaceKm, CITY_RADIUS_KM } from './places';
+
 export { createFrameStats, percentile } from './frameStats';
 export type { FrameStats, FrameSummary } from './frameStats';
 
