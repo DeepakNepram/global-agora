@@ -3,15 +3,8 @@ import { Group } from 'three';
 import { countVisible, type ClusterLayout, type NodeBuffer } from '@/core';
 
 import { earthTiltQuaternion } from '../views';
-import {
-  createPinMaterial,
-  createPinMesh,
-  createPinUniforms,
-  disposePinMesh,
-  nextPowerOfTwo,
-  uploadSlots,
-  type PinMesh,
-} from './pinMesh';
+import { createPinMaterial, createPinUniforms, uploadOrbMatches, uploadSlots } from './pinMesh';
+import { createFilterState, FILTER_FADE_SECONDS } from './pinFilter';
 import { landSprings, rebaseClock, writeAppearance } from './pinInstances';
 import type { PinLayer, PinLayerOptions } from './pinLayerTypes';
 import { pickPin } from './pinPick';
@@ -24,6 +17,7 @@ import {
   directionOf,
 } from './pinLayerRules';
 import { createSlotMap } from './pinSlots';
+import { createPinStorage } from './pinStorage';
 import { PIN_HALF_SIZE_CSS_PX, PULSE_CLOCK_REBASE_SECONDS } from './pinStyle';
 import { planTransitions } from './transitions';
 
@@ -50,20 +44,9 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
   tilt.name = 'pins-tilt';
   earthTiltQuaternion(tilt.quaternion);
 
-  const attach = (capacity: number): PinMesh => {
-    const built = createPinMesh(capacity, material);
-    built.mesh.onBeforeRender = (_renderer, _scene, camera) => {
-      built.mesh.worldToLocal(
-        uniforms.uCameraLocal.value.setFromMatrixPosition(camera.matrixWorld),
-      );
-    };
-    tilt.add(built.mesh);
-    return built;
-  };
-
+  const storage = createPinStorage(tilt, material, uniforms, options.capacity ?? DEFAULT_CAPACITY);
+  const filter = createFilterState(uniforms);
   const slots = createSlotMap();
-  let pins = attach(nextPowerOfTwo(options.capacity ?? DEFAULT_CAPACITY));
-  let groupSlot = new Int32Array(pins.buffer.count).fill(-1);
   let nodes: NodeBuffer | null = null;
   let shown: ClusterLayout | null = null;
   let selectedId: number | null = null;
@@ -82,54 +65,50 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
   let reducedMotion = false;
   let wasActive = false;
 
-  const ensureCapacity = (needed: number): void => {
-    if (needed <= pins.buffer.count) return;
-    // Replace, never add, so there is still exactly one InstancedMesh; the
-    // slots carry over as they are, animations and all.
-    const previous = pins;
-    pins = attach(nextPowerOfTwo(needed));
-    pins.array.set(previous.array);
-    disposePinMesh(previous);
-    const groups = new Int32Array(pins.buffer.count).fill(-1);
-    groups.set(groupSlot);
-    groupSlot = groups;
-  };
-
   /** Lands every spring where it is heading: reduced motion switched on mid-bloom. */
   const settleAll = (): void => {
-    landSprings(pins.array, slots.highWater, clock);
+    landSprings(storage.pins.array, slots.highWater, clock);
     settlesAt = clock;
     for (const release of releases) slots.release(release.slots);
     releases = [];
-    uploadSlots(pins, slots.highWater);
+    uploadSlots(storage.pins, slots.highWater);
+  };
+
+  /** Orbs match when any member does; redone for a new layout, a filter, or a window's edge moving. */
+  const matchOrbs = (force: boolean): void => {
+    if (!nodes || !shown) return;
+    const array = storage.pins.orbMatch.array as Float32Array;
+    if (filter.writeOrbs(nodes, shown, rowSlots, nowSeconds, array, force)) {
+      uploadOrbMatches(storage.pins, slots.highWater);
+    }
   };
 
   return {
     object3d: tilt,
 
     get capacity() {
-      return pins.buffer.count;
+      return storage.pins.buffer.count;
     },
 
     present(next, layout, presentOptions = {}) {
       const reset = presentOptions.reset === true;
       if (reset) {
         slots.reset();
-        groupSlot.fill(-1);
+        storage.groupSlot.fill(-1);
         releases = [];
         level = null;
         opened = false;
       }
       const instant = reset || nodes === null || reducedMotion;
       const { rowSlots: assigned, departed, fresh } = slots.assign(next.ids, next.count);
-      ensureCapacity(slots.highWater);
+      storage.ensureCapacity(slots.highWater);
       // A level change re-presents the same stories, whose publish times are
       // already written and whose freshness the shader derives.
       if (next !== nodes || reset) {
         published = writeAppearance(
           next,
           assigned,
-          pins.array,
+          storage.pins.array,
           nowSeconds,
           originSeconds,
           clock,
@@ -143,13 +122,13 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
       uniforms.uSelected.value = selectedSlot(nodes, shown, rowSlots, selectedId);
 
       const plan = planTransitions({
-        array: pins.array,
+        array: storage.pins.array,
         slotCount: slots.highWater,
         nodes: next,
         layout,
         rowSlots,
         fresh,
-        groupSlot,
+        groupSlot: storage.groupSlot,
         departed,
         clock,
         direction: directionOf(level, opened, layout),
@@ -162,8 +141,9 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
         if (instant) slots.release(departed);
         else releases.push({ at: plan.endsAt, slots: departed });
       }
-      uploadSlots(pins, slots.highWater);
-      pins.mesh.count = slots.highWater;
+      uploadSlots(storage.pins, slots.highWater);
+      matchOrbs(true);
+      storage.pins.mesh.count = slots.highWater;
       return { moving: plan.moving, durationMs: Math.max(0, plan.endsAt - clock) * 1000 };
     },
 
@@ -175,18 +155,29 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
       published = countVisible(nodes, nowSeconds);
       ratesDue = true;
       restSeconds = 0;
+      // Open layouts (the time moving) have no orbs; at rest a window's edge still moves with a live clock.
+      if (filter.current.withinHours !== null && shown && !shown.open) matchOrbs(false);
+    },
+
+    setFilter(next) {
+      if (!filter.set(next, reducedMotion)) return;
+      matchOrbs(true);
+      if (!reducedMotion) settlesAt = Math.max(settlesAt, clock + FILTER_FADE_SECONDS);
     },
 
     pick(x, y, camera, viewport, radiusPx) {
-      if (!nodes || !shown || !tilt.visible) return null;
+      const drawn = nodes;
+      const layout = shown;
+      if (!drawn || !layout || !tilt.visible) return null;
       return pickPin({
-        nodes,
-        layout: shown,
+        nodes: drawn,
+        layout,
         nowSec: nowSeconds,
         x,
         y,
         ...(radiusPx === undefined ? {} : { radiusPx }),
         project: cameraProjection(tilt, camera, viewport.width, viewport.height),
+        dimmed: (row) => filter.dimmed(drawn, layout, row, nowSeconds),
       });
     },
 
@@ -205,6 +196,7 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
       reducedMotion = motion === 'reduced';
       uniforms.uPulse.value = reducedMotion ? 0 : 1;
       if (reducedMotion && clock < settlesAt) settleAll();
+      if (reducedMotion) filter.settle();
     },
 
     setVisible(visible) {
@@ -231,17 +223,26 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
 
       if (clock > PULSE_CLOCK_REBASE_SECONDS) {
         const by = clock;
-        clock = rebaseClock(pins.array, slots.highWater, clock, by);
+        clock = rebaseClock(storage.pins.array, slots.highWater, clock, by);
         settlesAt -= by;
         releases = releases.map((release) => ({ ...release, at: release.at - by }));
-        uploadSlots(pins, slots.highWater);
+        uploadSlots(storage.pins, slots.highWater);
       }
       uniforms.uTime.value = clock;
+      filter.advance(step);
 
       restSeconds += step;
       if (ratesDue && nodes && restSeconds >= RETIME_REST_SECONDS) {
-        writeAppearance(nodes, rowSlots, pins.array, nowSeconds, originSeconds, clock, null);
-        uploadSlots(pins, slots.highWater);
+        writeAppearance(
+          nodes,
+          rowSlots,
+          storage.pins.array,
+          nowSeconds,
+          originSeconds,
+          clock,
+          null,
+        );
+        uploadSlots(storage.pins, slots.highWater);
         ratesDue = false;
       }
 
@@ -256,7 +257,7 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
 
     dispose() {
       tilt.removeFromParent();
-      disposePinMesh(pins);
+      storage.dispose();
       material.dispose();
     },
   };

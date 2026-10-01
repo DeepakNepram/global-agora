@@ -207,9 +207,9 @@ describe('pin shaders', () => {
   });
 
   it('implements the prompt pulse and horizon expressions', () => {
-    // Pins pulse; orbs, and pins mid-way to becoming one, hold still in proportion.
+    // Pins pulse; orbs, pins mid-way to becoming one, and filtered pins hold still in proportion.
     expect(PIN_VERT).toContain(
-      'float pulse = 1.0 + PULSE_AMPLITUDE * sin(uTime * aPulse.y + aPulse.x) * freshness * uPulse * (1.0 - orbness);',
+      'float pulse = 1.0 + PULSE_AMPLITUDE * sin(uTime * aPulse.y + aPulse.x) * freshness * uPulse * (1.0 - orbness) * (1.0 - dimmed);',
     );
     expect(PIN_VERT).toContain('float horizon = GLOBE_RADIUS / cameraDistance;');
     expect(PIN_VERT).toContain(
@@ -217,11 +217,22 @@ describe('pin shaders', () => {
     );
   });
 
+  it('dims and shrinks what the filters leave out, never the open story', () => {
+    expect(PIN_VERT).toMatch(/const float FILTERED_ALPHA = 0\.3;/);
+    expect(PIN_VERT).toMatch(/const float FILTERED_SCALE = 0\.6;/);
+    expect(PIN_VERT).toContain('return within < 0.0 ? 1.0 : step(age, within);');
+    expect(PIN_VERT).toContain(
+      'float dimmed = (1.0 - mix(endMatch(aInner.w, age), endMatch(aOuter.w, age), u)) * (1.0 - vSelected);',
+    );
+    expect(PIN_VERT).toContain('visibility *= mix(1.0, FILTERED_ALPHA, dimmed);');
+    expect(PIN_VERT).toContain('vHalfSizePx *= mix(1.0, FILTERED_SCALE, dimmed);');
+  });
+
   it('outputs premultiplied colour with the dot and shadow in alpha', () => {
     expect(PIN_FRAG).toContain('gl_FragColor = vec4(color, coverage) * vAlpha;');
     // Halos weighted by the view angle to the ground, so the limb does not ring.
     expect(PIN_VERT).toContain(
-      'vHaloWeight = max(dot(centre, normalize(uCameraLocal - centre)), 0.0);',
+      'vHaloWeight = max(dot(centre, normalize(uCameraLocal - centre)), 0.0) * (1.0 - dimmed);',
     );
     expect(PIN_FRAG).toContain('float halo = HALO_PEAK * vHaloWeight * fall * fall;');
     // Comments stripped: the shader explains why it avoids the keyword.

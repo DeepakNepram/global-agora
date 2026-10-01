@@ -25,6 +25,12 @@ export const PICK_RADIUS_CSS_PX = 22;
 /** Enter on the focused globe looks this far from the centre of the view. */
 export const ACTIVATE_RADIUS_CSS_PX = 48;
 
+/**
+ * A pin the filters dim still answers a tap, but one they show wins a near
+ * tie: its distance counts for less by this factor.
+ */
+export const DIMMED_PICK_PENALTY = 1.6;
+
 export type PinPick =
   | { readonly kind: 'story'; readonly row: number; readonly id: number }
   | {
@@ -59,6 +65,8 @@ export interface PickInput {
   readonly y: number;
   readonly radiusPx?: number;
   readonly project: ProjectPoint;
+  /** Rows the filters dim (see DIMMED_PICK_PENALTY); none when absent. */
+  readonly dimmed?: (row: number) => boolean;
 }
 
 /**
@@ -97,8 +105,10 @@ export function pickPin(input: PickInput): PinPick | null {
           orbScaleFor(layout.counts[row] ?? 1) * PIN_HALF_SIZE_CSS_PX * ORB_CORE_RADIUS,
         )
       : radius;
-    const score = Math.hypot(point.x - x, point.y - y) / reach;
-    if (score <= 1 && score < bestScore) {
+    const distance = Math.hypot(point.x - x, point.y - y) / reach;
+    if (distance > 1) continue;
+    const score = input.dimmed?.(row) === true ? distance * DIMMED_PICK_PENALTY : distance;
+    if (score < bestScore) {
       best = row;
       bestScore = score;
     }

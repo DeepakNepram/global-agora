@@ -5,7 +5,7 @@ import { FIXTURE_EPOCH_SEC, storyBuffer } from '@/core/cluster/cluster.fixture';
 import { createLayoutColumns } from '@/core/cluster/layout';
 
 import { petalOffset } from './bloom';
-import { PICK_RADIUS_CSS_PX, pickPin, type ProjectPoint } from './pinPick';
+import { DIMMED_PICK_PENALTY, PICK_RADIUS_CSS_PX, pickPin, type ProjectPoint } from './pinPick';
 
 /**
  * A stand-in camera looking down −z at the globe: a unit-sphere point lands
@@ -118,6 +118,22 @@ describe('pickPin', () => {
     ];
     expect(pickAt(rows, 521, 500)).toMatchObject({ kind: 'story', row: 1 });
     expect(pickAt(rows, 503, 500)).toMatchObject({ kind: 'cluster', row: 0 });
+  });
+
+  it('lets a pin the filters show win a near tie with a dimmed one', () => {
+    const { nodes, layout } = scene([
+      { at: [500, 500], role: CLUSTER_ROLE.pin },
+      { at: [512, 500], role: CLUSTER_ROLE.pin },
+    ]);
+    const dimmed = (row: number): boolean => row === 0;
+    // 5 px from the dimmed pin, 7 px from the shown one: 5 × 1.6 > 7.
+    const tie = pickPin({ nodes, layout, nowSec: NOW, x: 505, y: 500, project, dimmed });
+    expect(tie).toMatchObject({ row: 1 });
+    // Right on the dimmed pin, it still answers.
+    expect(pickPin({ nodes, layout, nowSec: NOW, x: 500, y: 500, project, dimmed })).toMatchObject({
+      row: 0,
+    });
+    expect(5 * DIMMED_PICK_PENALTY).toBeGreaterThan(7);
   });
 
   it('takes a wider radius for the keyboard', () => {

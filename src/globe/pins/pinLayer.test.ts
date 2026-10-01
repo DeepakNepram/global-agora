@@ -274,6 +274,45 @@ describe('createPinLayer', () => {
     expect(material.fragmentShader).toContain('RING_GAP_PX');
   });
 
+  it('dims what the filters leave out: uniforms for pins, members for orbs, a short fade', () => {
+    const now = FIXTURE_EPOCH_SEC + 3600;
+    const nodes = storyBuffer([...stack(3, 10, 10, 1), { id: 9, lat: -40, lon: 100, category: 5 }]);
+    const engine = createClusterEngine();
+    engine.load(1, clusterColumns(nodes));
+    const layer = createPinLayer({ timeMs: now * 1000 });
+    layer.present(nodes, engine.layout(1, 2, now));
+    const mesh = onlyMesh(layer);
+    const orbMatch = mesh.geometry.getAttribute('aOrbMatch');
+    expect(orbMatch.itemSize).toBe(2);
+
+    layer.setFilter({ categories: ['climate'], withinHours: 3 });
+    expect(Array.from(uniform(layer, 'uCategoryOn') as Float32Array)).toEqual([
+      0, 0, 0, 0, 0, 1, 0, 0,
+    ]);
+    expect(uniform(layer, 'uWithin')).toBe(3 * 3600);
+    expect(uniform(layer, 'uFilterMix')).toBe(0);
+    // The stack (all world) is an orb in slot 0: matched before, not now.
+    expect([orbMatch.getX(0), orbMatch.getY(0)]).toEqual([1, 0]);
+    expect(layer.animationRemainingMs()).toBeGreaterThan(0);
+    while (layer.advance(1 / 60) && Number(uniform(layer, 'uFilterMix')) < 1);
+    expect(uniform(layer, 'uFilterMix')).toBe(1);
+
+    layer.setMotion('reduced');
+    layer.setFilter({ categories: [], withinHours: null });
+    expect(uniform(layer, 'uFilterMix')).toBe(1);
+    expect([orbMatch.getX(0), orbMatch.getY(0)]).toEqual([1, 1]);
+    expect(mesh.material).toBeInstanceOf(ShaderMaterial);
+    expect((mesh.material as ShaderMaterial).vertexShader).toContain('uCategoryOn[8]');
+  });
+
+  it('carries the orb matches over when it grows', () => {
+    const layer = createPinLayer({ timeMs: WINDOW_END_MS, capacity: 4 });
+    const nodes = mockNodes(10);
+    showAll(layer, nodes);
+    const orbMatch = onlyMesh(layer).geometry.getAttribute('aOrbMatch');
+    expect(orbMatch.count).toBeGreaterThanOrEqual(10);
+  });
+
   it('draws a count only once the host hands it the glyphs', () => {
     const layer = createPinLayer({ timeMs: WINDOW_END_MS });
     expect(uniform(layer, 'uHasBadges')).toBe(0);

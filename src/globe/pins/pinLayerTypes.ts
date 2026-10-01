@@ -1,6 +1,6 @@
 import type { Camera, Object3D, Texture } from 'three';
 
-import type { ClusterLayout, NodeBuffer } from '@/core';
+import type { ClusterLayout, NodeBuffer, StoryFilter } from '@/core';
 
 import type { MotionPreference } from '../camera/types';
 import type { PinPick } from './pinPick';
@@ -75,6 +75,13 @@ export interface PinLayer {
    * follows it through later layouts; null clears. One uniform, no animation.
    */
   setSelected(id: number | null): void;
+  /**
+   * Dims and shrinks the stories `filter` leaves out (an orb when none of its
+   * members match), cross-fading over FILTER_FADE_SECONDS, at once under
+   * reduced motion. A time window counts back from the displayed instant, in
+   * the shader, so scrubbing still writes no per-pin data.
+   */
+  setFilter(filter: StoryFilter): void;
   /** Milliseconds until every slot has settled; 0 when nothing moves. */
   animationRemainingMs(): number;
   /** Advances pulses and springs. Returns true while either moves, so the host keeps drawing. */

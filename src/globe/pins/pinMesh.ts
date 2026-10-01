@@ -3,6 +3,7 @@ import {
   BufferGeometry,
   CustomBlending,
   DynamicDrawUsage,
+  InstancedBufferAttribute,
   InstancedInterleavedBuffer,
   InstancedMesh,
   InterleavedBufferAttribute,
@@ -14,13 +15,14 @@ import {
   type Texture,
 } from 'three';
 
+import { createFilterUniforms, type FilterUniforms } from './pinFilter';
 import { PIN_FRAG } from './pinFragment.glsl';
 import { PIN_OFFSET, PIN_STRIDE } from './pinInstances';
 import { CATEGORY_COLORS, PIN_HALF_SIZE_CSS_PX } from './pinStyle';
 import { PIN_VERT } from './pinVertex.glsl';
 
 /** The pin material's uniforms, shared by every mesh the layer builds. */
-export interface PinUniforms {
+export interface PinUniforms extends FilterUniforms {
   readonly uCameraLocal: { value: Vector3 };
   readonly uTime: { value: number };
   /** The displayed instant, seconds after the layer's time origin. */
@@ -49,6 +51,7 @@ export function createPinUniforms(): PinUniforms {
     uBadgeAtlas: { value: null },
     uHasBadges: { value: 0 },
     uSelected: { value: -1 },
+    ...createFilterUniforms(),
   };
 }
 
@@ -90,6 +93,12 @@ export interface PinMesh {
   readonly buffer: InstancedInterleavedBuffer;
   /** The buffer's own array, typed: three declares it as any TypedArray. */
   readonly array: Float32Array;
+  /**
+   * Per slot, whether its orb matches the previous and the current filter
+   * (pinFilter.ts). Apart from the interleaved buffer: it changes only with a
+   * filter or a layout, and then alone. Still the same one InstancedMesh.
+   */
+  readonly orbMatch: InstancedBufferAttribute;
 }
 
 /**
@@ -110,6 +119,9 @@ export function createPinMesh(capacity: number, material: ShaderMaterial): PinMe
   geometry.setAttribute('aOffsets', view(PIN_OFFSET.innerPx));
   geometry.setAttribute('aSpring', view(PIN_OFFSET.u0));
   geometry.setAttribute('aPulse', view(PIN_OFFSET.phase));
+  const orbMatch = new InstancedBufferAttribute(new Float32Array(capacity * 2).fill(1), 2);
+  orbMatch.setUsage(DynamicDrawUsage);
+  geometry.setAttribute('aOrbMatch', orbMatch);
 
   const mesh = new InstancedMesh(geometry, material, capacity);
   mesh.name = 'pins';
@@ -119,13 +131,20 @@ export function createPinMesh(capacity: number, material: ShaderMaterial): PinMe
   mesh.frustumCulled = false;
   // After the surface (0), clouds (1) and atmosphere (2).
   mesh.renderOrder = 3;
-  return { mesh, buffer, array };
+  return { mesh, buffer, array, orbMatch };
 }
 
 export function disposePinMesh({ mesh }: PinMesh): void {
   mesh.removeFromParent();
   mesh.geometry.dispose();
   mesh.dispose();
+}
+
+/** Marks the first `slots` slots' orb matches for upload. */
+export function uploadOrbMatches({ orbMatch }: PinMesh, slots: number): void {
+  orbMatch.clearUpdateRanges();
+  orbMatch.addUpdateRange(0, slots * 2);
+  orbMatch.needsUpdate = true;
 }
 
 /** Marks the first `slots` slots for upload. */

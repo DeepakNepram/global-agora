@@ -106,6 +106,13 @@ export const SELECTION_RING_WIDTH_CSS_PX = 1.75;
 /** Linear RGB, under bloom's threshold: an outline, not a light. */
 export const SELECTION_RING_COLOR: readonly [number, number, number] = [0.92, 0.95, 1.0];
 
+/**
+ * A story the filters leave out is drawn this much fainter and smaller, with
+ * no halo and no pulse: still there, so the globe never goes dark, but quiet.
+ */
+export const FILTERED_ALPHA = 0.3;
+export const FILTERED_SCALE = 0.6;
+
 export function orbScaleFor(count: number): number {
   return ORB_SCALE_MIN + ORB_SCALE_PER_DECADE * Math.log10(Math.max(count, 1));
 }

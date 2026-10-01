@@ -20,6 +20,8 @@ import {
   BIRTH_POP,
   COLOR_GAIN_NEW,
   COLOR_GAIN_OLD,
+  FILTERED_ALPHA,
+  FILTERED_SCALE,
   FRESH_BIRTH_SECONDS,
   FRESH_FADE_SECONDS,
   FRESH_PEAK_SECONDS,
@@ -48,6 +50,8 @@ attribute vec4 aOffsets;
 attribute vec4 aSpring;
 /** Pulse phase, pulse rate, publish time (s after the time origin), path twist. */
 attribute vec4 aPulse;
+/** Whether this slot's orb matches the previous and the current filter (pinFilter.ts). */
+attribute vec2 aOrbMatch;
 
 /** Camera position in the Earth-fixed frame, updated before every draw. */
 uniform vec3 uCameraLocal;
@@ -67,6 +71,13 @@ uniform float uPixelRatio;
 uniform vec3 uPalette[${NEWS_CATEGORIES.length}];
 /** Slot wearing the selection ring, −1 for none. */
 uniform float uSelected;
+/** The filters, current and previous: 1 per category shown, and the window in seconds (−1 any). */
+uniform float uCategoryOn[${NEWS_CATEGORIES.length}];
+uniform float uCategoryOnPrev[${NEWS_CATEGORIES.length}];
+uniform float uWithin;
+uniform float uWithinPrev;
+/** 0 shows the previous filter, 1 the current: a change cross-fades. */
+uniform float uFilterMix;
 
 varying vec2 vCorner;
 varying vec3 vColor;
@@ -90,6 +101,8 @@ const float SCALE_MAX = ${glslFloat(SCALE_MAX)};
 const float ORB_SCALE_MIN = ${glslFloat(ORB_SCALE_MIN)};
 const float ORB_SCALE_PER_DECADE = ${glslFloat(ORB_SCALE_PER_DECADE)};
 const float HIDDEN_SCALE = ${glslFloat(HIDDEN_SCALE)};
+const float FILTERED_ALPHA = ${glslFloat(FILTERED_ALPHA)};
+const float FILTERED_SCALE = ${glslFloat(FILTERED_SCALE)};
 const float COLOR_GAIN_OLD = ${glslFloat(COLOR_GAIN_OLD)};
 const float COLOR_GAIN_NEW = ${glslFloat(COLOR_GAIN_NEW)};
 const float ORB_COLOR_GAIN = ${glslFloat(ORB_COLOR_GAIN)};
@@ -131,6 +144,18 @@ vec3 endColor(float look, float freshness) {
   int category = int(mod(floor(look / 4.0), 8.0) + 0.5);
   float gain = mix(COLOR_GAIN_OLD + (COLOR_GAIN_NEW - COLOR_GAIN_OLD) * freshness, ORB_COLOR_GAIN, isOrb(kind));
   return uPalette[category] * gain;
+}
+
+// Whether one end matches the filters, 1 or 0, cross-faded from the previous:
+//   pin: categoryOn[category] · (within < 0 ? 1 : age ≤ within)
+//   orb: aOrbMatch, worked out on the CPU from its members
+float windowMatch(float within, float age) { return within < 0.0 ? 1.0 : step(age, within); }
+float endMatch(float look, float age) {
+  float orb = isOrb(lookKind(look));
+  int category = int(mod(floor(look / 4.0), 8.0) + 0.5);
+  float before = mix(uCategoryOnPrev[category] * windowMatch(uWithinPrev, age), aOrbMatch.x, orb);
+  float now = mix(uCategoryOn[category] * windowMatch(uWithin, age), aOrbMatch.y, orb);
+  return mix(before, now, uFilterMix);
 }
 
 void main() {
@@ -189,10 +214,16 @@ void main() {
   float visibility = smoothstep(horizon, horizon + HORIZON_FADE * (1.0 - horizon), facing) * shown;
 
   float orbness = mix(isOrb(innerKind), isOrb(outerKind), u);
+  // Slots are instances, so the selected one is gl_InstanceID (three compiles
+  // these shaders as GLSL ES 3.00 on WebGL2).
+  vSelected = 1.0 - step(0.5, abs(float(gl_InstanceID) - uSelected));
+  // How far the filters leave this slot out; the open story is never dimmed.
+  float dimmed = (1.0 - mix(endMatch(aInner.w, age), endMatch(aOuter.w, age), u)) * (1.0 - vSelected);
+  visibility *= mix(1.0, FILTERED_ALPHA, dimmed);
   vCorner = position.xy;
   vColor = mix(endColor(aInner.w, freshness), endColor(aOuter.w, freshness), u);
   //   hot = HOT_CORE_MAX · clamp((freshness − start) / (1 − start), 0, 1), pins only
-  vHot = HOT_CORE_MAX * clamp((freshness - HOT_FRESHNESS_START) / (1.0 - HOT_FRESHNESS_START), 0.0, 1.0) * (1.0 - orbness);
+  vHot = HOT_CORE_MAX * clamp((freshness - HOT_FRESHNESS_START) / (1.0 - HOT_FRESHNESS_START), 0.0, 1.0) * (1.0 - orbness) * (1.0 - dimmed);
   vOrb = vec4(
     orbness,
     badgeCode(isOrb(innerKind) * lookValue(aInner.w)),
@@ -215,17 +246,16 @@ void main() {
   //   mu = dot(normalize(P), normalize(cam - P))   cosine of the view angle to the ground
   // Additive halos would sum into a bright ring there. Weighting each halo by
   // mu keeps the glow per unit of screen even across the disc; dots stay whole.
-  vHaloWeight = max(dot(centre, normalize(uCameraLocal - centre)), 0.0);
+  vHaloWeight = max(dot(centre, normalize(uCameraLocal - centre)), 0.0) * (1.0 - dimmed);
 
   //   scale = base * (1 + PULSE_AMPLITUDE * sin(time * rate + phase) * freshness)   pins only
-  float pulse = 1.0 + PULSE_AMPLITUDE * sin(uTime * aPulse.y + aPulse.x) * freshness * uPulse * (1.0 - orbness);
+  float pulse = 1.0 + PULSE_AMPLITUDE * sin(uTime * aPulse.y + aPulse.x) * freshness * uPulse * (1.0 - orbness) * (1.0 - dimmed);
   // A pin grows in with a pop and draws a little larger while fresh:
   //   life = (HIDDEN_SCALE + (1 − HIDDEN_SCALE)·birth + BIRTH_POP·sin(π·birth)) · (1 + FRESH_SCALE_BOOST·freshness)
   float life = (HIDDEN_SCALE + (1.0 - HIDDEN_SCALE) * birth + BIRTH_POP * sin(PI * birth)) * (1.0 + FRESH_SCALE_BOOST * freshness);
   vHalfSizePx = uHalfSizePx * mix(endScale(aInner.w), endScale(aOuter.w), u) * mix(life, 1.0, orbness) * pulse;
-  // Slots are instances, so the selected one is gl_InstanceID (three compiles
-  // these shaders as GLSL ES 3.00 on WebGL2). Its quad grows to hold the ring.
-  vSelected = 1.0 - step(0.5, abs(float(gl_InstanceID) - uSelected));
+  vHalfSizePx *= mix(1.0, FILTERED_SCALE, dimmed);
+  // The selected slot's quad grows to hold the ring.
   vHalfSizePx *= mix(1.0, SELECTION_QUAD_SCALE, vSelected);
 
   // Billboard in clip space: offsetting xy by (pixels * 2 / viewport) * w moves
