@@ -5,6 +5,9 @@
  *
  *   npm run db:smoke                         local stack (reads `supabase status`)
  *   SUPABASE_URL=… SUPABASE_ANON_KEY=… npm run db:smoke    any project, anon key only
+ *
+ * On the local stack it also checks the signed-in library (smoke-library.ts)
+ * with two throwaway users; against any other project that part is skipped.
  */
 import { execSync } from 'node:child_process';
 
@@ -12,19 +15,27 @@ import { FREE_TIER_DEFAULTS } from '../../src/core/config.ts';
 import { createDbClient, type DbConfig } from '../../src/core/db/client.ts';
 import type { Database } from '../../src/core/db/types.ts';
 
+import { libraryChecks } from './smoke-library.ts';
+
 type TableName = keyof Database['public']['Tables'];
 
 /** Postgres "insufficient_privilege": the grant is missing, so RLS is never even reached. */
 const DENIED = '42501';
 
-function localConfig(): DbConfig {
+/** The project to check, and the local stack's service key (null for any other project). */
+function localConfig(): { config: DbConfig; serviceKey: string | null } {
   const url = process.env['SUPABASE_URL'];
   const anonKey = process.env['SUPABASE_ANON_KEY'];
-  if (url !== undefined && anonKey !== undefined) return { url, anonKey };
+  if (url !== undefined && anonKey !== undefined)
+    return { config: { url, anonKey }, serviceKey: null };
 
   const output = execSync('npx supabase status -o json', { encoding: 'utf8' });
   const json = output.slice(output.indexOf('{'), output.lastIndexOf('}') + 1);
-  const status = JSON.parse(json) as { API_URL?: string; ANON_KEY?: string };
+  const status = JSON.parse(json) as {
+    API_URL?: string;
+    ANON_KEY?: string;
+    SERVICE_ROLE_KEY?: string;
+  };
   if (status.API_URL === undefined || status.ANON_KEY === undefined) {
     // `supabase db start` (what CI runs) brings up Postgres without the API,
     // and a later `supabase start` then reports "already running".
@@ -32,7 +43,10 @@ function localConfig(): DbConfig {
       'The local Supabase API is not running. Run `npm run db:stop`, then `npm run db:start`.',
     );
   }
-  return { url: status.API_URL, anonKey: status.ANON_KEY };
+  return {
+    config: { url: status.API_URL, anonKey: status.ANON_KEY },
+    serviceKey: status.SERVICE_ROLE_KEY ?? null,
+  };
 }
 
 const results: { check: string; ok: boolean; detail: string }[] = [];
@@ -40,7 +54,7 @@ function record(check: string, ok: boolean, detail: string): void {
   results.push({ check, ok, detail });
 }
 
-const config = localConfig();
+const { config, serviceKey } = localConfig();
 const db = createDbClient(config, { persistSession: false });
 const windowHours = FREE_TIER_DEFAULTS.historyWindowHours;
 const since = new Date(Date.now() - windowHours * 3600 * 1000).toISOString();
@@ -85,6 +99,8 @@ const closed: readonly TableName[] = [
   'blocks',
   'story_signals',
   'ingest_runs',
+  'follows',
+  'saved_stories',
 ];
 for (const table of closed) {
   const { error } = await db.from(table).select('*').limit(1);
@@ -139,6 +155,9 @@ record(
   story.error === null && storyTitle !== undefined,
   story.error?.message ?? storyTitle ?? 'NOT FOUND',
 );
+
+// --- Signed in: the library (Prompt 3.4), local stack only. ------------------
+if (serviceKey !== null) await libraryChecks(config, serviceKey, record);
 
 // --- Report. ------------------------------------------------------------------
 console.log(`\nSupabase at ${config.url}\n`);

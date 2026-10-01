@@ -1,4 +1,5 @@
-import { NEWS_CATEGORIES, type NewsCategory } from './nodeBuffer';
+// Explicit .ts: scripts/db/smoke.ts loads this under plain Node, which needs it.
+import { NEWS_CATEGORIES, type NewsCategory } from './nodeBuffer.ts';
 
 /** What a reader sees for each category: on filter chips, in search and in the feed. */
 export const CATEGORY_LABELS: Readonly<Record<NewsCategory, string>> = {
