@@ -10,7 +10,9 @@ Web first. Native mobile is a later phase, so the code stays portable — see
 **Status: Phase 3 in progress.** The globe shows real news from GDELT:
 ingested every 15 minutes, grouped into stories, served as one compact
 payload, clustered in a Web Worker, and opened with an animated bloom as you
-zoom in. No scrubber, story sheet or discussions yet.
+zoom in. A time scrubber drags or plays back through the last 24 hours, with
+the pins and the day/night line moving together. No story sheet or
+discussions yet.
 
 ## Requirements
 

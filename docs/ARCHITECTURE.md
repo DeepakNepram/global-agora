@@ -52,8 +52,11 @@ browser <──Brotli, ETag, SWR── API Worker <─────────�
    Prompt 3.1). The pin scene asks it for the layout at the camera's zoom
    level, and the pin layer animates each change on the GPU: orbs bloom into
    their children, and stacked stories into a sunflower.
-5. Phase 3: the time scrubber filters those arrays client-side, with no
-   network calls, and moves pin visibility, brightness and the sun together.
+5. The time scrubber (`src/ui/scrubber/`, Prompt 3.2) writes only the time
+   store, with no network calls. The sun and the pins read it as uniforms:
+   the pin shader ages every story against `uNow`, so visibility and
+   brightness follow the scrubbed instant. While a drag or Play moves the
+   time, the clusters open into pins and fold back when it rests.
 
 The wire format is defined once, in `src/core/data/payload.ts`, and both the
 Worker and the client validate against it.
@@ -64,6 +67,7 @@ Worker and the client validate against it.
 - Pin slots are keyed by story id, never by row.
 - Animations are springs the vertex shader evaluates; the CPU writes a
   transition once, not every frame.
+- Time is a uniform: scrubbing never rewrites per-pin data.
 - Render on demand: stop the loop when nothing is moving.
 - Frame-rate-independent smoothing only — see `src/globe/smoothing.ts`.
 

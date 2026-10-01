@@ -6,6 +6,126 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-10-01 — Time scrubber: the GPU ages pins, clusters open while time moves, letting go holds
+
+Prompt 3.2 adds the scrubber along the bottom of the globe.
+
+**A scrub moves one uniform.** Each pin slot stores its story's publish time,
+in seconds after a time origin fixed when the pin layer is created. The vertex
+shader ages it against `uNow`. Float32 resolves 1/128 s a day from the origin
+and 2 s a year from it, so the origin never needs moving.
+
+- Before, every scrub tick re-derived recency for all slots on the CPU
+  (0.125 ms) and uploaded the whole 240 KB buffer.
+- Now a drag writes only the time store. That moves the sun uniform, the pin
+  uniform and the label: no pass over the stories, no upload, no network.
+- Pulse rates stay on the CPU, because changing a rate on the GPU would jump
+  the pulse's phase. They catch up once the time has rested for 0.25 s.
+  Mid-drag only the pulse frequency lags; its size follows freshness exactly.
+
+**The life of a pin**, the prompt's curve, in story time (age = displayed
+instant − publish time):
+
+- **Birth:** it grows in over 5 minutes with a small pop; scale peaks about
+  18 % over full.
+- **Brightest for 30 minutes:** freshness 1, a white-hot core, 15 % larger,
+  full pulse.
+- **Then it fades:** `f = e^(−(age − 30 min) / 3 h)`. The hot core is gone by
+  about 2.9 h, and the colour settles at the old-story floor (0.55).
+
+This replaces 1.5's recency, `e^(−age / 6 h)`. During Play (a day in 20 s) a
+story sparks for about four frames, glows for 0.4 s and dims over a few
+seconds, so the news visibly follows daylight round the globe.
+**Cost:** GDELT lags about an hour, so in live mode new stories usually arrive
+past their peak. A drag or Play shows the whole curve.
+
+**Clusters open while the time moves (your call).** Once a drag moves 6 px, or
+Play starts, every orb blooms open and each story shows its own appearance.
+When the time comes to rest, they fold back into the clusters of the resting
+instant.
+
+- **No worker work mid-drag.** An open layout does not depend on time: below
+  the petal level every story is a pin, and at it every level-8 cluster of all
+  the stories is a sunflower.
+- **What it beat:** re-clustering on every tick, measured, costs 1.8 ms of
+  main-thread planning and 3–8 ms of worker time per layout on the laptop. At
+  world view most stories would also stay hidden inside orbs.
+- **At rest,** a story not yet published is a pin at its own place, hidden by
+  the shader until its time, rather than a hidden row. A small time step then
+  shows it at once, and the next debounced layout folds it into its cluster.
+- **Cost:** opening at world view plans about 3,000 moves at once, 2–8 ms on
+  the laptop, at the start of a drag and again at the end. A sunflower shows
+  gaps while open.
+
+**Letting go holds the time (your call).** The prompt's "releasing snaps back
+to live" became:
+
+- **The magnet:** the last 32 CSS px of the track ease back to live, as do
+  Live and End.
+- **Anywhere else,** the time stays where you let go, which 3.3's Share needs.
+- **The return** is CLAUDE.md's smoothing, `x += (now − x)(1 − e^(−10·dt))`,
+  landing within 30 s of now: about 0.5 s from an hour back and 0.8 s from a
+  day. It is instant under reduced motion.
+
+**Play** runs the whole window in 20 s (`PLAY_SECONDS`; proportionally less
+from a held time).
+
+- **The curve** is a trapezoidal speed profile with 1 s ramps, aimed at the
+  moving now so it lands on live exactly.
+- **It is driven from the canvas loop** (r3f priority −1), so each frame draws
+  the time it set.
+- **A tap on the track** stays a single step and blooms nothing.
+
+**The bar** is a native `<input type="range">` over an SVG histogram of stories
+per 15 minutes, lit up to the playhead.
+
+- Native, because mobile screen readers can adjust a native range and not an
+  ARIA one.
+- No backdrop blur: 1.5 found it costs a phone on every frame.
+- Keyboard: arrows step 15 min, PageUp/PageDown 1 h, then Home and End.
+- Local time comes from the browser's `Intl` time zone. No location is read.
+
+**History depth** stays `AppConfig.historyWindowHours`
+(`VITE_HISTORY_WINDOW_HOURS`), the prompt's HISTORY_HOURS in all but name since
+2026-09-12. `tests/history.test.ts` fails on any other literal 24 in `src/`
+code.
+
+**Measured** with the dev panel's Scrub benchmark:
+
+- 3,000 mock stories, clustered, at world view, in full motion;
+- a 6 s drag sweeping the whole window back and forth 3 times, then a full Play;
+- headless Chrome on the Iris Xe, on mains, at a 144 Hz frame pace;
+- 1408 × 655 CSS px at 1.25;
+- the second of two runs per tier.
+
+| Tier   | Run  | Frames | Interval p50 / p95 / max | Slower than 60 fps | GPU p95 | CPU p95 | Plan max |
+| ------ | ---- | ------ | ------------------------ | ------------------ | ------- | ------- | -------- |
+| HIGH   | drag | 854    | 7.1 / 12.3 / 17.6 ms     | 0                  | 7.1 ms  | 0.6 ms  | 4.3 ms   |
+| HIGH   | Play | 2,792  | 7.2 / 12.2 / 22.0 ms     | 2                  | 7.1 ms  | 0.6 ms  | 3.9 ms   |
+| MEDIUM | drag | 908    | 6.9 / 7.4 / 13.0 ms      | 0                  | 6.1 ms  | 0.6 ms  | 2.0 ms   |
+| MEDIUM | Play | 2,891  | 6.9 / 7.5 / 13.6 ms      | 0                  | 5.9 ms  | 0.6 ms  | 2.7 ms   |
+
+- **Real mouse drags:** CDP input events on the actual slider, 360 moves over
+  about 11 s, timed by rAF.
+  - HIGH: 7.0 / 13.8 / 14.1 ms with 0 slow frames. A first run had one 21 ms
+    frame.
+  - MEDIUM: 6.9 / 7.1 / 7.3 ms.
+  - No request came from dragging. The only ones seen were the payload feed's
+    own timer, which fires the same with nobody touching anything.
+- **HIGH's p95 near 13.9 ms** is frames alternating between the 144 Hz and 72 Hz
+  cadence. Its GPU frame with 3,000 pins open, 7.1 ms, sits right at the
+  6.9 ms period.
+- **Three more HIGH Plays** timed by rAF: 0 slow frames in about 9,000.
+- **On battery** (the Iris Xe at about half speed, 60 Hz):
+  - the drag had 0 slow frames on both tiers (max 17.5 and 17.9 ms);
+  - Play had 1 slow frame at HIGH and 7 at MEDIUM (max 21.5 ms), with GPU p95
+    14.4 ms.
+- **Size:** the main chunk grew 3.8 KB gzip (now 345.65 KB).
+- **Not yet measured on the phone.** 1.5 measured 3,000 pins there at 40 fps
+  (MEDIUM), and opening the clusters draws the same 3,000.
+
+---
+
 ## 2026-09-24 — Clustering: supercluster in a worker, slots keyed by story id, the bloom on the GPU
 
 Prompt 3.1 clusters the pins and animates clusters opening ("the bloom").
