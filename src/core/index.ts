@@ -79,6 +79,26 @@ export type { NodeColumns, NodesPayload } from './data/payload';
 
 export { equationOfTimeMinutes, julianDay, subsolarPoint, sunDirection } from './sun';
 
+export {
+  fractionAt,
+  histogramBuckets,
+  historyRange,
+  inMagnet,
+  minutesAgo,
+  playProgress,
+  playSeconds,
+  playStartMs,
+  returnStep,
+  storyHistogram,
+  timeAt,
+  HISTOGRAM_BUCKET_MINUTES,
+  PLAY_RAMP_SECONDS,
+  PLAY_SECONDS,
+  RETURN_LAND_MS,
+  RETURN_RATE_PER_SECOND,
+} from './timeline';
+export type { ReturnStep, StoryTimes, TimeRange } from './timeline';
+
 export { createFrameStats, percentile } from './frameStats';
 export type { FrameStats, FrameSummary } from './frameStats';
 
