@@ -4,6 +4,7 @@ import { PerspectiveCamera } from 'three';
 
 import {
   createOrbitGlobeControls,
+  type CameraPose,
   earthTiltQuaternion,
   fitAltitudeKm,
   type MotionPreference,
@@ -24,6 +25,8 @@ export interface GlobeControlsOptions {
   readonly onReady: (controls: OrbitGlobeControls | null) => void;
   /** Taps, Enter and Escape on the globe; may change without re-binding input. */
   readonly input?: GlobeInputHandlers;
+  /** Where the camera starts (a shared link's view); the world view when absent. */
+  readonly initialPose?: CameraPose | null;
 }
 
 /**
@@ -31,7 +34,8 @@ export interface GlobeControlsOptions {
  * Frames are demand-driven: input and API calls request one through
  * `invalidate`, and each frame asks for the next only while motion continues.
  */
-export function useGlobeControls({ motion, onReady, input }: GlobeControlsOptions): void {
+export function useGlobeControls(options: GlobeControlsOptions): void {
+  const { motion, onReady, input } = options;
   const camera = useThree((state) => state.camera);
   const invalidate = useThree((state) => state.invalidate);
   const get = useThree((state) => state.get);
@@ -40,6 +44,8 @@ export function useGlobeControls({ motion, onReady, input }: GlobeControlsOption
   const height = useThree((state) => state.size.height);
   const [controls, setControls] = useState<OrbitGlobeControls | null>(null);
   const inputRef = useRef(input);
+  // Read once, at creation: a later change of link must not rebuild the controls.
+  const [initialPose] = useState(options.initialPose ?? null);
 
   useEffect(() => {
     inputRef.current = input;
@@ -52,7 +58,7 @@ export function useGlobeControls({ motion, onReady, input }: GlobeControlsOption
       camera,
       bodyOrientation: earthTiltQuaternion(),
       requestFrame: invalidate,
-      initialPose: {
+      initialPose: initialPose ?? {
         lat: 0,
         lon: 0,
         altitudeKm: fitAltitudeKm(size.width / Math.max(1, size.height)),
@@ -65,7 +71,7 @@ export function useGlobeControls({ motion, onReady, input }: GlobeControlsOption
       setControls(null);
       created.dispose();
     };
-  }, [camera, invalidate, get, onReady]);
+  }, [camera, invalidate, get, onReady, initialPose]);
 
   useEffect(() => {
     controls?.setViewport(width, height);

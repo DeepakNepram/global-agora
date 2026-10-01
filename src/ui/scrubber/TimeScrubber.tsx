@@ -11,6 +11,8 @@ export interface TimeScrubberProps {
   readonly nodes: NodeBuffer | null;
   /** AppConfig.historyWindowHours: how far back the scrubber reaches. */
   readonly historyHours: number;
+  /** Steps aside (slides down, inert) while a story sheet holds the bottom edge. */
+  readonly hidden?: boolean;
 }
 
 const ROUND_BUTTON =
@@ -34,7 +36,11 @@ function PlayIcon({ playing }: { playing: boolean }): JSX.Element {
  * outside this bar); letting go holds the time, and the last few pixels,
  * Live, or End ease it back to now.
  */
-export function TimeScrubber({ nodes, historyHours }: TimeScrubberProps): JSX.Element {
+export function TimeScrubber({
+  nodes,
+  historyHours,
+  hidden = false,
+}: TimeScrubberProps): JSX.Element {
   const timeMs = useTimeStore((state) => state.timeMs);
   const isLive = useTimeStore((state) => state.isLive);
   const returning = useTimeStore((state) => state.returning);
@@ -55,7 +61,10 @@ export function TimeScrubber({ nodes, historyHours }: TimeScrubberProps): JSX.El
   const { setMotion, returnToLive } = timeStore.getState();
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-void/95 via-void/70 to-transparent px-4 pb-3 pt-12">
+    <div
+      inert={hidden}
+      className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-void/95 via-void/70 to-transparent px-4 pb-3 pt-12 transition-[translate,opacity] duration-300 motion-reduce:transition-none ${hidden ? 'translate-y-full opacity-0' : ''}`}
+    >
       <section
         aria-label="Time scrubber"
         className="pointer-events-auto mx-auto flex max-w-5xl items-end gap-3"

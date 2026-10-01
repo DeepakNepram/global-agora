@@ -1,6 +1,6 @@
-import { useMemo, type JSX } from 'react';
+import { useMemo, useState, type JSX } from 'react';
 
-import type { AppConfig } from '@/core';
+import { decodePermalink, type AppConfig } from '@/core';
 
 import { useNodesFeed } from './data/useNodesFeed';
 import { GlobeCanvas } from './GlobeCanvas';
@@ -19,6 +19,8 @@ export interface AppProps {
 export function App({ config }: AppProps): JSX.Element {
   // Probing creates and discards a GL context, so do it once per mount.
   const quality = useMemo(() => resolveQuality(), []);
+  // Read once: the globe applies it and then clears it from the address bar.
+  const [link] = useState(() => decodePermalink(window.location.search));
   useNodesFeed({
     baseUrl: config.apiBaseUrl,
     hours: config.historyWindowHours,
@@ -41,7 +43,13 @@ export function App({ config }: AppProps): JSX.Element {
       </header>
 
       <main id="globe" tabIndex={-1} aria-label="News globe" className="relative min-h-0 flex-1">
-        <GlobeCanvas tier={quality.tier} historyWindowHours={config.historyWindowHours} />
+        <GlobeCanvas
+          tier={quality.tier}
+          historyWindowHours={config.historyWindowHours}
+          apiBaseUrl={config.apiBaseUrl}
+          savedStoryLimit={config.savedStoryLimit}
+          link={link}
+        />
       </main>
 
       <footer className="px-6 py-3 text-xs text-muted">

@@ -9,6 +9,7 @@ import {
 } from '@/globe';
 import { storyStore } from '@/state';
 
+import { nextAnnouncement } from '../announce';
 import type { GlobeInputHandlers } from './bindControlInput';
 import type { PinPicker } from './pinPicker';
 
@@ -17,9 +18,6 @@ export const CLUSTER_TAP_LEVELS = 2;
 
 /** Lands inside the target level's band, clear of its hysteresis (clusterZoom.ts). */
 const LEVEL_MIDDLE = 0.5;
-
-/** Appended to repeat a message, so a live region reads it again. */
-const NBSP = String.fromCharCode(0xa0);
 
 const NOTHING_AT_CENTRE =
   'No story near the centre. Turn the globe with the arrow keys, or zoom with plus and minus.';
@@ -44,9 +42,8 @@ export function useGlobeSelection(
   const [message, setMessage] = useState('');
 
   const input = useMemo((): GlobeInputHandlers => {
-    // A repeated message must still be announced: alternate a trailing space.
     const announce = (text: string): void =>
-      setMessage((previous) => (previous === text ? `${text}${NBSP}` : text));
+      setMessage((previous) => nextAnnouncement(previous, text));
 
     const flyInto = (hit: Extract<PinPick, { kind: 'cluster' }>): void => {
       if (!controls) return;

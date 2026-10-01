@@ -2,8 +2,9 @@ import { Canvas } from '@react-three/fiber';
 import { useMemo, useState, type JSX } from 'react';
 import { Color } from 'three';
 
-import { previewTextureSet, textureSetForTier, type QualityTier } from '@/core';
+import { previewTextureSet, textureSetForTier, type Permalink, type QualityTier } from '@/core';
 import { CAMERA_FOV_DEG, renderSettingsForTier, VIGNETTE, type OrbitGlobeControls } from '@/globe';
+import { useStoryStore } from '@/state';
 
 import { createPresentLog } from './globe/bloomReport';
 import { ControlsHost, PipelineHost } from './globe/canvasHosts';
@@ -21,11 +22,19 @@ import { usePrefersReducedMotion } from './globe/usePrefersReducedMotion';
 import { vignetteCssGradient } from './globe/vignette';
 import { TimeDriver } from './scrubber/TimeDriver';
 import { TimeScrubber } from './scrubber/TimeScrubber';
+import { useOpenPermalink } from './story/permalinkLink';
+import { StoryLayer } from './story/StoryLayer';
 
 export interface GlobeCanvasProps {
   readonly tier: QualityTier;
   /** AppConfig.historyWindowHours: the scrubber's reach, and the window mock stories span. */
   readonly historyWindowHours: number;
+  /** AppConfig.apiBaseUrl, for a story's details. */
+  readonly apiBaseUrl: string;
+  /** AppConfig.savedStoryLimit. */
+  readonly savedStoryLimit: number;
+  /** The shared view this page was opened with, if any (see src/core/permalink.ts). */
+  readonly link: Permalink;
 }
 
 /** Matches --color-void, so the opaque canvas is indistinguishable from the page. */
@@ -57,7 +66,8 @@ const GLOBE_LABEL =
  * - dpr capped at 2: a 3x phone would otherwise fill 2.25x the pixels of 2x
  *   for no visible gain on a sphere.
  */
-export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX.Element {
+export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
+  const { tier, historyWindowHours, apiBaseUrl, savedStoryLimit, link } = props;
   const settings = renderSettingsForTier(tier);
   const dev = useDevSettings(settings);
   const [controls, setControls] = useState<OrbitGlobeControls | null>(null);
@@ -66,7 +76,9 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
   const motion = reducedMotionPreferred && !dev.fullMotion ? 'reduced' : 'full';
   const picker = useMemo(() => createPinPicker(), []);
   const selection = useGlobeSelection(controls, picker);
+  const sheetOpen = useStoryStore((state) => state.sheet !== 'closed');
   useLiveClock();
+  useOpenPermalink(link, historyWindowHours);
 
   // Timing is dev tooling; production draws without queries or bookkeeping.
   const probe = useMemo(() => (import.meta.env.DEV ? createFrameProbe() : null), []);
@@ -93,7 +105,8 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
   );
 
   return (
-    <div className="absolute inset-0">
+    // Clips what slides off the bottom edge (the scrubber stepping aside, a closed sheet).
+    <div className="absolute inset-0 overflow-hidden">
       <Canvas
         frameloop="demand"
         flat={settings.postprocessing}
@@ -137,7 +150,12 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
           picker={picker}
           {...(presentLog ? { onPresent: presentLog.push } : {})}
         />
-        <ControlsHost motion={motion} onReady={setControls} input={selection.input} />
+        <ControlsHost
+          motion={motion}
+          onReady={setControls}
+          input={selection.input}
+          initialPose={link.camera}
+        />
         <PipelineHost settings={settings} bloomEnabled={dev.bloomEnabled} probe={probe} />
       </Canvas>
       {/* Straight after the canvas: it shows on the canvas's focus-visible (CSS peer). */}
@@ -152,7 +170,15 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
         />
       )}
 
-      <TimeScrubber nodes={pinNodes} historyHours={historyWindowHours} />
+      <TimeScrubber nodes={pinNodes} historyHours={historyWindowHours} hidden={sheetOpen} />
+      <StoryLayer
+        nodes={pinNodes}
+        controls={controls}
+        apiBaseUrl={apiBaseUrl}
+        savedStoryLimit={savedStoryLimit}
+        detailsAvailable={dev.pinSource === 'live'}
+        reducedMotion={motion === 'reduced'}
+      />
 
       {/* Inspection tooling only; compiled out of production builds. */}
       {import.meta.env.DEV && (
