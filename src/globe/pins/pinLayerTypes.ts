@@ -1,8 +1,9 @@
-import type { Object3D, Texture } from 'three';
+import type { Camera, Object3D, Texture } from 'three';
 
 import type { ClusterLayout, NodeBuffer } from '@/core';
 
 import type { MotionPreference } from '../camera/types';
+import type { PinPick } from './pinPick';
 
 /** The pin layer's public surface; createPinLayer (pinLayer.ts) implements it. */
 
@@ -29,6 +30,12 @@ export interface PresentResult {
   readonly durationMs: number;
 }
 
+/** The viewport a pick is measured in, CSS pixels. */
+export interface PickViewport {
+  readonly width: number;
+  readonly height: number;
+}
+
 export interface PinLayer {
   /** Add this to the scene. Carries the axial tilt, like the Earth layer. */
   readonly object3d: Object3D;
@@ -51,6 +58,23 @@ export interface PinLayer {
   setVisible(visible: boolean): void;
   /** The count glyphs (see badgeGlyphs.ts); null draws orbs without a count. The host owns it. */
   setBadgeAtlas(atlas: Texture | null): void;
+  /**
+   * The story pin or cluster orb drawn under CSS pixel (x, y), as the last
+   * layout placed it, within `radiusPx` (a 44 px target by default); null over
+   * nothing. Costs a pass over the stories, so call it per tap, not per frame.
+   */
+  pick(
+    x: number,
+    y: number,
+    camera: Camera,
+    viewport: PickViewport,
+    radiusPx?: number,
+  ): PinPick | null;
+  /**
+   * Rings story `id`'s pin, or the orb holding it while it is clustered, and
+   * follows it through later layouts; null clears. One uniform, no animation.
+   */
+  setSelected(id: number | null): void;
   /** Milliseconds until every slot has settled; 0 when nothing moves. */
   animationRemainingMs(): number;
   /** Advances pulses and springs. Returns true while either moves, so the host keeps drawing. */

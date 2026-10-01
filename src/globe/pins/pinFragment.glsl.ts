@@ -13,17 +13,24 @@ import {
   ORB_CORE_RADIUS,
   ORB_RIM_DARKEN,
   ORB_SHADOW_RADIUS,
+  SELECTION_QUAD_SCALE,
+  SELECTION_RING_COLOR,
+  SELECTION_RING_GAP_CSS_PX,
+  SELECTION_RING_WIDTH_CSS_PX,
   SHADOW_OPACITY,
   SHADOW_RADIUS,
 } from './pinStyle';
 
 const [INK_R, INK_G, INK_B] = BADGE_INK;
+const [RING_R, RING_G, RING_B] = SELECTION_RING_COLOR;
 
 export const PIN_FRAG = /* glsl */ `
 /** One row of glyphs, BADGE_GLYPHS in order, white on transparent. */
 uniform sampler2D uBadgeAtlas;
 /** 0 until the host supplies the atlas: orbs then draw without a count. */
 uniform float uHasBadges;
+/** Drawing-buffer pixels per CSS pixel. */
+uniform float uPixelRatio;
 
 varying vec2 vCorner;
 varying vec3 vColor;
@@ -32,6 +39,7 @@ varying float vHalfSizePx;
 varying float vHaloWeight;
 varying float vHot;
 varying vec4 vOrb;
+varying float vSelected;
 
 const float CORE_RADIUS = ${glslFloat(CORE_RADIUS)};
 const float ORB_CORE_RADIUS = ${glslFloat(ORB_CORE_RADIUS)};
@@ -43,6 +51,10 @@ const float ORB_RIM_DARKEN = ${glslFloat(ORB_RIM_DARKEN)};
 const float GLYPH_COUNT = ${glslFloat(BADGE_GLYPHS.length)};
 const float CELL_ASPECT = ${glslFloat(BADGE_CELL_ASPECT)};
 const vec3 BADGE_INK = vec3(${glslFloat(INK_R)}, ${glslFloat(INK_G)}, ${glslFloat(INK_B)});
+const float SELECTION_QUAD_SCALE = ${glslFloat(SELECTION_QUAD_SCALE)};
+const float RING_GAP_PX = ${glslFloat(SELECTION_RING_GAP_CSS_PX)};
+const float RING_WIDTH_PX = ${glslFloat(SELECTION_RING_WIDTH_CSS_PX)};
+const vec3 RING_COLOR = vec3(${glslFloat(RING_R)}, ${glslFloat(RING_G)}, ${glslFloat(RING_B)});
 
 // Ink coverage of a badge at quad point p, for a code packed as
 //   code = n + 16 · (g0 + 16 g1 + 256 g2 + 4096 g3)
@@ -67,15 +79,22 @@ float badgeInk(float code, vec2 p, float radius) {
 }
 
 void main() {
+  // The selected slot's quad is SELECTION_QUAD_SCALE larger, to hold its
+  // ring. Scaling its corner and pixel size back draws the pin itself exactly
+  // as before, with everything past the old edge (r > 1) left to the ring.
+  float grow = mix(1.0, SELECTION_QUAD_SCALE, vSelected);
+  vec2 corner = vCorner * grow;
+  float halfPx = vHalfSizePx / grow;
+
   // Distance from the quad's centre in quad half-sizes: 0 centre, 1 edge.
-  float r = length(vCorner);
+  float r = length(corner);
   float orb = vOrb.x;
   float radius = mix(CORE_RADIUS, ORB_CORE_RADIUS, orb);
 
   // Signed distance to the disc's edge, in pixels, gives a one-pixel antialiased
   // rim at any size without derivatives:
   //   core = clamp((R - r) * halfSizePx + 0.5, 0, 1)
-  float core = clamp((radius - r) * vHalfSizePx + 0.5, 0.0, 1.0);
+  float core = clamp((radius - r) * halfPx + 0.5, 0.0, 1.0);
 
   //   halo = HALO_PEAK * mu * (1 - smoothstep(R, 1, r))^2
   // Reaches 0 at the quad's inscribed circle, so the corners output nothing.
@@ -94,7 +113,7 @@ void main() {
 
   if (orb > 0.01 && uHasBadges > 0.5) {
     // The count cross-fades while an orb turns into another (vOrb.w follows the path).
-    float ink = mix(badgeInk(vOrb.y, vCorner, radius), badgeInk(vOrb.z, vCorner, radius), vOrb.w);
+    float ink = mix(badgeInk(vOrb.y, corner, radius), badgeInk(vOrb.z, corner, radius), vOrb.w);
     dotColor = mix(dotColor, BADGE_INK, ink * orb);
   }
 
@@ -107,6 +126,14 @@ void main() {
   // SHADOW_OPACITY, no colour) darkens it, and the halo (alpha 0) adds light.
   vec3 color = dotColor * core + vColor * halo * (1.0 - core);
   float coverage = core + shadow * (1.0 - core);
+
+  // The selection ring, antialiased in pixels like the dot's rim:
+  //   ring = clamp(width / 2 − |r · halfPx − (R · halfPx + gap)| + 0.5, 0, 1)
+  // It covers what is under it, so it reads on bright ground and dark.
+  float ringPx = radius * halfPx + RING_GAP_PX * uPixelRatio;
+  float ring = vSelected * clamp(0.5 * RING_WIDTH_PX * uPixelRatio - abs(r * halfPx - ringPx) + 0.5, 0.0, 1.0);
+  color = mix(color, RING_COLOR, ring);
+  coverage = mix(coverage, 1.0, ring);
   gl_FragColor = vec4(color, coverage) * vAlpha;
 
   // See EARTH_FRAG for both includes.

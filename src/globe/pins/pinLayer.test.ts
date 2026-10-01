@@ -2,7 +2,9 @@ import {
   DataTexture,
   InstancedMesh,
   InterleavedBufferAttribute,
+  PerspectiveCamera,
   ShaderMaterial,
+  Vector3,
   type BufferGeometry,
 } from 'three';
 import { describe, expect, it } from 'vitest';
@@ -10,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createNodeBuffer,
   fillMockNodes,
+  latLonToVec3,
   unclusteredLayout,
   PETAL_LEVEL,
   type NodeBuffer,
@@ -36,6 +39,20 @@ function mockNodes(count: number): NodeBuffer {
 
 function showAll(layer: PinLayer, nodes: NodeBuffer): void {
   layer.present(nodes, unclusteredLayout(nodes, WINDOW_END_MS / 1000));
+}
+
+const VIEWPORT = { width: 800, height: 600 };
+
+/** A camera 0.5 globe radii above (lat, lon), looking at the centre, as the controls place one. */
+function cameraAbove(layer: PinLayer, lat: number, lon: number): PerspectiveCamera {
+  const camera = new PerspectiveCamera(35, VIEWPORT.width / VIEWPORT.height, 0.01, 100);
+  const at = latLonToVec3({ lat, lon });
+  camera.position.copy(
+    new Vector3(at.x, at.y, at.z).applyQuaternion(layer.object3d.quaternion).multiplyScalar(1.5),
+  );
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  return camera;
 }
 
 function instancedMeshes(layer: PinLayer): InstancedMesh[] {
@@ -212,6 +229,49 @@ describe('createPinLayer', () => {
     expect(close.moving).toBe(12);
     // Reversed along the spiral it came out on, not a new path.
     for (let slot = 0; slot < 12; slot++) expect(twist(slot)).toBeCloseTo(BLOOM_TWIST_RAD, 6);
+  });
+
+  it('picks the story or cluster under a tap, as the last layout placed it', () => {
+    const now = FIXTURE_EPOCH_SEC + 3600;
+    const nodes = storyBuffer([...stack(6, 10, 10, 1), { id: 50, lat: -30, lon: 120 }]);
+    const engine = createClusterEngine();
+    engine.load(1, clusterColumns(nodes));
+    const layer = createPinLayer({ timeMs: now * 1000 });
+    const above = cameraAbove(layer, 10, 10);
+
+    // Petals: the hottest of the stack (id 1) sits on the centre.
+    layer.present(nodes, engine.layout(1, PETAL_LEVEL, now));
+    expect(layer.pick(400, 300, above, VIEWPORT)).toMatchObject({ kind: 'story', id: 1 });
+    expect(layer.pick(400, 300, cameraAbove(layer, -10, -170), VIEWPORT)).toBeNull();
+
+    layer.present(nodes, engine.layout(1, 2, now));
+    expect(layer.pick(400, 300, above, VIEWPORT)).toMatchObject({ kind: 'cluster', count: 6 });
+    layer.setVisible(false);
+    expect(layer.pick(400, 300, above, VIEWPORT)).toBeNull();
+  });
+
+  it('rings the selected story, or the orb holding it, with one uniform', () => {
+    const now = FIXTURE_EPOCH_SEC + 3600;
+    const nodes = storyBuffer(stack(6, 10, 10, 1));
+    const engine = createClusterEngine();
+    engine.load(1, clusterColumns(nodes));
+    const layer = createPinLayer({ timeMs: now * 1000 });
+    expect(uniform(layer, 'uSelected')).toBe(-1);
+
+    layer.present(nodes, engine.layout(1, PETAL_LEVEL, now));
+    layer.setSelected(3);
+    expect(uniform(layer, 'uSelected')).toBe(2);
+    // Folded into the stack's orb, whose representative is the lowest id.
+    layer.present(nodes, engine.layout(1, 2, now));
+    expect(uniform(layer, 'uSelected')).toBe(0);
+    layer.setSelected(999);
+    expect(uniform(layer, 'uSelected')).toBe(-1);
+    layer.setSelected(null);
+    expect(uniform(layer, 'uSelected')).toBe(-1);
+
+    const material = onlyMesh(layer).material as ShaderMaterial;
+    expect(material.vertexShader).toContain('gl_InstanceID');
+    expect(material.fragmentShader).toContain('RING_GAP_PX');
   });
 
   it('draws a count only once the host hands it the glyphs', () => {

@@ -42,11 +42,13 @@ export type {
 } from './camera/types';
 export {
   createPinLayer,
+  type PickViewport,
   type PinLayer,
   type PinLayerOptions,
   type PresentOptions,
   type PresentResult,
 } from './pins/pinLayer';
+export { ACTIVATE_RADIUS_CSS_PX, PICK_RADIUS_CSS_PX, type PinPick } from './pins/pinPick';
 export { PIN_HALF_SIZE_CSS_PX } from './pins/pinStyle';
 export { BADGE_CELL_ASPECT, BADGE_GLYPHS } from './pins/badgeGlyphs';
 export { BLOOM_SETTLE_SECONDS, bloomSeconds } from './pins/bloom';

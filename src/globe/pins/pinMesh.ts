@@ -32,6 +32,8 @@ export interface PinUniforms {
   readonly uPalette: { value: Float32Array };
   readonly uBadgeAtlas: { value: Texture | null };
   readonly uHasBadges: { value: number };
+  /** Slot wearing the selection ring, or −1. */
+  readonly uSelected: { value: number };
 }
 
 export function createPinUniforms(): PinUniforms {
@@ -46,6 +48,7 @@ export function createPinUniforms(): PinUniforms {
     uPalette: { value: CATEGORY_COLORS },
     uBadgeAtlas: { value: null },
     uHasBadges: { value: 0 },
+    uSelected: { value: -1 },
   };
 }
 

@@ -14,45 +14,26 @@ import {
 } from './pinMesh';
 import { landSprings, rebaseClock, writeAppearance } from './pinInstances';
 import type { PinLayer, PinLayerOptions } from './pinLayerTypes';
+import { pickPin } from './pinPick';
+import { cameraProjection, selectedSlot } from './pinSelection';
+import {
+  DEFAULT_CAPACITY,
+  MAX_STEP_SECONDS,
+  RESUME_STEP_SECONDS,
+  RETIME_REST_SECONDS,
+  directionOf,
+} from './pinLayerRules';
 import { createSlotMap } from './pinSlots';
 import { PIN_HALF_SIZE_CSS_PX, PULSE_CLOCK_REBASE_SECONDS } from './pinStyle';
 import { planTransitions } from './transitions';
 
-/** Enough for the 3000-story target, plus departures fading out, without growing. */
-const DEFAULT_CAPACITY = 4096;
-
-/** A step longer than this is a resumed tab, not motion; see earth.ts. */
-const MAX_STEP_SECONDS = 0.25;
-
-/**
- * The first step after the layer was idle. r3f's first delta after an idle
- * spell spans the whole spell, which would skip the start of a bloom; the
- * camera controls cap the same way (RESUME_STEP_SECONDS).
- */
-const RESUME_STEP_SECONDS = 1 / 60;
-
-/**
- * Pulse rates follow the displayed time once it has rested this long. A scrub
- * moves only uNow; re-deriving every rate on the CPU each tick would cost a
- * pass and a buffer upload per frame for a frequency nobody can judge mid-drag.
- */
-const RETIME_REST_SECONDS = 0.25;
-
-export type { PinLayer, PinLayerOptions, PresentOptions, PresentResult } from './pinLayerTypes';
-
-/**
- * Which way a change goes: clusters opening as the time starts to move bloom
- * out like a zoom in, and close like a zoom out; otherwise the level decides.
- */
-function directionOf(
-  previousLevel: number | null,
-  wasOpen: boolean,
-  layout: ClusterLayout,
-): number {
-  if (previousLevel === null) return 0;
-  if (layout.open !== wasOpen) return layout.open ? 1 : -1;
-  return Math.sign(layout.level - previousLevel);
-}
+export type {
+  PickViewport,
+  PinLayer,
+  PinLayerOptions,
+  PresentOptions,
+  PresentResult,
+} from './pinLayerTypes';
 
 /**
  * The news pins: one InstancedMesh (see pinMesh.ts) whose slots are keyed by
@@ -84,6 +65,8 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
   let pins = attach(nextPowerOfTwo(options.capacity ?? DEFAULT_CAPACITY));
   let groupSlot = new Int32Array(pins.buffer.count).fill(-1);
   let nodes: NodeBuffer | null = null;
+  let shown: ClusterLayout | null = null;
+  let selectedId: number | null = null;
   let rowSlots: Int32Array = new Int32Array(0);
   let level: number | null = null;
   let opened = false;
@@ -155,7 +138,9 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
         ratesDue = false;
       }
       nodes = next;
+      shown = layout;
       rowSlots = assigned;
+      uniforms.uSelected.value = selectedSlot(nodes, shown, rowSlots, selectedId);
 
       const plan = planTransitions({
         array: pins.array,
@@ -190,6 +175,24 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
       published = countVisible(nodes, nowSeconds);
       ratesDue = true;
       restSeconds = 0;
+    },
+
+    pick(x, y, camera, viewport, radiusPx) {
+      if (!nodes || !shown || !tilt.visible) return null;
+      return pickPin({
+        nodes,
+        layout: shown,
+        nowSec: nowSeconds,
+        x,
+        y,
+        ...(radiusPx === undefined ? {} : { radiusPx }),
+        project: cameraProjection(tilt, camera, viewport.width, viewport.height),
+      });
+    },
+
+    setSelected(id) {
+      selectedId = id;
+      uniforms.uSelected.value = selectedSlot(nodes, shown, rowSlots, selectedId);
     },
 
     setViewport(bufferWidth, bufferHeight, pixelRatio) {

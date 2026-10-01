@@ -95,6 +95,17 @@ export const HIDDEN_SCALE = 0.25;
  */
 export const BADGE_INK: readonly [number, number, number] = [0.004, 0.005, 0.009];
 
+/**
+ * The selected story's pin (or the orb holding it) wears a ring, drawn in its
+ * own quad grown by SELECTION_QUAD_SCALE to make room. The ring sits this far
+ * outside the dot's edge, so it reads around pins of every size.
+ */
+export const SELECTION_QUAD_SCALE = 1.5;
+export const SELECTION_RING_GAP_CSS_PX = 4.5;
+export const SELECTION_RING_WIDTH_CSS_PX = 1.75;
+/** Linear RGB, under bloom's threshold: an outline, not a light. */
+export const SELECTION_RING_COLOR: readonly [number, number, number] = [0.92, 0.95, 1.0];
+
 export function orbScaleFor(count: number): number {
   return ORB_SCALE_MIN + ORB_SCALE_PER_DECADE * Math.log10(Math.max(count, 1));
 }

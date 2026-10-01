@@ -34,6 +34,7 @@ import {
   PULSE_AMPLITUDE,
   SCALE_MAX,
   SCALE_MIN,
+  SELECTION_QUAD_SCALE,
 } from './pinStyle';
 
 export const PIN_VERT = /* glsl */ `
@@ -64,6 +65,8 @@ uniform float uHalfSizePx;
 uniform float uPixelRatio;
 /** Linear RGB per category, brightest channel 1. */
 uniform vec3 uPalette[${NEWS_CATEGORIES.length}];
+/** Slot wearing the selection ring, −1 for none. */
+uniform float uSelected;
 
 varying vec2 vCorner;
 varying vec3 vColor;
@@ -73,11 +76,14 @@ varying float vHaloWeight;
 varying float vHot;
 /** Orb-ness, the inner and outer badge codes, and the badge cross-fade. */
 varying vec4 vOrb;
+/** 1 for the selected slot. */
+varying float vSelected;
 
 const float GLOBE_RADIUS = ${glslFloat(GLOBE_RADIUS)};
 const float HORIZON_FADE = ${glslFloat(HORIZON_FADE_FRACTION)};
 const float PULSE_AMPLITUDE = ${glslFloat(PULSE_AMPLITUDE)};
 const float OMEGA = ${glslFloat(BLOOM_OMEGA)};
+const float SELECTION_QUAD_SCALE = ${glslFloat(SELECTION_QUAD_SCALE)};
 const float SETTLE = ${glslFloat(BLOOM_SETTLE_SECONDS)};
 const float SCALE_MIN = ${glslFloat(SCALE_MIN)};
 const float SCALE_MAX = ${glslFloat(SCALE_MAX)};
@@ -217,6 +223,10 @@ void main() {
   //   life = (HIDDEN_SCALE + (1 − HIDDEN_SCALE)·birth + BIRTH_POP·sin(π·birth)) · (1 + FRESH_SCALE_BOOST·freshness)
   float life = (HIDDEN_SCALE + (1.0 - HIDDEN_SCALE) * birth + BIRTH_POP * sin(PI * birth)) * (1.0 + FRESH_SCALE_BOOST * freshness);
   vHalfSizePx = uHalfSizePx * mix(endScale(aInner.w), endScale(aOuter.w), u) * mix(life, 1.0, orbness) * pulse;
+  // Slots are instances, so the selected one is gl_InstanceID (three compiles
+  // these shaders as GLSL ES 3.00 on WebGL2). Its quad grows to hold the ring.
+  vSelected = 1.0 - step(0.5, abs(float(gl_InstanceID) - uSelected));
+  vHalfSizePx *= mix(1.0, SELECTION_QUAD_SCALE, vSelected);
 
   // Billboard in clip space: offsetting xy by (pixels * 2 / viewport) * w moves
   // the corner that many pixels after the perspective divide, so the quad
