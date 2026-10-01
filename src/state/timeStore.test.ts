@@ -64,3 +64,59 @@ describe('time store', () => {
     expect(seen).toEqual([2_000]);
   });
 });
+
+describe('time motion and the return to live', () => {
+  it('starts still and not returning', () => {
+    const store = createTimeStore(() => 1_000);
+    expect(store.getState()).toMatchObject({ motion: 'still', returning: false });
+  });
+
+  it('returnToLive asks for an eased return and goLive ends it', () => {
+    const clock = fakeClock(10_000);
+    const store = createTimeStore(clock.now);
+    store.getState().setTime(2_000);
+    store.getState().returnToLive();
+    expect(store.getState()).toMatchObject({ timeMs: 2_000, isLive: false, returning: true });
+
+    // The driver's frames keep the return going.
+    store.getState().stepTime(6_000);
+    expect(store.getState()).toMatchObject({ timeMs: 6_000, returning: true });
+
+    clock.advance(500);
+    store.getState().goLive();
+    expect(store.getState()).toMatchObject({ timeMs: 10_500, isLive: true, returning: false });
+  });
+
+  it('does not start a return when already live', () => {
+    const store = createTimeStore(() => 1_000);
+    store.getState().returnToLive();
+    expect(store.getState().returning).toBe(false);
+  });
+
+  it('a drag leaving the magnet cancels the return', () => {
+    const store = createTimeStore(() => 10_000);
+    store.getState().setMotion('dragging');
+    store.getState().setTime(9_000);
+    store.getState().returnToLive();
+    expect(store.getState()).toMatchObject({ motion: 'dragging', returning: true });
+    store.getState().setTime(4_000);
+    expect(store.getState()).toMatchObject({ timeMs: 4_000, returning: false });
+  });
+
+  it('Play replaces a return, and a return stops Play', () => {
+    const store = createTimeStore(() => 10_000);
+    store.getState().setTime(2_000);
+    store.getState().returnToLive();
+    store.getState().setMotion('playing');
+    expect(store.getState()).toMatchObject({ motion: 'playing', returning: false });
+    store.getState().returnToLive();
+    expect(store.getState()).toMatchObject({ motion: 'still', returning: true });
+  });
+
+  it('stepTime leaves live mode without changing the motion', () => {
+    const store = createTimeStore(() => 10_000);
+    store.getState().setMotion('playing');
+    store.getState().stepTime(3_000);
+    expect(store.getState()).toMatchObject({ timeMs: 3_000, isLive: false, motion: 'playing' });
+  });
+});

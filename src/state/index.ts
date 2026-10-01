@@ -10,6 +10,7 @@ export {
   timeStore,
   useTimeStore,
   LIVE_SYNC_INTERVAL_MS,
+  type TimeMotion,
   type TimeState,
   type TimeStore,
 } from './timeStore';
