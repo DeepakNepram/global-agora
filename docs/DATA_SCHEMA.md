@@ -14,6 +14,7 @@ truth; the original design is the build plan's §3
 | `20260924140000_api.sql`                    | `stories.seq`, the API read functions                     |
 | `20260924150000_ingest_candidates_plan.sql` | fix: `ingest_candidates` at a full day's volume           |
 | `20261001100000_story_ui.sql`               | `story_location_reports`, the participant count           |
+| `20261002100000_payload_country.sql`        | `api_nodes` adds each story's country (`cc`)              |
 
 Each table ships with its RLS policies and grants in the same file: a table and
 its access rules are one change. Migrations are timestamped and forward-only.
@@ -235,7 +236,8 @@ validate what it serves and by the client to validate what it decodes.
     "srcN": [12, 3],
     "disc": [1, 0],
     "hl": ["Vote nears in London", "Shares slide in Tokyo"],
-    "pl": ["London, United Kingdom", "Tokyo, Japan"]
+    "pl": ["London, United Kingdom", "Tokyo, Japan"],
+    "cc": ["GB", "JP"]
   }
 }
 ```
@@ -253,10 +255,14 @@ validate what it serves and by the client to validate what it decodes.
 - **`heat`** 0–255; **`srcN`** distinct outlets; **`disc`** 1 when the
   discussion is open.
 - **`hl`, `pl`**: headline and place name (empty when unknown).
+- **`cc`** (Prompt 3.4): the place's country, ISO 3166-1 alpha-2, empty when
+  unknown. Following a country matches on it. Optional in the validator, so a
+  payload cached at the edge from before it existed still parses.
   Everything else loads on tap from `/api/story/:id`.
 
 Measured end to end on a real 24 h window: 3000 nodes are 134,646 bytes
-(131.5 KB) with Brotli 11; 415.7 KB decoded.
+(131.5 KB) with Brotli 11; 415.7 KB decoded. `cc` adds 2,727 bytes at
+Brotli 11 (measured on 3000 nodes from four real hours), about 134 KB in all.
 
 **HTTP:** `Content-Encoding: br` when accepted (identity JSON otherwise),
 weak `ETag`, `If-None-Match` → 304, and

@@ -44,6 +44,13 @@ describe('decodeNodes', () => {
       'Ice shelf calves',
     ]);
     expect(nodes.places).toEqual(['London, United Kingdom', 'Tokyo, Japan', '']);
+    expect(nodes.countryCodes).toEqual(['GB', 'JP', '']);
+  });
+
+  it('leaves countries empty for a payload without them', () => {
+    const payload = samplePayload();
+    const { cc: _cc, ...older } = payload.nodes;
+    expect(decodeNodes({ ...payload, nodes: older }).countryCodes).toEqual(['', '', '']);
   });
 
   it('puts the window start at generated_at minus the window', () => {

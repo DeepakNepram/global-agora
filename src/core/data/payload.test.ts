@@ -53,6 +53,7 @@ describe('parseNodesPayload', () => {
       disc: [],
       hl: [],
       pl: [],
+      cc: [],
     });
     expect(parseNodesPayload(empty).nodes.id).toHaveLength(0);
   });
@@ -80,6 +81,18 @@ describe('parseNodesPayload', () => {
     ['srcN', [0, '3', 0]],
   ])('refuses %s = %j', (column, values) => {
     expect(() => parseNodesPayload(withNodes({ [column]: values }))).toThrow(PayloadError);
+  });
+
+  it('accepts a payload from before the country column', () => {
+    const { cc: _cc, ...older } = samplePayload().nodes;
+    const payload = { ...samplePayload(), nodes: older };
+    expect(parseNodesPayload(payload).nodes.cc).toBeUndefined();
+  });
+
+  it('refuses country codes that are not ISO alpha-2', () => {
+    expect(() => parseNodesPayload(withNodes({ cc: ['GB', 'jp', ''] }))).toThrow(/cc\[1\]/);
+    expect(() => parseNodesPayload(withNodes({ cc: ['GBR', '', ''] }))).toThrow(/cc\[0\]/);
+    expect(() => parseNodesPayload(withNodes({ cc: ['GB'] }))).toThrow(/nodes.cc has 1 entries/);
   });
 
   it('refuses non-text headlines and malformed envelopes', () => {

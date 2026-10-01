@@ -35,6 +35,11 @@ export interface NodeColumns {
   readonly hl: readonly string[];
   /** Place name; empty when unknown. */
   readonly pl: readonly string[];
+  /**
+   * The place's country, ISO 3166-1 alpha-2; empty when unknown. Optional: a
+   * payload cached at the edge from before it existed still parses.
+   */
+  readonly cc?: readonly string[];
 }
 
 export interface NodesPayload {
@@ -67,6 +72,7 @@ export function dequantizeLat(latQ: number): number {
 }
 
 const UINT32_MAX = 0xffffffff;
+const COUNTRY_RE = /^(?:[A-Z]{2})?$/;
 
 type IntColumn = 'id' | 'lonQ' | 'latQ' | 't' | 'cat' | 'heat' | 'srcN' | 'disc';
 
@@ -90,11 +96,19 @@ function intColumn(
   }
 }
 
-function stringColumn(nodes: Record<string, unknown>, name: 'hl' | 'pl'): void {
+function stringColumn(
+  nodes: Record<string, unknown>,
+  name: 'hl' | 'pl' | 'cc',
+  pattern?: RegExp,
+): void {
   const column = nodes[name];
   if (!Array.isArray(column)) throw new PayloadError(`nodes.${name} is not an array`);
   for (let i = 0; i < column.length; i++) {
-    if (typeof column[i] !== 'string') throw new PayloadError(`nodes.${name}[${i}] is not text`);
+    const value: unknown = column[i];
+    if (typeof value !== 'string') throw new PayloadError(`nodes.${name}[${i}] is not text`);
+    if (pattern && !pattern.test(value)) {
+      throw new PayloadError(`nodes.${name}[${i}] = ${JSON.stringify(value)} is malformed`);
+    }
   }
 }
 
@@ -135,9 +149,14 @@ export function parseNodesPayload(value: unknown): NodesPayload {
   intColumn(nodes, 'disc', 0, 1);
   stringColumn(nodes, 'hl');
   stringColumn(nodes, 'pl');
+  const columns = ['lonQ', 'latQ', 't', 'cat', 'heat', 'srcN', 'disc', 'hl', 'pl'];
+  if (nodes['cc'] !== undefined) {
+    stringColumn(nodes, 'cc', COUNTRY_RE);
+    columns.push('cc');
+  }
 
   const count = (nodes['id'] as unknown[]).length;
-  for (const name of ['lonQ', 'latQ', 't', 'cat', 'heat', 'srcN', 'disc', 'hl', 'pl']) {
+  for (const name of columns) {
     const length = (nodes[name] as unknown[]).length;
     if (length !== count) {
       throw new PayloadError(`nodes.${name} has ${length} entries, nodes.id has ${count}`);

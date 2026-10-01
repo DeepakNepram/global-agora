@@ -5,7 +5,7 @@
 -- whatever the seed or a local ingest left in the table.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(32);
+select plan(33);
 
 insert into public.stories
   (id, title, category, lat, lon, place_name, place_source, place_conf, country_code,
@@ -17,7 +17,7 @@ values
   ('00000000-0000-4000-8000-0000000000b2', 'Middle story', 2, -90, -180,
    null, 'gdelt', 55, null, 150, 3, '2100-01-01 12:00:00+00', '2100-01-01 12:15:00+00', 'none'),
   ('00000000-0000-4000-8000-0000000000b3', 'Newest story', 3, 0, 0,
-   'Null Island', 'manual', 80, null, 100, 2, '2100-01-01 23:59:59+00', '2100-01-02 00:00:00+00', 'queued'),
+   'Null Island', 'manual', 80, 'GH', 100, 2, '2100-01-01 23:59:59+00', '2100-01-02 00:00:00+00', 'queued'),
   -- Coolest in the window: dropped when the limit is 3.
   ('00000000-0000-4000-8000-0000000000b4', 'Coolest story', 0, 51.5, -0.1,
    'London, United Kingdom', 'gdelt', 80, 'GB', 10, 1, '2100-01-01 06:00:00+00', '2100-01-01 06:15:00+00', 'none'),
@@ -79,6 +79,8 @@ select is((select (r->'payload'->'nodes'->>'disc') from n), '[1,0,0]',
           'disc is 1 only for an open discussion');
 select is((select (r->'payload'->'nodes'->>'pl') from n), '["North Pole","","Null Island"]',
           'place names, empty when unknown');
+select is((select (r->'payload'->'nodes'->>'cc') from n), '["","","GH"]',
+          'country codes, empty when unknown');
 select ok((select (r->'payload'->'nodes'->>'id') !~ ' ' from n), 'columns are written without spaces');
 
 -- The unchanged check: the same data gives the same hash, and a caller that

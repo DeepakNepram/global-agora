@@ -50,6 +50,8 @@ export interface NodeBuffer {
   readonly headlines: string[];
   /** Place name per node, empty when unknown. */
   readonly places: string[];
+  /** The place's country per node, ISO 3166-1 alpha-2; empty when unknown. */
+  readonly countryCodes: string[];
 }
 
 export function nodeBufferCapacity(buffer: NodeBuffer): number {
@@ -72,5 +74,6 @@ export function createNodeBuffer(capacity: number): NodeBuffer {
     discussionOpen: new Uint8Array(capacity),
     headlines: new Array<string>(capacity).fill(''),
     places: new Array<string>(capacity).fill(''),
+    countryCodes: new Array<string>(capacity).fill(''),
   };
 }

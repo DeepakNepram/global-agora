@@ -61,7 +61,7 @@ function categoryMap(names: readonly string[]): Uint8Array {
  *   x = -sin(theta)·cos(phi), y = cos(theta), z = sin(theta)·sin(phi)
  */
 export function decodeNodes(payload: NodesPayload): NodeBuffer {
-  const { id, lonQ, latQ, t, cat, heat, srcN, disc, hl, pl } = payload.nodes;
+  const { id, lonQ, latQ, t, cat, heat, srcN, disc, hl, pl, cc } = payload.nodes;
   const count = id.length;
   const buffer = createNodeBuffer(count);
   const categories = categoryMap(payload.categories);
@@ -88,6 +88,7 @@ export function decodeNodes(payload: NodesPayload): NodeBuffer {
     buffer.discussionOpen[i] = disc[i] ?? 0;
     buffer.headlines[i] = hl[i] ?? '';
     buffer.places[i] = pl[i] ?? '';
+    buffer.countryCodes[i] = cc?.[i] ?? '';
   }
   return buffer;
 }

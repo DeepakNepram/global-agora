@@ -20,6 +20,7 @@ export function samplePayload(): NodesPayload {
       disc: [1, 0, 0],
       hl: ['Vote nears in London', 'Shares slide in Tokyo', 'Ice shelf calves'],
       pl: ['London, United Kingdom', 'Tokyo, Japan', ''],
+      cc: ['GB', 'JP', ''],
     },
   };
 }

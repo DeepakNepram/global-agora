@@ -79,6 +79,7 @@ export function fillMockNodes(buffer: NodeBuffer, options: MockNodeOptions): Nod
     buffer.discussionOpen[i] = 0;
     buffer.headlines[i] = `Placeholder story ${i + 1}`;
     buffer.places[i] = '';
+    buffer.countryCodes[i] = '';
   }
 
   const { stack } = options;
