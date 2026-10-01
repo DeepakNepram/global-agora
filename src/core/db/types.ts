@@ -494,6 +494,14 @@ export type Database = {
         Args: { p_hours: number; p_known?: string; p_limit: number };
         Returns: Json;
       };
+      api_outlet_stories: {
+        Args: { p_hours: number; p_limit: number; p_outlet: string };
+        Returns: Json;
+      };
+      api_outlets: {
+        Args: { p_hours: number; p_known?: string; p_limit: number };
+        Returns: Json;
+      };
       api_report_location: {
         Args: { p_id?: string; p_seq?: number };
         Returns: boolean;
@@ -501,6 +509,15 @@ export type Database = {
       api_story: {
         Args: { p_article_limit?: number; p_id?: string; p_seq?: number };
         Returns: Json;
+      };
+      api_window: {
+        Args: { p_hours: number; p_limit: number };
+        Returns: {
+          published_at: string;
+          seq: number;
+          story_id: string;
+          window_end: string;
+        }[];
       };
       discussion_participants: { Args: { p_story: string }; Returns: number };
       ingest_apply: { Args: { p_batch: Json }; Returns: Json };

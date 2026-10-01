@@ -2,6 +2,8 @@
  * The API Worker's routes, free of Worker globals so tests can drive them.
  *
  *   GET|HEAD /api/nodes?hours=N                  the columnar payload (docs/DATA_SCHEMA.md)
+ *   GET|HEAD /api/outlets?hours=N                the outlets covering its stories, with counts
+ *   GET|HEAD /api/outlets/:outlet?hours=N        one outlet's stories, as payload ids
  *   GET|HEAD /api/story/:id                      one story in full; :id is the payload's id or the UUID
  *   POST     /api/story/:id/location-report      one "wrong location" report: 204, or 404
  *   GET      /api/health                         200 when configured
@@ -16,8 +18,10 @@ import { errorFields, type Logger } from '../../shared/log.ts';
 import type { EntryStore, SwrCache } from './cache.ts';
 import { GoneError } from './cache.ts';
 import type { ApiConfig } from './config.ts';
+import { isOutletName } from '../../../src/core/data/outlets.ts';
+
 import type { ApiDb, StoryRef } from './db.ts';
-import { buildNodes, buildStory } from './entries.ts';
+import { buildNodes, buildOutlets, buildOutletStories, buildStory } from './entries.ts';
 import { corsHeaders, jsonError, jsonReply, preflight, serveEntry } from './http.ts';
 
 export interface ApiDeps {
@@ -35,6 +39,7 @@ export interface ApiDeps {
 }
 
 const STORY_PATH = /^\/api\/story\/([^/]+)$/;
+const OUTLET_PATH = /^\/api\/outlets\/([^/]+)$/;
 const REPORT_PATH = /^\/api\/story\/([^/]+)\/location-report$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SEQ = /^[1-9]\d{0,15}$/;
@@ -74,6 +79,67 @@ async function nodes(request: Request, url: URL, deps: ApiDeps, db: ApiDb): Prom
         { db, hours, limit: config.nodeLimit, brotliQuality: config.brotliQuality, now: deps.now },
         previous,
       ),
+    timings: config,
+    now: deps.now,
+    waitUntil: deps.waitUntil,
+    log: deps.log,
+  });
+  return serveEntry(request, entry, {
+    cacheControl: cacheControl(config),
+    status,
+    extraHeaders: corsHeaders(request, config.allowedOrigins),
+  });
+}
+
+/** Every outlet covering the window's stories: memory then edge, like the payload. */
+async function outlets(request: Request, url: URL, deps: ApiDeps, db: ApiDb): Promise<Response> {
+  const { config } = deps;
+  const hours = parseHours(url.searchParams.get('hours'), config.maxHours);
+  if (hours === null)
+    return jsonError(400, `hours must be a whole number from 1 to ${config.maxHours}`);
+  const { entry, status } = await deps.cache.get({
+    key: `outlets:v1:${hours}:${config.nodeLimit}`,
+    stores: deps.nodeStores,
+    build: (previous) =>
+      buildOutlets(
+        { db, hours, limit: config.nodeLimit, brotliQuality: config.brotliQuality, now: deps.now },
+        previous,
+      ),
+    timings: config,
+    now: deps.now,
+    waitUntil: deps.waitUntil,
+    log: deps.log,
+  });
+  return serveEntry(request, entry, {
+    cacheControl: cacheControl(config),
+    status,
+    extraHeaders: corsHeaders(request, config.allowedOrigins),
+  });
+}
+
+/** One outlet's stories, chosen in search: edge only, like a story. */
+async function outletStories(
+  request: Request,
+  url: URL,
+  raw: string,
+  deps: ApiDeps,
+  db: ApiDb,
+): Promise<Response> {
+  const { config } = deps;
+  let outlet: string;
+  try {
+    outlet = decodeURIComponent(raw);
+  } catch {
+    outlet = '';
+  }
+  if (!isOutletName(outlet)) return jsonError(400, 'outlet must be 1 to 120 characters');
+  const hours = parseHours(url.searchParams.get('hours'), config.maxHours);
+  if (hours === null)
+    return jsonError(400, `hours must be a whole number from 1 to ${config.maxHours}`);
+  const { entry, status } = await deps.cache.get({
+    key: `outlet:v1:${hours}:${config.nodeLimit}:${outlet}`,
+    stores: deps.storyStores,
+    build: () => buildOutletStories({ db, outlet, hours, limit: config.nodeLimit, now: deps.now }),
     timings: config,
     now: deps.now,
     waitUntil: deps.waitUntil,
@@ -145,7 +211,11 @@ async function route(request: Request, url: URL, deps: ApiDeps): Promise<Respons
 
   const readable = request.method === 'GET' || request.method === 'HEAD';
   const known =
-    pathname === '/api/nodes' || pathname === '/api/health' || STORY_PATH.test(pathname);
+    pathname === '/api/nodes' ||
+    pathname === '/api/outlets' ||
+    pathname === '/api/health' ||
+    STORY_PATH.test(pathname) ||
+    OUTLET_PATH.test(pathname);
   if (!known) return jsonError(404, 'not found');
   if (request.method === 'OPTIONS') return preflight(request, deps.config.allowedOrigins);
   if (!readable) return jsonError(405, 'method not allowed', { allow: 'GET, HEAD, OPTIONS' });
@@ -156,6 +226,9 @@ async function route(request: Request, url: URL, deps: ApiDeps): Promise<Respons
   if (deps.db === null)
     return jsonError(503, 'API not configured: set SUPABASE_URL and SUPABASE_ANON_KEY');
   if (pathname === '/api/nodes') return nodes(request, url, deps, deps.db);
+  if (pathname === '/api/outlets') return outlets(request, url, deps, deps.db);
+  const outlet = OUTLET_PATH.exec(pathname);
+  if (outlet) return outletStories(request, url, outlet[1] ?? '', deps, deps.db);
   return story(request, STORY_PATH.exec(pathname)?.[1] ?? '', deps, deps.db);
 }
 

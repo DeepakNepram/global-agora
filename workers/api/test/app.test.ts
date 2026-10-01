@@ -2,6 +2,7 @@ import { brotliDecompressSync } from 'node:zlib';
 
 import { describe, expect, it } from 'vitest';
 
+import { parseOutletsIndex } from '../../../src/core/data/outlets.ts';
 import { parseNodesPayload } from '../../../src/core/data/payload.ts';
 import { NEWS_CATEGORIES } from '../../../src/core/nodeBuffer.ts';
 import { createLogger } from '../../shared/log.ts';
@@ -61,9 +62,32 @@ function fakeDb(state = { version: 'h1', heat: [200, 150] }) {
       reports.push(ref);
       return 'seq' in ref ? ref.seq === 7 : ref.id === STORY.id;
     },
+    async outlets(hours, _limit, known) {
+      calls.push({ hours, known });
+      return known === state.version
+        ? { hash: state.version }
+        : {
+            hash: state.version,
+            payload: {
+              generated_at: 1_790_000_000,
+              window_hours: hours,
+              outlets: ['wire.example', 'a.example'],
+              n: [2, 1],
+            },
+          };
+    },
+    async outletStories(outlet) {
+      return { outlet, ids: outlet === 'wire.example' ? [9, 7] : [] };
+    },
   };
   return { db, calls, state, reports };
 }
+
+/** Fakes that only answer one call: the rest is never reached. */
+const UNUSED = {
+  outlets: async () => ({ hash: 'x' }),
+  outletStories: async () => ({ outlet: 'x', ids: [] }),
+};
 
 function deps(overrides: Partial<ApiDeps> = {}, config: Partial<ApiConfig> = {}) {
   const clock = { now: 1_000_000 };
@@ -180,6 +204,7 @@ describe('GET /api/nodes', () => {
       },
       story: async () => null,
       reportLocation: async () => false,
+      ...UNUSED,
     };
     const { d, lines } = deps({ db: failing });
     const response = await handleFetch(get('/api/nodes'), d);
@@ -193,8 +218,60 @@ describe('GET /api/nodes', () => {
       nodes: async () => ({ hash: 'x', payload: { generated_at: 1, window_hours: 24, nodes: {} } }),
       story: async () => null,
       reportLocation: async () => false,
+      ...UNUSED,
     };
     expect((await handleFetch(get('/api/nodes'), deps({ db: broken }).d)).status).toBe(502);
+  });
+});
+
+describe('GET /api/outlets', () => {
+  it("serves the outlet index Brotli-compressed, validated, with the payload's caching", async () => {
+    const { d } = deps();
+    const response = await handleFetch(get('/api/outlets?hours=24', BR), d);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-encoding')).toBe('br');
+    expect(response.headers.get('cache-control')).toContain('stale-while-revalidate=900');
+    const text = brotliDecompressSync(new Uint8Array(await response.arrayBuffer())).toString();
+    const index = parseOutletsIndex(JSON.parse(text));
+    expect(index.outlets).toEqual(['wire.example', 'a.example']);
+    expect(index.n).toEqual([2, 1]);
+  });
+
+  it('re-times unchanged data with the hash alone', async () => {
+    const fake = fakeDb();
+    const { d, clock, background } = deps({ db: fake.db });
+    await handleFetch(get('/api/outlets', BR), d);
+    clock.now += 61_000;
+    await handleFetch(get('/api/outlets', BR), d);
+    await Promise.all(background);
+    expect(fake.calls.map((call) => call.known)).toEqual([null, 'h1']);
+  });
+
+  it('refuses a malformed index and a bad window', async () => {
+    const broken: ApiDb = {
+      ...fakeDb().db,
+      outlets: async () => ({ hash: 'x', payload: { generated_at: 1, window_hours: 24 } }),
+    };
+    expect((await handleFetch(get('/api/outlets'), deps({ db: broken }).d)).status).toBe(502);
+    expect((await handleFetch(get('/api/outlets?hours=0'), deps().d)).status).toBe(400);
+  });
+});
+
+describe('GET /api/outlets/:outlet', () => {
+  it("lists one outlet's stories, newest first, and none for an unknown one", async () => {
+    const { d } = deps();
+    const wire = await handleFetch(get('/api/outlets/wire.example?hours=24'), d);
+    expect(wire.status).toBe(200);
+    expect(await wire.json()).toEqual({ outlet: 'wire.example', ids: [9, 7] });
+    const named = await handleFetch(get('/api/outlets/Tasman%20Record'), d);
+    expect(await named.json()).toEqual({ outlet: 'Tasman Record', ids: [] });
+  });
+
+  it('refuses a name it cannot decode, or too long', async () => {
+    const { d } = deps();
+    for (const raw of ['%E0%A4%A', 'x'.repeat(121), 'a%0Ab']) {
+      expect((await handleFetch(get(`/api/outlets/${raw}`), d)).status).toBe(400);
+    }
   });
 });
 
@@ -338,6 +415,22 @@ describe('anon database client', () => {
       p_limit: 3000,
       p_known: 'abc',
     });
+  });
+
+  it('calls the outlet RPCs', async () => {
+    const sent: string[] = [];
+    const db = createAnonDb('http://db.example', 'sb_publishable_xyz', async (url, init) => {
+      sent.push(`${url} ${String(init?.body)}`);
+      return new Response(
+        url.endsWith('api_outlets') ? '{"hash":"h"}' : '{"outlet":"a.example","ids":[]}',
+      );
+    });
+    expect(await db.outlets(24, 3000, 'h')).toEqual({ hash: 'h' });
+    expect(await db.outletStories('a.example', 24, 3000)).toEqual({ outlet: 'a.example', ids: [] });
+    expect(sent).toEqual([
+      'http://db.example/rest/v1/rpc/api_outlets {"p_hours":24,"p_limit":3000,"p_known":"h"}',
+      'http://db.example/rest/v1/rpc/api_outlet_stories {"p_outlet":"a.example","p_hours":24,"p_limit":3000}',
+    ]);
   });
 
   it('reports a location through api_report_location', async () => {

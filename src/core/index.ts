@@ -161,6 +161,16 @@ export type { StoryFilter } from './filters';
 export { fetchPlaces, parsePlaces, PlacesError, PLACES_PATH } from './data/places';
 export type { City, Country, Gazetteer } from './data/places';
 export { cityLabel, nearestCity, surfaceKm, CITY_RADIUS_KM } from './places';
+export {
+  fetchOutlets,
+  fetchOutletStories,
+  isOutletName,
+  parseOutletsIndex,
+  parseOutletStories,
+  OutletsError,
+  OUTLETS_VERSION,
+} from './data/outlets';
+export type { OutletsIndex, OutletStories } from './data/outlets';
 
 export { createFrameStats, percentile } from './frameStats';
 export type { FrameStats, FrameSummary } from './frameStats';

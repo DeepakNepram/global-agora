@@ -72,8 +72,9 @@ select is(
 );
 
 -- Exactly the API's functions: the two reads (Prompt 2.3), the participant
--- count api_story calls and the location report (Prompt 3.3). Anything else a
--- client could call is a mistake.
+-- count api_story calls and the location report (Prompt 3.3), and outlet
+-- search with the window it shares with the payload (Prompt 3.4). Anything
+-- else a client could call is a mistake.
 select is(
   (select coalesce(array_agg(p.proname::text order by p.proname), '{}')
      from pg_proc p
@@ -81,7 +82,8 @@ select is(
     where n.nspname = 'public'
       and (has_function_privilege('anon', p.oid, 'execute')
            or has_function_privilege('authenticated', p.oid, 'execute'))),
-  array['api_nodes', 'api_report_location', 'api_story', 'discussion_participants'],
+  array['api_nodes', 'api_outlet_stories', 'api_outlets', 'api_report_location', 'api_story',
+        'api_window', 'discussion_participants'],
   'client roles can call exactly the API functions'
 );
 

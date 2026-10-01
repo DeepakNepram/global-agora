@@ -1,8 +1,8 @@
 /**
  * The API Worker's database access: RPCs over PostgREST with the publishable
  * (anon) key. They run as the anon role, so this Worker holds no key that can
- * read or write anything a signed-out visitor cannot: two reads under RLS, and
- * the location report, which can only add one to a counter.
+ * read or write anything a signed-out visitor cannot: reads under RLS, and the
+ * location report, which can only add one to a counter.
  *
  * No supabase-js here, as in the ingest Worker: three calls need no auth
  * session, realtime or storage client.
@@ -16,7 +16,7 @@ type Args<F extends keyof Functions> = Functions[F]['Args'];
 
 export type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
-/** What api_nodes returns: the payload, or only the hash when `known` matched. */
+/** What api_nodes and api_outlets return: the body, or only the hash when `known` matched. */
 export interface NodesResult {
   readonly hash: string;
   readonly payload?: unknown;
@@ -30,6 +30,10 @@ export interface ApiDb {
   story(ref: StoryRef, articleLimit: number): Promise<unknown>;
   /** One "wrong location" report; false when there is no such story. */
   reportLocation(ref: StoryRef): Promise<boolean>;
+  /** The outlets covering the window's stories, with the same hash protocol as nodes. */
+  outlets(hours: number, limit: number, known: string | null): Promise<NodesResult>;
+  /** One outlet's window stories, as api_outlet_stories builds them. */
+  outletStories(outlet: string, hours: number, limit: number): Promise<unknown>;
 }
 
 export class DbError extends Error {
@@ -55,20 +59,37 @@ export function createAnonDb(url: string, anonKey: string, fetchFn: Fetch = fetc
     }
   }
 
+  /** The hash protocol's reply: the hash, and the body unless the caller had it. */
+  function hashed(name: string, result: unknown): NodesResult {
+    if (typeof result !== 'object' || result === null || !('hash' in result)) {
+      throw new DbError(`${name}: no hash in the response`);
+    }
+    const { hash, payload } = result as { hash: unknown; payload?: unknown };
+    if (typeof hash !== 'string') throw new DbError(`${name}: hash is not text`);
+    return payload === undefined || payload === null ? { hash } : { hash, payload };
+  }
+
   return {
     async nodes(hours, limit, known): Promise<NodesResult> {
-      const result = await call('api_nodes', {
+      const args = {
         p_hours: hours,
         p_limit: limit,
         ...(known === null ? {} : { p_known: known }),
-      });
-      if (typeof result !== 'object' || result === null || !('hash' in result)) {
-        throw new DbError('api_nodes: no hash in the response');
-      }
-      const { hash, payload } = result as { hash: unknown; payload?: unknown };
-      if (typeof hash !== 'string') throw new DbError('api_nodes: hash is not text');
-      return payload === undefined || payload === null ? { hash } : { hash, payload };
+      };
+      return hashed('api_nodes', await call('api_nodes', args));
     },
+
+    async outlets(hours, limit, known): Promise<NodesResult> {
+      const args = {
+        p_hours: hours,
+        p_limit: limit,
+        ...(known === null ? {} : { p_known: known }),
+      };
+      return hashed('api_outlets', await call('api_outlets', args));
+    },
+
+    outletStories: (outlet, hours, limit) =>
+      call('api_outlet_stories', { p_outlet: outlet, p_hours: hours, p_limit: limit }),
 
     story: (ref, articleLimit) =>
       call('api_story', {

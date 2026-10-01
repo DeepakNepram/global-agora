@@ -1,8 +1,14 @@
 /**
- * Builds the two cacheable responses from the database: the nodes payload and
- * one story. Each returns a CacheEntry, the unit the SWR cache stores.
+ * Builds the cacheable responses from the database: the nodes payload, one
+ * story, and outlet search's index and lists. Each returns a CacheEntry, the
+ * unit the SWR cache stores.
  */
 
+import {
+  OUTLETS_VERSION,
+  parseOutletsIndex,
+  parseOutletStories,
+} from '../../../src/core/data/outlets.ts';
 import { PAYLOAD_VERSION, parseNodesPayload } from '../../../src/core/data/payload.ts';
 import { NEWS_CATEGORIES } from '../../../src/core/nodeBuffer.ts';
 
@@ -106,6 +112,74 @@ export async function buildStory(build: StoryBuild): Promise<CacheEntry> {
   const json = encoder.encode(
     JSON.stringify({ ...story, category: NEWS_CATEGORIES[category] ?? NEWS_CATEGORIES[0] }),
   );
+  const etag = await weakEtag(json);
+  return {
+    body: json,
+    encoding: 'identity',
+    contentType: JSON_TYPE,
+    etag,
+    sourceHash: etag,
+    checkedAt: build.now(),
+  };
+}
+
+export interface OutletsBuild {
+  readonly db: ApiDb;
+  readonly hours: number;
+  readonly limit: number;
+  readonly brotliQuality: number;
+  readonly now: () => number;
+}
+
+/**
+ * Every outlet covering the window's stories, with counts: fetched when
+ * search opens, so it is compressed once here like the payload. Unchanged
+ * data only re-times the entry.
+ */
+export async function buildOutlets(
+  build: OutletsBuild,
+  previous: CacheEntry | null,
+): Promise<CacheEntry> {
+  const result = await build.db.outlets(build.hours, build.limit, previous?.sourceHash ?? null);
+  if (result.payload === undefined) {
+    if (previous === null || previous.sourceHash !== result.hash) {
+      throw new DbError('api_outlets returned no body for an unknown hash');
+    }
+    return { ...previous, checkedAt: build.now() };
+  }
+  const body = isRecord(result.payload) ? result.payload : {};
+  const index = parseOutletsIndex({
+    v: OUTLETS_VERSION,
+    generated_at: body['generated_at'],
+    window_hours: body['window_hours'],
+    outlets: body['outlets'],
+    n: body['n'],
+  });
+  const json = encoder.encode(JSON.stringify(index));
+  return {
+    body: brotli(json, build.brotliQuality),
+    encoding: 'br',
+    contentType: JSON_TYPE,
+    etag: await weakEtag(json),
+    sourceHash: result.hash,
+    checkedAt: build.now(),
+  };
+}
+
+export interface OutletStoriesBuild {
+  readonly db: ApiDb;
+  readonly outlet: string;
+  readonly hours: number;
+  readonly limit: number;
+  readonly now: () => number;
+}
+
+/** One outlet's stories: a short list of ids, left to Cloudflare's compression. */
+export async function buildOutletStories(build: OutletStoriesBuild): Promise<CacheEntry> {
+  const list = parseOutletStories(
+    await build.db.outletStories(build.outlet, build.hours, build.limit),
+  );
+  const json = encoder.encode(JSON.stringify(list));
   const etag = await weakEtag(json);
   return {
     body: json,
