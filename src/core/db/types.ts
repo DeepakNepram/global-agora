@@ -388,6 +388,35 @@ export type Database = {
         };
         Relationships: [];
       };
+      story_location_reports: {
+        Row: {
+          first_reported_at: string;
+          last_reported_at: string;
+          reports: number;
+          story_id: string;
+        };
+        Insert: {
+          first_reported_at?: string;
+          last_reported_at?: string;
+          reports?: number;
+          story_id: string;
+        };
+        Update: {
+          first_reported_at?: string;
+          last_reported_at?: string;
+          reports?: number;
+          story_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'story_location_reports_story_id_fkey';
+            columns: ['story_id'];
+            isOneToOne: true;
+            referencedRelation: 'stories';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       story_signals: {
         Row: {
           keys: string[];
@@ -465,10 +494,15 @@ export type Database = {
         Args: { p_hours: number; p_known?: string; p_limit: number };
         Returns: Json;
       };
+      api_report_location: {
+        Args: { p_id?: string; p_seq?: number };
+        Returns: boolean;
+      };
       api_story: {
         Args: { p_article_limit?: number; p_id?: string; p_seq?: number };
         Returns: Json;
       };
+      discussion_participants: { Args: { p_story: string }; Returns: number };
       ingest_apply: { Args: { p_batch: Json }; Returns: Json };
       ingest_candidates: {
         Args: { p_clusters: Json; p_min_overlap?: number; p_since: string };

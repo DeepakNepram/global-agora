@@ -2,7 +2,7 @@
 -- Run with `npm run db:test`. Each file runs in a transaction that rolls back.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(32);
+select plan(34);
 
 -- CLAUDE.md #8, checked generically so a table added later is covered too.
 select is(
@@ -29,8 +29,8 @@ select is(
 select tables_are(
   'public',
   array['articles', 'blocks', 'discussions', 'feature_flags', 'ingest_runs', 'posts',
-        'profiles', 'reports', 'stories', 'story_signals', 'votes'],
-  'public holds exactly the v1 tables and the ingest ledger'
+        'profiles', 'reports', 'stories', 'story_location_reports', 'story_signals', 'votes'],
+  'public holds exactly the v1 tables, the ingest ledger and the location reports'
 );
 
 -- The grant matrix (docs/DATA_SCHEMA.md). Grants are the first lock, RLS the second.
@@ -45,6 +45,8 @@ select table_privs_are('public', 'profiles',      'anon', '{}'::text[],   'anon:
 select table_privs_are('public', 'feature_flags', 'anon', '{}'::text[],   'anon: nothing on feature_flags');
 select table_privs_are('public', 'story_signals', 'anon', '{}'::text[],   'anon: nothing on story_signals');
 select table_privs_are('public', 'ingest_runs',   'anon', '{}'::text[],   'anon: nothing on ingest_runs');
+select table_privs_are('public', 'story_location_reports', 'anon', '{}'::text[],
+  'anon: nothing on story_location_reports');
 
 select table_privs_are('public', 'stories',       'authenticated', array['SELECT'], 'signed in: read stories');
 select table_privs_are('public', 'articles',      'authenticated', array['SELECT'], 'signed in: read articles');
@@ -57,6 +59,8 @@ select table_privs_are('public', 'profiles',      'authenticated', array['SELECT
 select table_privs_are('public', 'feature_flags', 'authenticated', array['SELECT'], 'signed in: read feature_flags');
 select table_privs_are('public', 'story_signals', 'authenticated', '{}'::text[],   'signed in: nothing on story_signals');
 select table_privs_are('public', 'ingest_runs',   'authenticated', '{}'::text[],   'signed in: nothing on ingest_runs');
+select table_privs_are('public', 'story_location_reports', 'authenticated', '{}'::text[],
+  'signed in: nothing on story_location_reports');
 
 -- Generic guards that survive new tables and functions.
 select is(
@@ -67,8 +71,9 @@ select is(
   'no client role holds a write privilege on any public table'
 );
 
--- Exactly the API's two read functions (Prompt 2.3); anything else a client
--- could call is a mistake.
+-- Exactly the API's functions: the two reads (Prompt 2.3), the participant
+-- count api_story calls and the location report (Prompt 3.3). Anything else a
+-- client could call is a mistake.
 select is(
   (select coalesce(array_agg(p.proname::text order by p.proname), '{}')
      from pg_proc p
@@ -76,8 +81,8 @@ select is(
     where n.nspname = 'public'
       and (has_function_privilege('anon', p.oid, 'execute')
            or has_function_privilege('authenticated', p.oid, 'execute'))),
-  array['api_nodes', 'api_story'],
-  'client roles can call exactly api_nodes and api_story'
+  array['api_nodes', 'api_report_location', 'api_story', 'discussion_participants'],
+  'client roles can call exactly the API functions'
 );
 
 -- The ingest Worker writes with the service role, so it must keep its grants.

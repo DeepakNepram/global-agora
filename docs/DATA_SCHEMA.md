@@ -13,6 +13,7 @@ truth; the original design is the build plan's §3
 | `20260924120000_ingest.sql`                 | `story_signals`, `ingest_runs`, the ingest functions      |
 | `20260924140000_api.sql`                    | `stories.seq`, the API read functions                     |
 | `20260924150000_ingest_candidates_plan.sql` | fix: `ingest_candidates` at a full day's volume           |
+| `20261001100000_story_ui.sql`               | `story_location_reports`, the participant count           |
 
 Each table ships with its RLS policies and grants in the same file: a table and
 its access rules are one change. Migrations are timestamped and forward-only.
@@ -27,8 +28,10 @@ its access rules are one change. Migrations are timestamped and forward-only.
   grants is closed rather than open. Functions are closed too, because
   PostgREST exposes them as RPC endpoints: the ingest migration revokes
   PUBLIC's EXECUTE by default and on each function by name. Client roles may
-  call exactly two, the API's read-only `api_nodes` and `api_story`, and a
-  pgTAP test fails if that list changes.
+  call exactly four, and a pgTAP test fails if that list changes:
+  - the API's read-only `api_nodes` and `api_story`;
+  - `discussion_participants`, the count `api_story` calls as the caller;
+  - `api_report_location`, which can only add one to a counter.
 - **Only the service role writes news.** The ingest Worker holds the service
   key and bypasses RLS (CLAUDE.md #9). No client role can write any table yet.
 - **No precise user location, ever.** No coordinates on any user-written table.
@@ -44,19 +47,20 @@ its access rules are one change. Migrations are timestamped and forward-only.
 
 Grants and policies agree; `npm run db:test` checks both.
 
-| Table           | Signed out | Signed in                               | Writes                           |
-| --------------- | ---------- | --------------------------------------- | -------------------------------- |
-| `stories`       | read       | read                                    | service role (ingest Worker)     |
-| `articles`      | read       | read                                    | service role (ingest Worker)     |
-| `discussions`   | none       | read                                    | service role (admin, Prompt 4.6) |
-| `feature_flags` | none       | read                                    | service role                     |
-| `posts`         | none       | read if `mod_state = 'ok'`, or your own | none yet (Prompt 4.2)            |
-| `profiles`      | none       | your own row                            | none yet (Prompt 4.1)            |
-| `votes`         | none       | your own votes                          | none yet (Prompt 4.2)            |
-| `blocks`        | none       | blocks you made                         | none yet (Prompt 4.3)            |
-| `reports`       | none       | none (explicit restrictive deny)        | service role only                |
-| `story_signals` | none       | none (explicit restrictive deny)        | service role (ingest Worker)     |
-| `ingest_runs`   | none       | none (explicit restrictive deny)        | service role (ingest Worker)     |
+| Table                    | Signed out | Signed in                               | Writes                           |
+| ------------------------ | ---------- | --------------------------------------- | -------------------------------- |
+| `stories`                | read       | read                                    | service role (ingest Worker)     |
+| `articles`               | read       | read                                    | service role (ingest Worker)     |
+| `discussions`            | none       | read                                    | service role (admin, Prompt 4.6) |
+| `feature_flags`          | none       | read                                    | service role                     |
+| `posts`                  | none       | read if `mod_state = 'ok'`, or your own | none yet (Prompt 4.2)            |
+| `profiles`               | none       | your own row                            | none yet (Prompt 4.1)            |
+| `votes`                  | none       | your own votes                          | none yet (Prompt 4.2)            |
+| `blocks`                 | none       | blocks you made                         | none yet (Prompt 4.3)            |
+| `reports`                | none       | none (explicit restrictive deny)        | service role only                |
+| `story_signals`          | none       | none (explicit restrictive deny)        | service role (ingest Worker)     |
+| `ingest_runs`            | none       | none (explicit restrictive deny)        | service role (ingest Worker)     |
+| `story_location_reports` | none       | none (explicit restrictive deny)        | `api_report_location` only       |
 
 Open questions left for the prompts that own them:
 
@@ -112,6 +116,17 @@ profile and, through it, that user's posts, votes and blocks (Prompt 4.1:
 deletion that actually deletes). `tier` is the monetization hook, unused in v1.
 
 **`feature_flags`**: `key`, `enabled`, an optional `value` payload.
+
+**`story_location_reports`**: how many readers said a story's pin is in the
+wrong place (Prompt 3.3).
+
+- One row per reported story: `reports`, `first_reported_at`,
+  `last_reported_at`. A counter, not a log: no reporter, no text, no IP.
+- Written only through `api_report_location`, which adds one and saturates
+  rather than overflowing. Read by the service role (the admin correction
+  tool, Prompt 4.6), most-reported first.
+- `story_id` cascades: a report is about a pin and goes when the story is
+  pruned.
 
 ## Ingest (Prompt 2.2)
 
@@ -169,16 +184,22 @@ local development. It is generated by `scripts/seed/generate.ts` and applied by
 
 ## API (Prompt 2.3)
 
-The API Worker (`workers/api/`) serves the globe. It calls two read functions
-with the **publishable** key, so it sees exactly what a signed-out visitor
-may: both run as the caller, under RLS.
+The API Worker (`workers/api/`) serves the globe. It calls the database with
+the **publishable** key, so it sees exactly what a signed-out visitor may: the
+two reads run as the caller, under RLS, and the two `SECURITY DEFINER`
+functions (Prompt 3.3) each expose one count.
 
 - **`api_nodes(p_hours, p_limit, p_known)`:** the payload's columns, built in
   SQL (one row, so PostgREST's row cap never applies). Returns
   `{hash, payload}`, or `{hash}` alone when `p_known` is the current hash.
 - **`api_story(p_seq | p_id, p_article_limit)`:** one story in full, or null.
+- **`discussion_participants(p_story)`:** people with a visible post
+  (`mod_state = 'ok'`), each counted once. `SECURITY DEFINER`, because posts
+  are closed to signed-out readers; it returns the count and nothing else.
+- **`api_report_location(p_seq | p_id)`:** one "wrong location" report;
+  false for an unknown story. `SECURITY DEFINER`, writing only that counter.
 
-Both refuse out-of-range arguments (hours 1–720, limit 1–10,000, articles
+The reads refuse out-of-range arguments (hours 1–720, limit 1–10,000, articles
 1–5,000): safety bounds on functions any client can call. The product limits
 are the Worker's config.
 
@@ -247,9 +268,14 @@ tier); anything else is a 400.
 **`GET /api/story/:id`** (`:id` is the payload id or the UUID) returns the
 story with its `summary`, `category` (by name), heat, sentiment, times,
 `place` (name, lat, lon, `source`, `confidence`, country: the provenance
-behind "why this location"), `discussion.state`, `article_count`, and
+behind "why this location"), `discussion.state`, `discussion.participants`
+(people with a visible post, null without a discussion), `article_count`, and
 `articles` newest first (outlet, country, headline, URL, published time,
 snippet), capped at `API_STORY_ARTICLE_LIMIT` (1000). 404 when unknown.
+
+**`POST /api/story/:id/location-report`** counts one "wrong location" report:
+204, or 404 for an unknown story. No body, `no-store`, nothing about the
+reader read or kept.
 
 ## Monetization hooks (present, unused)
 
