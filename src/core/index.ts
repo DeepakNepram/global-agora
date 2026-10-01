@@ -47,6 +47,39 @@ export type { MockNodeOptions, MockStack } from './mockNodes';
 export { decodeNodes, fetchNodes, nodesUrl, NodesFetchError } from './data/nodes';
 export type { FetchLike, FetchNodesOptions, FetchNodesResult } from './data/nodes';
 export { retryDelayMs, startNodesFeed } from './data/nodesFeed';
+export {
+  fetchStory,
+  locationReportUrl,
+  parseStory,
+  reportStoryLocation,
+  safeHttpUrl,
+  storyUrl,
+  DISCUSSION_STATES,
+  PLACE_SOURCES,
+  StoryError,
+  StoryGoneError,
+} from './data/story';
+export type {
+  DiscussionState,
+  FetchStoryOptions,
+  PlaceSource,
+  StoryArticle,
+  StoryDetail,
+  StoryDiscussion,
+  StoryPlace,
+} from './data/story';
+export {
+  groupByOutlet,
+  leadOutlet,
+  nearbyStories,
+  outletName,
+  placeConfidence,
+  placeExplanation,
+  rowOfStory,
+  NEARBY_LIMIT,
+  NEARBY_MAX_KM,
+} from './story';
+export type { NearbyOptions, NearbyStory, OutletGroup, PlaceConfidence } from './story';
 
 // The cluster engine (./cluster/engine) is deliberately absent: it pulls in
 // supercluster, which belongs in the worker chunk. The worker imports it directly.
