@@ -37,6 +37,18 @@ describe('summariseBloom', () => {
     });
   });
 
+  it('counts a frame as slower than 60 fps only past vsync jitter', () => {
+    const at = [0, 16.6, 33.9, 50.6, 69.5, 86.2, 119.6];
+    const summary = summariseBloom([
+      {
+        window: { startMs: 0, endMs: 200, moving: 1, planMs: 0 },
+        capture: { frames: at.map((atMs) => ({ atMs, cpuMs: 1 })), gpu: [] },
+      },
+    ]);
+    // 17.3 ms is a 60 Hz display's jitter; 18.9 ms and 33.4 ms missed a vsync.
+    expect(summary.slowerThan60fps).toBe(2);
+  });
+
   it('reports nothing measured rather than zeros for no frames', () => {
     const summary = summariseBloom([]);
     expect(summary.frames).toBe(0);

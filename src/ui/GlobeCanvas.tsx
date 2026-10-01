@@ -155,6 +155,7 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
           presentLog={presentLog}
           controls={controls}
           reducedMotionPreferred={reducedMotionPreferred}
+          historyHours={historyWindowHours}
         />
       )}
     </div>

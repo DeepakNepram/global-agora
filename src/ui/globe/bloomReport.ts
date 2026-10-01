@@ -22,7 +22,7 @@ export interface BloomStats {
   readonly intervalP50Ms: number | null;
   readonly intervalP95Ms: number | null;
   readonly intervalMaxMs: number | null;
-  /** Frames that took longer than a 60 fps frame (16.7 ms) to follow the previous one. */
+  /** Frames that followed the previous one later than a 60 fps frame (16.7 ms) plus vsync jitter. */
   readonly slowerThan60fps: number;
   readonly cpuP50Ms: number | null;
   readonly cpuP95Ms: number | null;
@@ -34,6 +34,12 @@ export interface BloomStats {
 }
 
 const SIXTY_FPS_MS = 1000 / 60;
+/**
+ * A display paced at 60 Hz spaces frames 16.6–17.3 ms apart (vsync jitter);
+ * only a frame later than that, a missed vsync at 60 Hz, is slower than 60 fps.
+ * At 144 Hz pacing (3.1's runs) nothing comes near either line.
+ */
+const VSYNC_JITTER_MS = 2;
 /** GPU queries resolve a few frames late; results this long after a window still belong to it. */
 const GPU_LAG_MS = 60;
 
@@ -84,7 +90,8 @@ export function summariseBloom(
     intervalP50Ms,
     intervalP95Ms,
     intervalMaxMs,
-    slowerThan60fps: intervals.filter((interval) => interval > SIXTY_FPS_MS).length,
+    slowerThan60fps: intervals.filter((interval) => interval > SIXTY_FPS_MS + VSYNC_JITTER_MS)
+      .length,
     cpuP50Ms,
     cpuP95Ms,
     cpuMaxMs,
@@ -99,6 +106,8 @@ export function summariseBloom(
 export interface PresentLog {
   readonly count: number;
   push(report: PresentReport): void;
+  /** Every report after the first `since`. */
+  since(since: number): readonly PresentReport[];
   /** The first report after the first `since` that matches, or null after `timeoutMs`. */
   next(
     since: number,
@@ -117,6 +126,9 @@ export function createPresentLog(): PresentLog {
     },
     push(report) {
       reports.push(report);
+    },
+    since(since) {
+      return reports.slice(since);
     },
     async next(since, match, timeoutMs) {
       for (let waited = 0; waited <= timeoutMs; waited += POLL_MS) {

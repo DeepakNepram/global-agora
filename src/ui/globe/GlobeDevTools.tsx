@@ -13,6 +13,7 @@ import { GlobeDebugPanel } from './GlobeDebugPanel';
 import { PinBenchmark } from './PinBenchmark';
 import { PinDebugControls } from './PinDebugControls';
 import { RenderDebugControls } from './RenderDebugControls';
+import { ScrubBenchmark } from './ScrubBenchmark';
 import { TierDebugControls } from './TierDebugControls';
 import type { DevSettings } from './useDevSettings';
 
@@ -24,6 +25,8 @@ export interface GlobeDevToolsProps {
   readonly presentLog: PresentLog | null;
   readonly controls: OrbitGlobeControls | null;
   readonly reducedMotionPreferred: boolean;
+  /** AppConfig.historyWindowHours, for the scrub benchmark. */
+  readonly historyHours: number;
 }
 
 /**
@@ -33,6 +36,7 @@ export interface GlobeDevToolsProps {
  */
 export function GlobeDevTools(props: GlobeDevToolsProps): JSX.Element {
   const { dev, tier, settings, probe, presentLog, controls, reducedMotionPreferred } = props;
+  const { historyHours } = props;
 
   return (
     <>
@@ -77,6 +81,22 @@ export function GlobeDevTools(props: GlobeDevToolsProps): JSX.Element {
             log={presentLog}
             tier={tier}
             controls={controls}
+            pinSource={dev.pinSource}
+            clustering={dev.clustering}
+            fullMotion={dev.fullMotion}
+            onPinSourceChange={dev.setPinSource}
+            onClusteringChange={dev.setClustering}
+            onFullMotionChange={dev.setFullMotion}
+            onRunningChange={dev.setBenchmarking}
+          />
+        )}
+        {probe && presentLog && (
+          <ScrubBenchmark
+            probe={probe}
+            log={presentLog}
+            tier={tier}
+            controls={controls}
+            historyHours={historyHours}
             pinSource={dev.pinSource}
             clustering={dev.clustering}
             fullMotion={dev.fullMotion}
