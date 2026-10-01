@@ -243,14 +243,16 @@ async function send(url: string, init: RequestInit, fetchFn: FetchLike): Promise
 }
 
 /**
- * Loads one story. The browser's HTTP cache honours the API's max-age and
- * revalidates with its ETag, so re-asking for an open story (the participant
- * count) is a cache hit or a bodiless 304 until it changes.
+ * Loads one story. Always revalidated (`no-cache`): the API's
+ * stale-while-revalidate is meant for the edge, and a browser honouring it
+ * would show a participant count up to 15 minutes old. Revalidating costs a
+ * bodiless 304 while nothing changed, and the edge answers from its own cache.
  */
 export async function fetchStory(options: FetchStoryOptions): Promise<StoryDetail> {
   const response = await send(
     storyUrl(options.baseUrl, options.id),
     {
+      cache: 'no-cache',
       headers: { accept: 'application/json' },
       ...(options.signal === undefined ? {} : { signal: options.signal }),
     },

@@ -135,12 +135,13 @@ describe('fetchStory', () => {
     const story = await fetchStory({
       baseUrl: '/api/',
       id: 7,
-      fetch: async (url) => {
-        asked.push(url);
+      fetch: async (url, init) => {
+        asked.push(`${url} ${init?.cache}`);
         return new Response(JSON.stringify(storyJson()));
       },
     });
-    expect(asked).toEqual(['/api/story/7']);
+    // Revalidated every time, so a stale-while-revalidate copy never lingers.
+    expect(asked).toEqual(['/api/story/7 no-cache']);
     expect(story.title).toBe('Vote nears in London');
   });
 
