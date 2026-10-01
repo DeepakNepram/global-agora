@@ -1,5 +1,7 @@
 import type { OrbitGlobeControls, PointerInput } from '@/globe';
 
+import { createTapTracker } from './tapGesture';
+
 /** Pixels per wheel line in deltaMode 1 (Firefox with a mouse wheel). */
 const LINE_PX = 16;
 
@@ -19,6 +21,17 @@ const NUDGES: Readonly<Record<string, readonly [east: number, north: number]>> =
 
 const ZOOM_IN_KEYS = new Set(['+', '=']);
 const ZOOM_OUT_KEYS = new Set(['-', '_']);
+const ACTIVATE_KEYS = new Set(['Enter', ' ']);
+
+/** What the globe does with a tap and its keys beyond moving the camera. */
+export interface GlobeInputHandlers {
+  /** A tap (see tapGesture.ts), in CSS pixels from the canvas's top left. */
+  onTap(x: number, y: number): void;
+  /** Enter or Space on the focused globe, with the view's centre. */
+  onActivate(x: number, y: number): void;
+  /** Escape on the focused globe. Returns true if it closed something. */
+  onEscape(): boolean;
+}
 
 /**
  * The DOM half of the camera controls: translates pointer, wheel and key
@@ -27,9 +40,16 @@ const ZOOM_OUT_KEYS = new Set(['-', '_']);
  *
  * Keys are bound to the element, not the window, so arrows and +/- only move
  * the globe while it has focus and never fight the time slider or page scroll.
+ * Taps, Enter and Escape go to `handlers`: the camera never sees a tap as
+ * anything but a press that did not move.
  */
-export function bindControlInput(element: HTMLElement, controls: OrbitGlobeControls): () => void {
+export function bindControlInput(
+  element: HTMLElement,
+  controls: OrbitGlobeControls,
+  handlers: GlobeInputHandlers | null = null,
+): () => void {
   let rect = element.getBoundingClientRect();
+  const taps = createTapTracker();
 
   const toInput = (event: PointerEvent): PointerInput => ({
     id: event.pointerId,
@@ -42,7 +62,11 @@ export function bindControlInput(element: HTMLElement, controls: OrbitGlobeContr
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     rect = element.getBoundingClientRect();
     element.setPointerCapture(event.pointerId);
-    controls.pointerDown(toInput(event));
+    // Read before the press stops the motion: stopping a spin is not a tap.
+    const { mode } = controls.getTelemetry();
+    const input = toInput(event);
+    taps.down(input.id, input.x, input.y, input.timeMs, mode === 'inertia' || mode === 'flight');
+    controls.pointerDown(input);
   };
 
   const onPointerMove = (event: PointerEvent): void => {
@@ -51,12 +75,21 @@ export function bindControlInput(element: HTMLElement, controls: OrbitGlobeContr
     const samples = event.getCoalescedEvents?.() ?? [];
     if (samples.length === 0) controls.pointerMove(toInput(event));
     for (const sample of samples) controls.pointerMove(toInput(sample));
+    const input = toInput(event);
+    taps.move(input.id, input.x, input.y);
   };
 
-  const onPointerUp = (event: PointerEvent): void => controls.pointerUp(toInput(event));
+  const onPointerUp = (event: PointerEvent): void => {
+    const input = toInput(event);
+    controls.pointerUp(input);
+    if (taps.up(input.id, input.x, input.y, input.timeMs)) handlers?.onTap(input.x, input.y);
+  };
   // Controls ignore ids they are not tracking, so a lostpointercapture after a
   // normal pointerup is harmless.
-  const onPointerCancel = (event: PointerEvent): void => controls.pointerCancel(toInput(event));
+  const onPointerCancel = (event: PointerEvent): void => {
+    taps.cancel(event.pointerId);
+    controls.pointerCancel(toInput(event));
+  };
 
   const onWheel = (event: WheelEvent): void => {
     event.preventDefault();
@@ -73,11 +106,16 @@ export function bindControlInput(element: HTMLElement, controls: OrbitGlobeContr
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.target !== element || event.metaKey || event.ctrlKey || event.altKey) return;
     const nudge = NUDGES[event.key];
+    let handled = true;
     if (nudge) controls.nudge(nudge[0], nudge[1]);
     else if (ZOOM_IN_KEYS.has(event.key)) controls.zoomStep('in');
     else if (ZOOM_OUT_KEYS.has(event.key)) controls.zoomStep('out');
-    else return;
-    event.preventDefault();
+    else if (ACTIVATE_KEYS.has(event.key) && handlers) {
+      rect = element.getBoundingClientRect();
+      handlers.onActivate(rect.width / 2, rect.height / 2);
+    } else handled = event.key === 'Escape' && handlers !== null && handlers.onEscape();
+    // Space would otherwise scroll the page.
+    if (handled) event.preventDefault();
   };
 
   element.addEventListener('pointerdown', onPointerDown);

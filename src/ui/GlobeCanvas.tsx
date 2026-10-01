@@ -9,9 +9,12 @@ import { createPresentLog } from './globe/bloomReport';
 import { ControlsHost, PipelineHost } from './globe/canvasHosts';
 import { createFrameProbe } from './globe/frameProbe';
 import { GlobeDevTools } from './globe/GlobeDevTools';
+import { GlobeReticle } from './globe/GlobeReticle';
 import { GlobeScene } from './globe/GlobeScene';
+import { createPinPicker } from './globe/pinPicker';
 import { PinScene } from './globe/PinScene';
 import { useDevSettings } from './globe/useDevSettings';
+import { useGlobeSelection } from './globe/useGlobeSelection';
 import { useLiveClock } from './globe/useLiveClock';
 import { usePinNodes } from './globe/usePinNodes';
 import { usePrefersReducedMotion } from './globe/usePrefersReducedMotion';
@@ -35,7 +38,8 @@ const CAMERA = { fov: CAMERA_FOV_DEG } as const;
 
 const GLOBE_LABEL =
   'Globe of Earth with news stories as pins, grouped into numbered clusters that open as you zoom in. ' +
-  'Drag to rotate, scroll or pinch to zoom. When focused, arrow keys rotate and plus or minus zoom.';
+  'Drag to rotate, scroll or pinch to zoom, tap a pin to read its story. When focused, arrow keys ' +
+  'rotate, plus or minus zoom, and Enter opens the story nearest the centre.';
 
 /**
  * The one <Canvas> in the app.
@@ -60,6 +64,8 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
   const reducedMotionPreferred = usePrefersReducedMotion();
   const pinNodes = usePinNodes(dev.pinSource, historyWindowHours);
   const motion = reducedMotionPreferred && !dev.fullMotion ? 'reduced' : 'full';
+  const picker = useMemo(() => createPinPicker(), []);
+  const selection = useGlobeSelection(controls, picker);
   useLiveClock();
 
   // Timing is dev tooling; production draws without queries or bookkeeping.
@@ -107,7 +113,7 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
         aria-label={GLOBE_LABEL}
         tabIndex={0}
         style={{ touchAction: 'none' }}
-        className="focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        className="peer focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         fallback={
           <p className="p-6 text-sm text-muted">
             This globe needs WebGL, which is unavailable in this browser.
@@ -128,11 +134,14 @@ export function GlobeCanvas({ tier, historyWindowHours }: GlobeCanvasProps): JSX
           visible={dev.pinsVisible}
           motion={motion}
           clustering={dev.clustering}
+          picker={picker}
           {...(presentLog ? { onPresent: presentLog.push } : {})}
         />
-        <ControlsHost motion={motion} onReady={setControls} />
+        <ControlsHost motion={motion} onReady={setControls} input={selection.input} />
         <PipelineHost settings={settings} bloomEnabled={dev.bloomEnabled} probe={probe} />
       </Canvas>
+      {/* Straight after the canvas: it shows on the canvas's focus-visible (CSS peer). */}
+      <GlobeReticle message={selection.message} />
 
       {!settings.postprocessing && (
         // LOW has no composer; a CSS vignette matching VignetteEffect costs no GPU pass.

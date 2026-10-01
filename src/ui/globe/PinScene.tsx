@@ -13,9 +13,10 @@ import {
   type PinLayer,
   type PresentResult,
 } from '@/globe';
-import { monotonicNowMs, timeStore } from '@/state';
+import { monotonicNowMs, ringedStory, storyStore, timeStore } from '@/state';
 
 import { createBadgeAtlas } from './badgeAtlas';
+import type { PinPicker } from './pinPicker';
 import { useClusterFeed } from './useClusterFeed';
 
 export interface PresentReport extends PresentResult {
@@ -37,6 +38,8 @@ export interface PinSceneProps {
   readonly clustering: boolean;
   /** Dev tooling: told about every layout presented. */
   readonly onPresent?: (report: PresentReport) => void;
+  /** Receives the layer's pick function, for taps outside the canvas. */
+  readonly picker?: PinPicker;
 }
 
 /**
@@ -48,8 +51,9 @@ export interface PinSceneProps {
  * render-on-demand idles as before.
  */
 export function PinScene(props: PinSceneProps): JSX.Element | null {
-  const { nodes, sourceKey, visible, motion, clustering, onPresent } = props;
+  const { nodes, sourceKey, visible, motion, clustering, onPresent, picker } = props;
   const gl = useThree((state) => state.gl);
+  const get = useThree((state) => state.get);
   const invalidate = useThree((state) => state.invalidate);
   const width = useThree((state) => state.size.width);
   const height = useThree((state) => state.size.height);
@@ -171,6 +175,37 @@ export function PinScene(props: PinSceneProps): JSX.Element | null {
     layer.setVisible(visible);
     invalidate();
   }, [layer, visible, invalidate]);
+
+  useEffect(() => {
+    if (!layer || !picker) return;
+    picker.attach(
+      (x, y, radiusPx) => {
+        const { camera, size } = get();
+        const startMs = monotonicNowMs();
+        const hit = layer.pick(x, y, camera, size, radiusPx);
+        // Dev builds time each pick; DevTools shows it under User Timing.
+        if (import.meta.env.DEV) {
+          performance.measure('agora:pick', { start: startMs, end: monotonicNowMs() });
+        }
+        return hit;
+      },
+      () => get().size,
+    );
+    return () => picker.attach(null, null);
+  }, [layer, picker, get]);
+
+  useEffect(() => {
+    if (!layer) return;
+    const ring = (id: number | null): void => {
+      layer.setSelected(id);
+      invalidate();
+    };
+    ring(ringedStory(storyStore.getState()));
+    return storyStore.subscribe((state, previous) => {
+      const id = ringedStory(state);
+      if (id !== ringedStory(previous)) ring(id);
+    });
+  }, [layer, invalidate]);
 
   useFrame((state, delta) => {
     // The camera always looks at the globe's centre, so its distance is its altitude.

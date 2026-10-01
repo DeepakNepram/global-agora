@@ -1,5 +1,5 @@
 import { useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PerspectiveCamera } from 'three';
 
 import {
@@ -10,7 +10,7 @@ import {
   type OrbitGlobeControls,
 } from '@/globe';
 
-import { bindControlInput } from './bindControlInput';
+import { bindControlInput, type GlobeInputHandlers } from './bindControlInput';
 
 /**
  * Before scene updates (priority 0) and the render (priority 1): the frame is
@@ -22,6 +22,8 @@ export interface GlobeControlsOptions {
   readonly motion: MotionPreference;
   /** Receives the controls once created, and null when they are torn down. */
   readonly onReady: (controls: OrbitGlobeControls | null) => void;
+  /** Taps, Enter and Escape on the globe; may change without re-binding input. */
+  readonly input?: GlobeInputHandlers;
 }
 
 /**
@@ -29,7 +31,7 @@ export interface GlobeControlsOptions {
  * Frames are demand-driven: input and API calls request one through
  * `invalidate`, and each frame asks for the next only while motion continues.
  */
-export function useGlobeControls({ motion, onReady }: GlobeControlsOptions): void {
+export function useGlobeControls({ motion, onReady, input }: GlobeControlsOptions): void {
   const camera = useThree((state) => state.camera);
   const invalidate = useThree((state) => state.invalidate);
   const get = useThree((state) => state.get);
@@ -37,6 +39,11 @@ export function useGlobeControls({ motion, onReady }: GlobeControlsOptions): voi
   const width = useThree((state) => state.size.width);
   const height = useThree((state) => state.size.height);
   const [controls, setControls] = useState<OrbitGlobeControls | null>(null);
+  const inputRef = useRef(input);
+
+  useEffect(() => {
+    inputRef.current = input;
+  }, [input]);
 
   useEffect(() => {
     if (!(camera instanceof PerspectiveCamera)) return;
@@ -70,7 +77,12 @@ export function useGlobeControls({ motion, onReady }: GlobeControlsOptions): voi
 
   useEffect(() => {
     if (!controls || !(eventTarget instanceof HTMLElement)) return;
-    return bindControlInput(eventTarget, controls);
+    // Through the ref, so new handlers never re-bind (and reset) a gesture.
+    return bindControlInput(eventTarget, controls, {
+      onTap: (x, y) => inputRef.current?.onTap(x, y),
+      onActivate: (x, y) => inputRef.current?.onActivate(x, y),
+      onEscape: () => inputRef.current?.onEscape() ?? false,
+    });
   }, [controls, eventTarget]);
 
   useFrame((_state, delta) => {
