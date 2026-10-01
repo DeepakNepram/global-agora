@@ -172,6 +172,30 @@ export {
 } from './data/outlets';
 export type { OutletsIndex, OutletStories } from './data/outlets';
 
+export { categoryAt, isNewsCategory, CATEGORY_LABELS } from './categories';
+export {
+  indexOutlets,
+  indexPlaces,
+  indexStories,
+  matchTier,
+  normalizeSearch,
+  resultCount,
+  search,
+  MIN_QUERY_LENGTH,
+  NO_RESULTS,
+  SEARCH_LIMITS,
+} from './search';
+export type {
+  OutletResult,
+  PlaceResult,
+  SearchEntry,
+  SearchResults,
+  SearchSources,
+  StoryIndex,
+  StoryResult,
+  TopicResult,
+} from './search';
+
 export { createFrameStats, percentile } from './frameStats';
 export type { FrameStats, FrameSummary } from './frameStats';
 
