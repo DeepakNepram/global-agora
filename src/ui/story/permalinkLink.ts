@@ -4,20 +4,22 @@ import {
   encodePermalink,
   historyRange,
   isEmptyPermalink,
+  withFilters,
   withoutPermalink,
   type CameraView,
   type Permalink,
 } from '@/core';
-import { storyStore, timeStore, wallClockNow } from '@/state';
+import { filterStore, storyStore, timeStore, wallClockNow } from '@/state';
 
 /** The app's own address: share links point here, whatever path they were copied from. */
 export function appBaseUrl(): string {
   return `${window.location.origin}${import.meta.env.BASE_URL}`;
 }
 
-/** The link for this view: the camera, the displayed instant and the open story. */
+/** The link for this view: the camera, the displayed instant, the open story and the filters. */
 export function shareUrl(story: number, camera: CameraView | null, timeMs: number): string {
-  return encodePermalink(appBaseUrl(), { story, camera, timeMs });
+  const url = new URL(encodePermalink(appBaseUrl(), { story, camera, timeMs }));
+  return `${url.origin}${url.pathname}${withFilters(url.search, filterStore.getState().filter)}`;
 }
 
 /** False when the browser refuses (no permission, an insecure origin). */

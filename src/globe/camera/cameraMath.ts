@@ -80,6 +80,33 @@ export function fitAltitudeKm(aspect: number): number {
   return (distance - GLOBE_RADIUS) * EARTH_RADIUS_KM;
 }
 
+/** The share of the field of view a framed region may fill, leaving a margin. */
+export const FRAME_FILL = 0.85;
+
+/**
+ * The height from which a region reaching `radiusDeg` of arc from the view's
+ * centre fills FRAME_FILL of the narrower half of the field of view (a
+ * country flown to from search). A point θ from the centre, seen from
+ * distance d (globe radii) with the camera on the centre, is
+ *   tan α = sin θ / (d − cos θ)   off the view axis, so
+ *   d = cos θ + sin θ / tan(FRAME_FILL · φ)
+ * where φ is the narrower half-angle: vertical, or atan(tan(vertical) ·
+ * aspect) on a portrait screen. Never closer than MIN_ALTITUDE_KM nor farther
+ * than the world view.
+ */
+export function altitudeToShowKm(
+  radiusDeg: number,
+  aspect: number,
+  fovDeg: number = CAMERA_FOV_DEG,
+): number {
+  const vertical = degToRad(fovDeg) / 2;
+  const half = Math.min(vertical, Math.atan(Math.tan(vertical) * Math.max(aspect, 1e-3)));
+  const theta = degToRad(Math.min(Math.max(radiusDeg, 0), 90));
+  const distance = Math.cos(theta) + Math.sin(theta) / Math.tan(FRAME_FILL * half);
+  const altitude = (distance - GLOBE_RADIUS) * EARTH_RADIUS_KM;
+  return Math.min(fitAltitudeKm(aspect), Math.max(MIN_ALTITUDE_KM, altitude));
+}
+
 export function maxAltitudeKm(aspect: number): number {
   return fitAltitudeKm(aspect) * MAX_ALTITUDE_FIT_MULTIPLE;
 }

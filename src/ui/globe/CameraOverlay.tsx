@@ -58,7 +58,7 @@ export function CameraOverlay({ controls }: CameraOverlayProps): JSX.Element {
   return (
     <section
       aria-label="Camera"
-      className="absolute left-4 top-4 w-56 rounded-lg bg-void/80 p-3 font-mono text-[11px] text-ink backdrop-blur"
+      className="absolute left-4 top-28 w-56 rounded-lg bg-void/80 p-3 font-mono text-[11px] text-ink backdrop-blur"
     >
       <p className="mb-1 uppercase tracking-wide text-muted">Camera · {telemetry.mode}</p>
       {/* aria-live off: a 10Hz readout would drown a screen reader. */}

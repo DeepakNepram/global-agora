@@ -25,6 +25,7 @@ export {
   CAMERA_FOV_DEG,
   MAX_LATITUDE_DEG,
   MIN_ALTITUDE_KM,
+  altitudeToShowKm,
   fitAltitudeKm,
   type CameraPose,
 } from './camera/cameraMath';
@@ -49,7 +50,7 @@ export {
   type PresentResult,
 } from './pins/pinLayer';
 export { ACTIVATE_RADIUS_CSS_PX, PICK_RADIUS_CSS_PX, type PinPick } from './pins/pinPick';
-export { PIN_HALF_SIZE_CSS_PX } from './pins/pinStyle';
+export { CATEGORY_HUES, PIN_HALF_SIZE_CSS_PX } from './pins/pinStyle';
 export { BADGE_CELL_ASPECT, BADGE_GLYPHS } from './pins/badgeGlyphs';
 export { BLOOM_SETTLE_SECONDS, bloomSeconds } from './pins/bloom';
 export {

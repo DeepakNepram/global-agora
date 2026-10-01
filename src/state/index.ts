@@ -79,4 +79,11 @@ export {
   type ReportedState,
   type ReportedStore,
 } from './reportedStore';
+export {
+  createFilterStore,
+  filterStore,
+  useFilterStore,
+  type FilterState,
+  type FilterStore,
+} from './filterStore';
 export type { KeyValueStorage } from './persist';

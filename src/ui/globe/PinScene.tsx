@@ -13,7 +13,7 @@ import {
   type PinLayer,
   type PresentResult,
 } from '@/globe';
-import { monotonicNowMs, ringedStory, storyStore, timeStore } from '@/state';
+import { filterStore, monotonicNowMs, ringedStory, storyStore, timeStore } from '@/state';
 
 import { createBadgeAtlas } from './badgeAtlas';
 import type { PinPicker } from './pinPicker';
@@ -204,6 +204,18 @@ export function PinScene(props: PinSceneProps): JSX.Element | null {
     return storyStore.subscribe((state, previous) => {
       const id = ringedStory(state);
       if (id !== ringedStory(previous)) ring(id);
+    });
+  }, [layer, invalidate]);
+
+  // Filters dim and shrink what they leave out; the layer cross-fades the change.
+  useEffect(() => {
+    if (!layer) return;
+    layer.setFilter(filterStore.getState().filter);
+    invalidate();
+    return filterStore.subscribe((state, previous) => {
+      if (state.filter === previous.filter) return;
+      layer.setFilter(state.filter);
+      invalidate();
     });
   }, [layer, invalidate]);
 

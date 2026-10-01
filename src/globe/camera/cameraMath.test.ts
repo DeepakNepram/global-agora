@@ -5,7 +5,9 @@ import { EARTH_RADIUS_KM, GLOBE_RADIUS, kmToWorld } from '@/core';
 
 import {
   CAMERA_FOV_DEG,
+  FRAME_FILL,
   MIN_ALTITUDE_KM,
+  altitudeToShowKm,
   clipPlanes,
   fitAltitudeKm,
   maxAltitudeKm,
@@ -88,5 +90,32 @@ describe('clip planes', () => {
       // 24-bit depth is comfortable well below a 1:10^4 range.
       expect(far / near).toBeLessThan(1e4);
     }
+  });
+});
+
+describe('altitudeToShowKm', () => {
+  it('frames a small country close and a large one far, never past the world view', () => {
+    const uk = altitudeToShowKm(4.9, 16 / 9);
+    const usa = altitudeToShowKm(23.1, 16 / 9);
+    expect(uk).toBeGreaterThan(MIN_ALTITUDE_KM);
+    expect(usa).toBeGreaterThan(uk);
+    expect(altitudeToShowKm(90, 16 / 9)).toBeLessThanOrEqual(fitAltitudeKm(16 / 9));
+    expect(altitudeToShowKm(0, 16 / 9)).toBe(MIN_ALTITUDE_KM);
+  });
+
+  it("puts the region's edge at FRAME_FILL of the narrower half-angle", () => {
+    for (const aspect of [16 / 9, 9 / 19.5]) {
+      const radiusDeg = 6;
+      const d = 1 + altitudeToShowKm(radiusDeg, aspect) / EARTH_RADIUS_KM;
+      const theta = (radiusDeg * Math.PI) / 180;
+      const alpha = Math.atan(Math.sin(theta) / (d - Math.cos(theta)));
+      const vertical = ((CAMERA_FOV_DEG / 2) * Math.PI) / 180;
+      const half = Math.min(vertical, Math.atan(Math.tan(vertical) * aspect));
+      expect(alpha).toBeCloseTo(FRAME_FILL * half, 6);
+    }
+  });
+
+  it('backs off on a portrait screen', () => {
+    expect(altitudeToShowKm(10, 9 / 19.5)).toBeGreaterThan(altitudeToShowKm(10, 16 / 9));
   });
 });

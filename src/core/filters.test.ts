@@ -143,6 +143,15 @@ describe('withFilters', () => {
     expect(withFilters('?cats=tech', NO_FILTER)).toBe('');
   });
 
+  it('keeps the other fields exactly as written', () => {
+    expect(
+      withFilters('?story=5&cam=51.5,-0.1,833&t=20261001T120000Z', {
+        categories: ['climate'],
+        withinHours: 6,
+      }),
+    ).toBe('?story=5&cam=51.5,-0.1,833&t=20261001T120000Z&cats=climate&within=6');
+  });
+
   it('round-trips', () => {
     const filter: StoryFilter = { categories: ['world', 'health'], withinHours: 3 };
     expect(decodeFilters(withFilters('', filter), 24)).toEqual(filter);

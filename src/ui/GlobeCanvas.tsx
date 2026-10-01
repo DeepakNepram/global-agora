@@ -20,6 +20,7 @@ import { useLiveClock } from './globe/useLiveClock';
 import { usePinNodes } from './globe/usePinNodes';
 import { usePrefersReducedMotion } from './globe/usePrefersReducedMotion';
 import { vignetteCssGradient } from './globe/vignette';
+import { NavLayer } from './nav/NavLayer';
 import { TimeDriver } from './scrubber/TimeDriver';
 import { TimeScrubber } from './scrubber/TimeScrubber';
 import { useOpenPermalink } from './story/permalinkLink';
@@ -170,6 +171,13 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
         />
       )}
 
+      <NavLayer
+        nodes={pinNodes}
+        controls={controls}
+        picker={picker}
+        apiBaseUrl={apiBaseUrl}
+        historyHours={historyWindowHours}
+      />
       <TimeScrubber nodes={pinNodes} historyHours={historyWindowHours} hidden={sheetOpen} />
       <StoryLayer
         nodes={pinNodes}

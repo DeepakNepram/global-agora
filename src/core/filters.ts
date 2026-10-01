@@ -114,11 +114,13 @@ export function decodeFilters(search: string, historyHours: number): StoryFilter
  * default) and every other field kept, "" when nothing is left.
  */
 export function withFilters(search: string, filter: StoryFilter): string {
-  const params = new URLSearchParams(search);
-  params.delete(FILTER_PARAMS.categories);
-  params.delete(FILTER_PARAMS.within);
-  // Written by hand: URLSearchParams would escape the commas.
-  const parts = params.toString() === '' ? [] : [params.toString()];
+  const ours: readonly string[] = [FILTER_PARAMS.categories, FILTER_PARAMS.within];
+  // The other fields are kept as written, and these written by hand:
+  // URLSearchParams would escape the commas here and in a permalink's camera.
+  const parts = search
+    .replace(/^\?/, '')
+    .split('&')
+    .filter((part) => part !== '' && !ours.includes(decodeURIComponent(part.split('=')[0] ?? '')));
   if (filter.categories.length > 0) {
     parts.push(`${FILTER_PARAMS.categories}=${filter.categories.join(',')}`);
   }
