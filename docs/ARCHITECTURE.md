@@ -57,6 +57,12 @@ browser <──Brotli, ETag, SWR── API Worker <─────────�
    the pin shader ages every story against `uNow`, so visibility and
    brightness follow the scrubbed instant. While a drag or Play moves the
    time, the clusters open into pins and fold back when it rests.
+6. A tap is picked on the CPU against the last layout
+   (`src/globe/pins/pinPick.ts`, Prompt 3.3) and opens the story sheet
+   (`src/ui/story/`). The card fills at once from the payload, then from
+   `GET /api/story/:id`, revalidated on every ask. Share copies a permalink
+   (`src/core/permalink.ts`) of the camera, the instant and the story, and a
+   page opened with one starts on that view.
 
 The wire format is defined once, in `src/core/data/payload.ts`, and both the
 Worker and the client validate against it.
@@ -68,6 +74,7 @@ Worker and the client validate against it.
 - Animations are springs the vertex shader evaluates; the CPU writes a
   transition once, not every frame.
 - Time is a uniform: scrubbing never rewrites per-pin data.
+- Selection is a uniform too: one slot index the shader rings.
 - Render on demand: stop the loop when nothing is moving.
 - Frame-rate-independent smoothing only — see `src/globe/smoothing.ts`.
 

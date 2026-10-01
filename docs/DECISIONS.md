@@ -6,6 +6,152 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-10-01 — Story UI: picking on the CPU, one spring for the sheet, links that carry the view
+
+Prompt 3.3 adds the peek card, the full sheet, Save, Share and Discuss.
+
+**A tap is picked on the CPU, once per tap.** The GPU knows where it drew each
+pin, but asking would mean a read-back that stalls a frame. Instead the pin
+layer projects the last layout's rows to CSS pixels
+(`src/globe/pins/pinPick.ts`) and takes the nearest one within a 44 px target.
+
+- **It skips what is not drawn:** hidden rows, the far side of the globe and
+  stories not yet published at the displayed instant.
+- **Petals** add their sunflower offset, and an orb reaches as far as its disc.
+- **It picks where the layout puts a row,** not where a spring has it
+  mid-flight, so a tap during a 0.5 s bloom picks where things are going.
+- **Measured:** 0.1–0.5 ms per pick with 3,000 stories, clustered or not.
+- **What a tap does:** a story opens its peek card; a cluster flies the camera
+  two levels deeper, so it blooms (a stack takes two taps to reach its
+  sunflower); empty globe closes a peek card. A press that stops a spinning
+  globe only stops it.
+- **Keyboard:** while the globe has focus, a reticle marks the centre and
+  Enter opens the nearest story within 48 px, or announces that there is none.
+
+**The open story wears a ring,** drawn by the pin shader for one slot: a
+uniform holding the slot, matched against `gl_InstanceID` (three compiles
+these shaders as GLSL ES 3.00). A story folded into a cluster rings its orb.
+Nothing animates, so render-on-demand stays idle.
+
+**One sheet, three stops.** Closed, peek (a third of the globe's area, at
+least 208 px so the card fits a short landscape screen) and full (90 %).
+
+- **Motion:** a critically damped spring, `x = to + (Δ + (v₀ + ωΔ)τ)e^(−ωτ)`
+  with ω = 28.9 /s, lands within 0.1 % in the prompt's 320 ms and then
+  exactly. It is closed form, so it is frame-rate independent.
+- **A flick cannot overshoot:** a critically damped spring crosses its target
+  once if it starts moving toward it faster than ω·|Δ|, so the release
+  velocity is capped there.
+- **Dragging:** the transform is written from requestAnimationFrame, so a drag
+  or a spring costs no React render. A release rests at the stop nearest to
+  where its velocity would carry the sheet in 150 ms. In peek the whole card
+  drags; full, only the header does, and the rest scrolls.
+- **Not `visibility: hidden` before it is measured:** the global
+  reduced-motion rule makes every change a 0.01 ms transition, and an element
+  "hidden" for that instant cannot take the focus it is given on opening.
+  The sheet waits below the edge with a transform instead.
+- **Keyboard and screen readers:** a non-modal dialog named by its headline.
+  The headline takes focus on opening; the grabber is an Expand/Collapse
+  button; Escape steps down; closing hands focus back to the globe. The closed
+  sheet, and the details of a folded one, are inert.
+- **No backdrop blur,** as for the scrubber: the sheet is opaque.
+
+**The scrubber steps aside while a sheet is open.** Both live on the bottom
+edge, and a third of a phone screen cannot hold both.
+
+**What fills the card:**
+
+- **At once, from the payload:** headline, place, sources, time.
+- **About 100 ms later, from `GET /api/story/:id`:** the outlet, the discussion
+  state and its participants, and the full sheet's content.
+- **The outlet** is the one whose headline titles the story (ingest titles a
+  story with its lead write-up), else the earliest article.
+- **The summary** shows only when there is one: GDELT stories have none.
+- **"Why this location"** says who placed the pin and how surely, in words:
+  ingest's `place_conf` is precision × agreement (a city named by every
+  report is 80), so 60 and up reads "High confidence", 35 and up "Medium".
+- **Article links** must be http(s) (checked again on the client), open in a
+  new tab and send no referrer.
+- **Nearby:** the five nearest stories within 1,000 km, published by the
+  displayed instant.
+- **Dev mock pins** fetch nothing: their ids are fake and collide with real
+  ones.
+
+**Discuss is never hidden (your call on the count).**
+
+- **Open:** "Discuss · N taking part", where N is the people with a visible post. A
+  `SECURITY DEFINER` function returns that count alone, since posts are
+  closed to signed-out readers. An open card re-asks every 30 s.
+- **Otherwise:** greyed, `aria-disabled` but still focusable, so a screen reader
+  hears "Discussion not open yet" ("Discussion closed" once closed).
+- **Its click is a stub** until Prompt 4.5 builds the discussion view. No
+  discussion can open before then.
+- **On a phone,** Save and Share become 44 px icons (their names stay in the
+  accessible name) so Discuss has room for its reason.
+
+**A story is always revalidated.** The API's `stale-while-revalidate=900` is
+meant for the edge, but Chrome honours it too: it kept serving a story up to
+15 minutes old, participant count included. `fetchStory` asks with
+`no-cache`: a bodiless 304 while nothing changed, and the edge answers from
+its own 60 s cache. Measured: a newly approved post showed on an open card
+within one 30 s poll.
+
+**"Report wrong location" counts, nothing more (your call).** One tap posts
+to `POST /api/story/:id/location-report`, which adds one to that story's row
+in `story_location_reports`. No reporter, text or IP is kept. A device
+remembers what it reported, so the link reads "Reported. Thanks." Anyone can
+inflate a count only the admin tool (Prompt 4.6) reads; rate limiting is for
+Prompt 5.2.
+
+**Save keeps a snapshot on this device:** id, headline, place and time,
+because stories leave the API after 48 h. It is capped at
+`AppConfig.savedStoryLimit` and lives in localStorage, guarded against blocked
+or full storage. Prompt 3.4 adds the list and the move to an account.
+
+**Share copies a link that carries the view** (`src/core/permalink.ts`):
+`/?story=23904&cam=51.5074,-0.1278,1200&t=20261001T123456Z`.
+
+- **Readable fields:** four decimals of a degree are finer than a pixel even
+  at 50 km; altitude keeps a decimal below 100 km; the time is basic ISO 8601
+  to the second.
+- **Each field decodes on its own,** so a mangled camera still opens the story
+  at its time.
+- **Always the instant:** live or held, so the recipient sees the moment
+  shared, not a later one. One older than the window opens at its oldest,
+  and the story still loads while the API has it.
+- **On opening:** the camera becomes the controls' initial pose (no flash of
+  the default view), the time is held, the story opens, and the fields leave
+  the address bar, which should not go on claiming a view the reader has left.
+- **If the clipboard refuses,** a pre-selected field shows the link.
+
+**Measured** in headless Chrome on the Iris Xe, on mains:
+
+- 1408 × 655 CSS px at 1.25, 3,000 mock stories at world view, in full motion;
+- five rounds of open, expand, collapse and close, every frame timed by rAF,
+  against 9 s of the globe alone before them.
+
+| Tier   | Frames | Interval p50 / p95 / max | Slower than 60 fps | Globe alone, p95 |
+| ------ | ------ | ------------------------ | ------------------ | ---------------- |
+| HIGH   | 1,209  | 7.0 / 13.7 / 14.6 ms     | 0                  | 7.3 ms           |
+| HIGH   | 1,205  | 7.0 / 13.8 / 20.9 ms     | 1                  | 7.5 ms           |
+| MEDIUM | 1,289  | 6.9 / 7.1 / 7.4 ms       | 0                  | 7.1 ms           |
+
+- **HIGH's p95 of 13.7 ms** is frames alternating between 144 and 72 Hz. It is
+  the globe, not the sheet: two runs with the sheet's shadow removed showed
+  the same 13.5–13.7 ms with the sheet still, as 3.2 found (3,000 pins sit at
+  the edge of the 144 Hz budget on HIGH).
+- **Picking:** 0.1–0.5 ms per tap at 3,000 stories.
+- **Size:** the main chunk grew 11.0 KB gzip (now 356.6 KB). Splitting the
+  sheet into its own chunk saves 5.4 KB of that on the cold start at a cost of
+  2.4 KB more in all and one more request; not worth it.
+- **A story's details:** a 10-article seed story is 4.3 KB (0.9 KB gzip). At
+  the API's 1,000-article cap, varied text estimates 286 KB raw, 63 KB gzip,
+  31 KB Brotli. It loads on tap, never on start. `API_STORY_ARTICLE_LIMIT` is
+  config, if that proves too much on a phone.
+- **Not yet measured on the phone.**
+
+---
+
 ## 2026-10-01 — Time scrubber: the GPU ages pins, clusters open while time moves, letting go holds
 
 Prompt 3.2 adds the scrubber along the bottom of the globe.
