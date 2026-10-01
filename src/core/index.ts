@@ -99,6 +99,17 @@ export {
 } from './timeline';
 export type { ReturnStep, StoryTimes, TimeRange } from './timeline';
 
+export {
+  decodePermalink,
+  encodePermalink,
+  formatLinkTime,
+  isEmptyPermalink,
+  parseLinkTime,
+  withoutPermalink,
+  PERMALINK_PARAMS,
+} from './permalink';
+export type { CameraView, Permalink } from './permalink';
+
 export { createFrameStats, percentile } from './frameStats';
 export type { FrameStats, FrameSummary } from './frameStats';
 
