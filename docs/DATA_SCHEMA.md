@@ -16,6 +16,7 @@ truth; the original design is the build plan's §3
 | `20261001100000_story_ui.sql`               | `story_location_reports`, the participant count           |
 | `20261002100000_payload_country.sql`        | `api_nodes` adds each story's country (`cc`)              |
 | `20261002110000_outlets.sql`                | `api_window`, outlet search's two reads                   |
+| `20261002120000_library.sql`                | `follows`, `saved_stories`                                |
 
 Each table ships with its RLS policies and grants in the same file: a table and
 its access rules are one change. Migrations are timestamped and forward-only.
@@ -38,7 +39,8 @@ its access rules are one change. Migrations are timestamped and forward-only.
     `api_window`, the payload's stories, which they and `api_nodes` call as
     the caller.
 - **Only the service role writes news.** The ingest Worker holds the service
-  key and bypasses RLS (CLAUDE.md #9). No client role can write any table yet.
+  key and bypasses RLS (CLAUDE.md #9). The one thing a client writes is a
+  signed-in reader's own library: `follows` and `saved_stories` (Prompt 3.4).
 - **No precise user location, ever.** No coordinates on any user-written table.
   `posts.region_label` is coarse text from the Cloudflare IP header, capped at
   64 characters (#5). A unit test scans the user tables for coordinate columns.
@@ -66,6 +68,8 @@ Grants and policies agree; `npm run db:test` checks both.
 | `story_signals`          | none       | none (explicit restrictive deny)        | service role (ingest Worker)     |
 | `ingest_runs`            | none       | none (explicit restrictive deny)        | service role (ingest Worker)     |
 | `story_location_reports` | none       | none (explicit restrictive deny)        | `api_report_location` only       |
+| `follows`                | none       | your own                                | add and remove your own          |
+| `saved_stories`          | none       | your own                                | add and remove your own          |
 
 Open questions left for the prompts that own them:
 
@@ -132,6 +136,28 @@ wrong place (Prompt 3.3).
   tool, Prompt 4.6), most-reported first.
 - `story_id` cascades: a report is about a pin and goes when the story is
   pruned.
+
+**`follows`** (Prompt 3.4): what a signed-in reader follows. Guests keep
+theirs on the device, and the app moves them here on sign-in.
+
+- Primary key `(user_id, kind, target)`; `user_id` defaults to the caller.
+- `kind` is `place`, `category` or `story`, and `target` has one spelling per
+  kind, so the same follow made on two devices merges: `city:<ne_id>` (Natural
+  Earth's id, resolved by the app's gazetteer) or `country:<ISO-2>`, a
+  category name, or a story's payload id. No coordinates (#5).
+- `label` is what the reader saw ("Tokyo, Japan"); `baseline` a story's
+  source count when followed, for "+12 sources since you followed".
+- Added or removed, never updated: no UPDATE grant.
+
+**`saved_stories`** (Prompt 3.4): a signed-in reader's saves, as snapshots
+(`story_seq`, `headline`, `place`, `published_at`, `saved_at`). There is no
+foreign key to `stories`: a save must outlive the story's 48 hours.
+
+Both cascade from `auth.users`, so deleting an account deletes them, and a
+trigger refuses a person's 1,001st row in either: an abuse bound. The product's
+saved-story limit is `AppConfig.savedStoryLimit` (a tier boundary), applied by
+the app; moving a guest's saves up on sign-in may pass it, because nothing a
+guest saved is dropped.
 
 ## Ingest (Prompt 2.2)
 

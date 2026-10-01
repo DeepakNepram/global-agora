@@ -45,6 +45,12 @@ describe('migrations', () => {
     expect(Number(match?.[1])).toBe(NEWS_CATEGORIES.length - 1);
   });
 
+  it('let a reader follow exactly the categories in NEWS_CATEGORIES', () => {
+    const match = lastMatch(/kind = 'category' and target in\s*\(([^)]*)\)/g);
+    const names = [...(match?.[1] ?? '').matchAll(/'(\w+)'/g)].map((m) => m[1]);
+    expect(names).toEqual([...NEWS_CATEGORIES]);
+  });
+
   it('cap posts at the same length as the app (CLAUDE.md #7)', () => {
     const match = lastMatch(/posts_body_length check \(char_length\(body\) between 1 and (\d+)\)/g);
     expect(Number(match?.[1])).toBe(FREE_TIER_DEFAULTS.maxPostLength);
@@ -52,7 +58,15 @@ describe('migrations', () => {
 
   it('store no user coordinates (CLAUDE.md #5)', () => {
     // Stories carry the news event's location; nothing a user writes may.
-    const userTables = ['profiles', 'posts', 'votes', 'reports', 'blocks'];
+    const userTables = [
+      'profiles',
+      'posts',
+      'votes',
+      'reports',
+      'blocks',
+      'follows',
+      'saved_stories',
+    ];
     for (const table of userTables) {
       const body = new RegExp(`create table public\\.${table} \\(([\\s\\S]*?)\\n\\);`).exec(
         allSql,

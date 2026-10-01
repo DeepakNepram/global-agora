@@ -2,7 +2,7 @@
 -- Run with `npm run db:test`. Each file runs in a transaction that rolls back.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(34);
+select plan(38);
 
 -- CLAUDE.md #8, checked generically so a table added later is covered too.
 select is(
@@ -28,9 +28,10 @@ select is(
 -- A new table fails here until someone decides its row in the matrix below.
 select tables_are(
   'public',
-  array['articles', 'blocks', 'discussions', 'feature_flags', 'ingest_runs', 'posts',
-        'profiles', 'reports', 'stories', 'story_location_reports', 'story_signals', 'votes'],
-  'public holds exactly the v1 tables, the ingest ledger and the location reports'
+  array['articles', 'blocks', 'discussions', 'feature_flags', 'follows', 'ingest_runs', 'posts',
+        'profiles', 'reports', 'saved_stories', 'stories', 'story_location_reports',
+        'story_signals', 'votes'],
+  'public holds exactly the v1 tables, the ingest ledger, the location reports and the library'
 );
 
 -- The grant matrix (docs/DATA_SCHEMA.md). Grants are the first lock, RLS the second.
@@ -47,6 +48,8 @@ select table_privs_are('public', 'story_signals', 'anon', '{}'::text[],   'anon:
 select table_privs_are('public', 'ingest_runs',   'anon', '{}'::text[],   'anon: nothing on ingest_runs');
 select table_privs_are('public', 'story_location_reports', 'anon', '{}'::text[],
   'anon: nothing on story_location_reports');
+select table_privs_are('public', 'follows',       'anon', '{}'::text[],   'anon: nothing on follows');
+select table_privs_are('public', 'saved_stories', 'anon', '{}'::text[],   'anon: nothing on saved_stories');
 
 select table_privs_are('public', 'stories',       'authenticated', array['SELECT'], 'signed in: read stories');
 select table_privs_are('public', 'articles',      'authenticated', array['SELECT'], 'signed in: read articles');
@@ -61,14 +64,22 @@ select table_privs_are('public', 'story_signals', 'authenticated', '{}'::text[],
 select table_privs_are('public', 'ingest_runs',   'authenticated', '{}'::text[],   'signed in: nothing on ingest_runs');
 select table_privs_are('public', 'story_location_reports', 'authenticated', '{}'::text[],
   'signed in: nothing on story_location_reports');
+-- The library (Prompt 3.4): the only tables a client writes, and only its own rows (RLS).
+select table_privs_are('public', 'follows', 'authenticated', array['SELECT', 'INSERT', 'DELETE'],
+  'signed in: read, add and remove follows (RLS: own)');
+select table_privs_are('public', 'saved_stories', 'authenticated', array['SELECT', 'INSERT', 'DELETE'],
+  'signed in: read, add and remove saved stories (RLS: own)');
 
 -- Generic guards that survive new tables and functions.
 select is(
   (select count(*) from information_schema.role_table_grants
     where table_schema = 'public' and grantee in ('anon', 'authenticated')
-      and privilege_type <> 'SELECT'),
+      and privilege_type <> 'SELECT'
+      and not (grantee = 'authenticated'
+               and table_name in ('follows', 'saved_stories')
+               and privilege_type in ('INSERT', 'DELETE'))),
   0::bigint,
-  'no client role holds a write privilege on any public table'
+  'no client role holds a write privilege on any public table but its own library'
 );
 
 -- Exactly the API's functions: the two reads (Prompt 2.3), the participant

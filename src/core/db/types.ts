@@ -145,6 +145,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      follows: {
+        Row: {
+          baseline: number | null;
+          created_at: string;
+          kind: string;
+          label: string;
+          target: string;
+          user_id: string;
+        };
+        Insert: {
+          baseline?: number | null;
+          created_at?: string;
+          kind: string;
+          label: string;
+          target: string;
+          user_id?: string;
+        };
+        Update: {
+          baseline?: number | null;
+          created_at?: string;
+          kind?: string;
+          label?: string;
+          target?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       ingest_runs: {
         Row: {
           attempts: number;
@@ -321,6 +348,33 @@ export type Database = {
             referencedColumns: ['id'];
           },
         ];
+      };
+      saved_stories: {
+        Row: {
+          headline: string;
+          place: string;
+          published_at: string;
+          saved_at: string;
+          story_seq: number;
+          user_id: string;
+        };
+        Insert: {
+          headline: string;
+          place?: string;
+          published_at: string;
+          saved_at?: string;
+          story_seq: number;
+          user_id?: string;
+        };
+        Update: {
+          headline?: string;
+          place?: string;
+          published_at?: string;
+          saved_at?: string;
+          story_seq?: number;
+          user_id?: string;
+        };
+        Relationships: [];
       };
       stories: {
         Row: {
