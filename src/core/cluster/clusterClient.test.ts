@@ -108,6 +108,47 @@ describe('createClusterClient', () => {
     expect(t.layoutRequests()[0]?.nowSec).toBe(FIXTURE_EPOCH_SEC + 7200);
   });
 
+  it('opens and closes the clusters at once, not after the debounce', () => {
+    const t = harness();
+    t.client.load(storyBuffer(stack(3, 0, 0, 1)), NOW);
+    t.posted.length = 0;
+    t.client.setOpen(true);
+    expect(t.layoutRequests()).toEqual([expect.objectContaining({ open: true, level: 2 })]);
+    expect(t.timers.pending()).toBe(0);
+    t.client.setOpen(true);
+    expect(t.layoutRequests()).toHaveLength(1);
+  });
+
+  it('asks nothing while open, then closes at the instant the time came to rest', () => {
+    const t = harness();
+    const nodes = storyBuffer([...stack(2, 0, 0, 1), { id: 9, lat: 0, lon: 0, t: 7200 }]);
+    t.client.load(nodes, NOW);
+    t.client.setOpen(true);
+    for (const reply of t.answer()) t.client.receive(reply);
+    expect(t.layouts.at(-1)?.layout.open).toBe(true);
+    for (let step = 1; step <= 10; step++) t.client.setTime(NOW + step * 1000);
+    expect(t.posted).toEqual([]);
+    expect(t.timers.pending()).toBe(0);
+
+    t.client.setOpen(false);
+    expect(t.layoutRequests()).toEqual([
+      expect.objectContaining({ open: false, nowSec: NOW + 10_000 }),
+    ]);
+    for (const reply of t.answer()) t.client.receive(reply);
+    // Published by then, so clustered with the stack it shares a place with.
+    expect(t.layouts.at(-1)?.layout.visible).toBe(3);
+  });
+
+  it('keeps the open state for a level change made while open', () => {
+    const t = harness();
+    t.client.load(storyBuffer(stack(3, 0, 0, 1)), NOW);
+    t.client.setOpen(true);
+    t.posted.length = 0;
+    t.client.setLevel(9);
+    t.timers.fireAll();
+    expect(t.layoutRequests()).toEqual([expect.objectContaining({ open: true, level: 9 })]);
+  });
+
   it('uses only the answer to its latest question', () => {
     const t = harness();
     t.client.load(storyBuffer(stack(3, 0, 0, 1)), NOW);

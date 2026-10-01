@@ -29,8 +29,10 @@ export interface ClusterLayoutRequest {
   /** Increases with every request; only the latest one's reply is used. */
   readonly request: number;
   readonly level: number;
-  /** Stories published after this instant (epoch seconds) are left out. */
+  /** Stories published after this instant (epoch seconds) are left out of clusters. */
   readonly nowSec: number;
+  /** The time is moving: open every cluster (see ClusterLayout.open). */
+  readonly open: boolean;
 }
 
 export type ClusterRequest = ClusterLoadRequest | ClusterLayoutRequest;

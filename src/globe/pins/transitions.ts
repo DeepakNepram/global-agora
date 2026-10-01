@@ -41,7 +41,10 @@ export interface PlanInput {
   readonly groupSlot: Int32Array;
   readonly departed: readonly number[];
   readonly clock: number;
-  /** +1 when the new level is deeper (zoomed in), −1 shallower, 0 the same. */
+  /**
+   * +1 when the new layout is deeper (zoomed in, or clusters opening as the
+   * time starts to move), −1 shallower (or closing), 0 the same.
+   */
   readonly direction: number;
   /** Land every change at once: first layout, a new source, or reduced motion. */
   readonly instant: boolean;
@@ -103,11 +106,6 @@ export function planTransitions(input: PlanInput): PlanResult {
       } else if (!isVisibleLook(now.look) && now.alpha < 0.01) {
         // Out of sight already: re-seat it silently at its new group's centre.
         setPath(slot, centre, centre, 0, 1, 1);
-      } else if (groupRow < 0) {
-        // Unpublished at the new instant: shrink where it is.
-        endAt(start, now.x, now.y, now.z, hiddenLook(now.look), { x: now.ox, y: now.oy });
-        setPath(slot, start, now, 0, 1, 0);
-        record(slot, slot, 0, isAtRest(now));
       } else {
         setPath(slot, centre, now, BLOOM_TWIST_RAD, 1, 0);
         record(slot, newGroup, 0, isAtRest(now));

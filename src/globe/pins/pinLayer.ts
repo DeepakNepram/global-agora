@@ -1,6 +1,6 @@
 import { Group } from 'three';
 
-import { countVisible, type NodeBuffer } from '@/core';
+import { countVisible, type ClusterLayout, type NodeBuffer } from '@/core';
 
 import { earthTiltQuaternion } from '../views';
 import {
@@ -41,6 +41,20 @@ const RETIME_REST_SECONDS = 0.25;
 export type { PinLayer, PinLayerOptions, PresentOptions, PresentResult } from './pinLayerTypes';
 
 /**
+ * Which way a change goes: clusters opening as the time starts to move bloom
+ * out like a zoom in, and close like a zoom out; otherwise the level decides.
+ */
+function directionOf(
+  previousLevel: number | null,
+  wasOpen: boolean,
+  layout: ClusterLayout,
+): number {
+  if (previousLevel === null) return 0;
+  if (layout.open !== wasOpen) return layout.open ? 1 : -1;
+  return Math.sign(layout.level - previousLevel);
+}
+
+/**
  * The news pins: one InstancedMesh (see pinMesh.ts) whose slots are keyed by
  * story id (pinSlots.ts), drawn as pins or cluster orbs and moved by the
  * transition planner (transitions.ts).
@@ -72,6 +86,7 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
   let nodes: NodeBuffer | null = null;
   let rowSlots: Int32Array = new Int32Array(0);
   let level: number | null = null;
+  let opened = false;
   let nowSeconds = options.timeMs / 1000;
   const originSeconds = Math.floor(nowSeconds);
   uniforms.uNow.value = nowSeconds - originSeconds;
@@ -120,6 +135,7 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
         groupSlot.fill(-1);
         releases = [];
         level = null;
+        opened = false;
       }
       const instant = reset || nodes === null || reducedMotion;
       const { rowSlots: assigned, departed, fresh } = slots.assign(next.ids, next.count);
@@ -151,10 +167,11 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
         groupSlot,
         departed,
         clock,
-        direction: level === null ? 0 : Math.sign(layout.level - level),
+        direction: directionOf(level, opened, layout),
         instant,
       });
       level = layout.level;
+      opened = layout.open;
       settlesAt = Math.max(settlesAt, plan.endsAt);
       if (departed.length > 0) {
         if (instant) slots.release(departed);

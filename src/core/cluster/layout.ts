@@ -6,10 +6,14 @@ import { UNCLUSTERED_LEVEL } from './constants';
  * What each story row does at one cluster level, as columns: the clustering
  * engine's answer and the pin layer's input. Rows are the rows of the
  * NodeBuffer the layout was computed from.
+ *
+ * Time is not a role. A story not yet published at the layout's instant is a
+ * pin at its own place, and the pin shader keeps it hidden until its publish
+ * time, so moving the time shows it at once, before any new layout arrives.
  */
 
 export const CLUSTER_ROLE = {
-  /** Inside a cluster its representative draws, or not yet published. */
+  /** Inside a cluster its representative draws. */
   hidden: 0,
   /** Its own pin at its own place. */
   pin: 1,
@@ -25,16 +29,21 @@ export interface ClusterLayout {
   /** The client's generation for the NodeBuffer this was computed from. */
   readonly generation: number;
   readonly level: number;
+  /**
+   * Clusters opened while the time moves (a drag or Play): every story its own
+   * pin, or at PETAL_LEVEL a petal, whatever its publish time.
+   */
+  readonly open: boolean;
   /** Rows covered: the NodeBuffer's count. */
   readonly count: number;
-  /** Rows published at the layout's instant. */
+  /** Rows published at the layout's instant; clusters hold only these. */
   readonly visible: number;
   /** CLUSTER_ROLE per row. */
   readonly roles: Uint8Array;
   /**
    * Row of the group's representative, the member with the lowest story id;
-   * the row itself for a pin, -1 while unpublished. Story ids only grow, so the
-   * same cluster keeps the same representative across payload refreshes.
+   * the row itself for a pin. Story ids only grow, so the same cluster keeps
+   * the same representative across payload refreshes.
    */
   readonly groups: Int32Array;
   /** Where the row's group sits, xyz per row: its own place for a pin, else the cluster centre. */
@@ -56,7 +65,7 @@ export interface LayoutColumns {
   petals: Uint16Array;
 }
 
-/** Fresh columns for `count` rows: all hidden, unpublished. */
+/** Fresh, empty columns for `count` rows. */
 export function createLayoutColumns(count: number): LayoutColumns {
   return {
     roles: new Uint8Array(count),
@@ -104,9 +113,9 @@ export function writePin(out: LayoutColumns, nodes: StoryColumns, row: number): 
 }
 
 /**
- * Every published story as its own pin: clustering switched off, the pin
- * benchmark (so it stays comparable with 1.5's numbers) and tests. Unpublished
- * rows stay hidden at their own place, so they grow in where they belong.
+ * Every story as its own pin: clustering switched off, the pin benchmark (so
+ * it stays comparable with 1.5's numbers) and tests. Like every layout it
+ * leaves publish times to the shader, so it holds at any instant.
  */
 export function unclusteredLayout(
   nodes: NodeBuffer,
@@ -114,15 +123,13 @@ export function unclusteredLayout(
   generation = 0,
 ): ClusterLayout {
   const out = createLayoutColumns(nodes.count);
-  let visible = 0;
-  for (let row = 0; row < nodes.count; row++) {
-    writePin(out, nodes, row);
-    if (isPublished(nodes, row, nowSec)) {
-      visible++;
-    } else {
-      out.roles[row] = CLUSTER_ROLE.hidden;
-      out.groups[row] = -1;
-    }
-  }
-  return { generation, level: UNCLUSTERED_LEVEL, count: nodes.count, visible, ...out };
+  for (let row = 0; row < nodes.count; row++) writePin(out, nodes, row);
+  return {
+    generation,
+    level: UNCLUSTERED_LEVEL,
+    open: false,
+    count: nodes.count,
+    visible: countVisible(nodes, nowSec),
+    ...out,
+  };
 }

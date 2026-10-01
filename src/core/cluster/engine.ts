@@ -41,8 +41,12 @@ const WORLD: [number, number, number, number] = [-180, -90, 180, 90];
 
 export interface ClusterEngine {
   load(generation: number, columns: ClusterColumns): void;
-  /** Throws if nothing is loaded or `generation` is not the loaded one. */
-  layout(generation: number, level: number, nowSec: number): ClusterLayout;
+  /**
+   * Throws if nothing is loaded or `generation` is not the loaded one. Open, it
+   * ignores `nowSec`: below PETAL_LEVEL every story is a pin, and at it every
+   * level-8 cluster of all the stories is a sunflower.
+   */
+  layout(generation: number, level: number, nowSec: number, open?: boolean): ClusterLayout;
 }
 
 function isCluster(feature: IndexFeature): feature is ClusterFeature<Record<never, never>> {
@@ -158,22 +162,22 @@ export function createClusterEngine(): ClusterEngine {
       }
     },
 
-    layout(generation, requestedLevel, nowSec) {
+    layout(generation, requestedLevel, nowSec, open = false) {
       if (!columns || generation !== loaded) {
         throw new Error(`layout for generation ${generation}, but ${loaded} is loaded`);
       }
       const level = Math.min(Math.max(Math.round(requestedLevel), 0), PETAL_LEVEL);
       const visible = countVisible(columns, nowSec);
-      const tree = buildIndex(nowSec, visible);
       const out = createLayoutColumns(columns.count);
+      const result = { generation, level, open, count: columns.count, visible, ...out };
 
-      // Unpublished rows stay hidden at their own place, so they grow in where they belong.
-      for (let row = 0; row < columns.count; row++) {
-        out.anchors[row * 3] = columns.positions[row * 3] ?? 0;
-        out.anchors[row * 3 + 1] = columns.positions[row * 3 + 1] ?? 0;
-        out.anchors[row * 3 + 2] = columns.positions[row * 3 + 2] ?? 0;
-      }
+      // Every row starts as its own pin. Clustered rows are rewritten below;
+      // the rest are opened clusters or stories the shader keeps hidden until
+      // their publish time.
+      for (let row = 0; row < columns.count; row++) writePin(out, columns, row);
+      if (open && level < PETAL_LEVEL) return result;
 
+      const tree = open ? buildIndex(Infinity, columns.count) : buildIndex(nowSec, visible);
       for (const feature of tree.getClusters(WORLD, Math.min(level, CLUSTER_MAX_ZOOM))) {
         if (isCluster(feature)) {
           const rows = tree
@@ -185,7 +189,7 @@ export function createClusterEngine(): ClusterEngine {
           writePin(out, columns, feature.properties.row);
         }
       }
-      return { generation, level, count: columns.count, visible, ...out };
+      return result;
     },
   };
 }
@@ -206,7 +210,7 @@ export function handleClusterRequest(
     return null;
   }
   try {
-    const layout = engine.layout(request.generation, request.level, request.nowSec);
+    const layout = engine.layout(request.generation, request.level, request.nowSec, request.open);
     return {
       reply: { type: 'layout', request: request.request, layout },
       transfer: layoutBuffers(layout),

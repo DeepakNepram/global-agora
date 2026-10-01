@@ -8,10 +8,15 @@ import { CLUSTER_ROLE, type ClusterLayout } from './layout';
 
 const NOW = FIXTURE_EPOCH_SEC + 3600;
 
-function layoutOf(specs: readonly StorySpec[], level: number, nowSec = NOW): ClusterLayout {
+function layoutOf(
+  specs: readonly StorySpec[],
+  level: number,
+  nowSec = NOW,
+  open = false,
+): ClusterLayout {
   const engine = createClusterEngine();
   engine.load(1, clusterColumns(storyBuffer(specs)));
-  return engine.layout(1, level, nowSec);
+  return engine.layout(1, level, nowSec, open);
 }
 
 function rolesOf(layout: ClusterLayout): number[] {
@@ -99,16 +104,36 @@ describe('createClusterEngine', () => {
     expect(tie.categories[0]).toBe(2);
   });
 
-  it('leaves out stories not yet published at the instant', () => {
+  it('clusters only stories published at the instant and leaves the rest as their own pins', () => {
     const specs = [...stack(3, 30, 30, 1), { id: 9, lat: 30, lon: 30, t: 7200 }];
     const layout = layoutOf(specs, 3, NOW);
-    expect(layout.visible).toBe(3);
-    expect(layout.roles[3]).toBe(CLUSTER_ROLE.hidden);
-    expect(layout.groups[3]).toBe(-1);
+    expect(layout).toMatchObject({ visible: 3, open: false });
+    // The shader hides it until 7200 s; as a pin it appears the moment the time passes that.
+    expect(layout.roles[3]).toBe(CLUSTER_ROLE.pin);
+    expect(layout.groups[3]).toBe(3);
     expect(layout.counts[0]).toBe(3);
     const later = layoutOf(specs, 3, FIXTURE_EPOCH_SEC + 7200);
     expect(later.visible).toBe(4);
     expect(later.counts[0]).toBe(4);
+    expect(later.roles[3]).toBe(CLUSTER_ROLE.hidden);
+  });
+
+  it('opens every cluster into pins below the petal level, whatever the time', () => {
+    const specs = [...stack(3, 30, 30, 1), { id: 9, lat: 30, lon: 30, t: 7200 }];
+    for (const nowSec of [NOW, FIXTURE_EPOCH_SEC + 7200]) {
+      const layout = layoutOf(specs, 3, nowSec, true);
+      expect(layout.open).toBe(true);
+      expect(Array.from(layout.roles)).toEqual(new Array(4).fill(CLUSTER_ROLE.pin));
+      expect(Array.from(layout.groups)).toEqual([0, 1, 2, 3]);
+    }
+  });
+
+  it('opens at the petal level into sunflowers of every story, published or not', () => {
+    const specs = [...stack(3, 30, 30, 1), { id: 9, lat: 30, lon: 30, t: 7200 }];
+    const layout = layoutOf(specs, PETAL_LEVEL, NOW, true);
+    expect(Array.from(layout.roles)).toEqual(new Array(4).fill(CLUSTER_ROLE.petal));
+    expect(Array.from(layout.counts)).toEqual([4, 4, 4, 4]);
+    expect(new Set(layout.petals).size).toBe(4);
   });
 
   it('clamps the level into the range it knows', () => {
@@ -136,6 +161,7 @@ describe('handleClusterRequest', () => {
       request: 5,
       level: 2,
       nowSec: NOW,
+      open: false,
     });
     expect(handled?.reply.type).toBe('layout');
     expect(handled?.reply.request).toBe(5);
@@ -149,6 +175,7 @@ describe('handleClusterRequest', () => {
       request: 1,
       level: 0,
       nowSec: NOW,
+      open: false,
     });
     expect(handled?.reply).toMatchObject({ type: 'error', request: 1 });
     expect(handled?.transfer).toEqual([]);

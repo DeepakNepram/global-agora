@@ -18,9 +18,9 @@ import { FIXTURE_EPOCH_SEC, stack, storyBuffer } from '@/core/cluster/cluster.fi
 import { clusterColumns } from '@/core/cluster/clusterClient';
 import { createClusterEngine } from '@/core/cluster/engine';
 
-import { bloomSeconds } from './bloom';
+import { BLOOM_TWIST_RAD, bloomSeconds } from './bloom';
 import { createPinLayer, type PinLayer } from './pinLayer';
-import { PIN_STRIDE } from './pinInstances';
+import { PIN_OFFSET, PIN_STRIDE } from './pinInstances';
 import { PULSE_CLOCK_REBASE_SECONDS } from './pinStyle';
 
 const WINDOW_END_MS = Date.UTC(2026, 8, 17, 12, 0, 0);
@@ -186,6 +186,32 @@ describe('createPinLayer', () => {
     layer.setMotion('reduced');
     expect(layer.animationRemainingMs()).toBe(0);
     expect(layer.present(nodes, engine.layout(1, 8, now)).durationMs).toBe(0);
+  });
+
+  it('blooms clusters open when the time starts to move and folds them back along the same paths', () => {
+    const now = FIXTURE_EPOCH_SEC + 3600;
+    // Two stacks a little apart: one orb each at level 2, every story its own pin when open.
+    const nodes = storyBuffer([...stack(6, 10, 10, 1), ...stack(6, 10.5, 10.5, 101)]);
+    const engine = createClusterEngine();
+    engine.load(1, clusterColumns(nodes));
+    const layer = createPinLayer({ timeMs: now * 1000 });
+    const array = onlyMesh(layer).geometry.getAttribute('aInner') as InterleavedBufferAttribute;
+    const twist = (slot: number): number =>
+      (array.data.array as Float32Array)[slot * PIN_STRIDE + PIN_OFFSET.twist] ?? NaN;
+    layer.setVisible(false);
+
+    layer.present(nodes, engine.layout(1, 2, now));
+    const open = layer.present(nodes, engine.layout(1, 2, now, true));
+    expect(open.moving).toBe(12);
+    // Every child spirals out, like a zoom in: the orb's own slot included.
+    for (let slot = 0; slot < 12; slot++) expect(twist(slot)).toBeCloseTo(BLOOM_TWIST_RAD, 6);
+    expect(open.durationMs).toBeLessThan(600);
+
+    while (layer.advance(1 / 60));
+    const close = layer.present(nodes, engine.layout(1, 2, now));
+    expect(close.moving).toBe(12);
+    // Reversed along the spiral it came out on, not a new path.
+    for (let slot = 0; slot < 12; slot++) expect(twist(slot)).toBeCloseTo(BLOOM_TWIST_RAD, 6);
   });
 
   it('draws a count only once the host hands it the glyphs', () => {

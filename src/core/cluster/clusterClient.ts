@@ -10,10 +10,11 @@ import type { ClusterColumns, ClusterReply, ClusterRequest } from './protocol';
  * stories changes, and hands back only the answer to its latest question.
  *
  * Level and time changes are debounced (a zoom gesture crosses levels in
- * quick succession, and only where it stops matters). A new payload is asked
- * about at once. The port and timers are injected: no Worker or DOM here, so
- * tests run it synchronously and a native shell can host the engine however
- * it likes.
+ * quick succession, and only where it stops matters). A new payload, and
+ * opening or closing the clusters, are asked about at once. While open (the
+ * time is moving), time changes ask nothing: the open layout does not depend
+ * on time. The port and timers are injected: no Worker or DOM here, so tests
+ * run it synchronously and a native shell can host the engine however it likes.
  */
 
 export interface ClusterClientOptions {
@@ -34,6 +35,8 @@ export interface ClusterClient {
   setLevel(level: number): void;
   /** The displayed instant; a new layout only if a story crossed its publish time. */
   setTime(nowSec: number): void;
+  /** Open every cluster while the time moves; close them, at the resting instant, when it stops. */
+  setOpen(open: boolean): void;
   /** Feed every engine reply here, e.g. from worker.onmessage. */
   receive(reply: ClusterReply): void;
   dispose(): void;
@@ -57,6 +60,7 @@ interface Asked {
   readonly generation: number;
   readonly level: number;
   readonly visible: number;
+  readonly open: boolean;
 }
 
 export function createClusterClient(options: ClusterClientOptions): ClusterClient {
@@ -66,6 +70,7 @@ export function createClusterClient(options: ClusterClientOptions): ClusterClien
   let level = options.initialLevel;
   let nowSec = 0;
   let visible = 0;
+  let open = false;
   let latest = 0;
   let asked: Asked | null = null;
   let timer: unknown = null;
@@ -81,12 +86,17 @@ export function createClusterClient(options: ClusterClientOptions): ClusterClien
     if (!nodes || disposed) return;
     // Back where the last question left off (a level crossed and uncrossed
     // within the debounce): that answer is already on its way.
-    if (asked?.generation === generation && asked.level === level && asked.visible === visible) {
+    if (
+      asked?.generation === generation &&
+      asked.level === level &&
+      asked.open === open &&
+      (open || asked.visible === visible)
+    ) {
       return;
     }
     latest += 1;
-    asked = { generation, level, visible };
-    post({ type: 'layout', generation, request: latest, level, nowSec });
+    asked = { generation, level, visible, open };
+    post({ type: 'layout', generation, request: latest, level, nowSec, open });
   };
 
   const schedule = (): void => {
@@ -117,11 +127,20 @@ export function createClusterClient(options: ClusterClientOptions): ClusterClien
     setTime(now) {
       if (disposed) return;
       nowSec = now;
-      if (!nodes) return;
+      if (!nodes || open) return;
       const next = countVisible(nodes, now);
       if (next === visible) return;
       visible = next;
       schedule();
+    },
+
+    setOpen(next) {
+      if (disposed || next === open) return;
+      open = next;
+      // Closing clusters at the instant the time came to rest, which may be
+      // far from where it was when they opened.
+      if (!open && nodes) visible = countVisible(nodes, nowSec);
+      ask();
     },
 
     receive(reply) {

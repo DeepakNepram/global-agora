@@ -11,15 +11,17 @@ describe('unclusteredLayout', () => {
     { id: 7, lat: -5, lon: 60, t: 900 },
   ]);
 
-  it('makes every published story its own pin at its own place', () => {
+  it('makes every story its own pin at its own place, leaving publish times to the shader', () => {
     const layout = unclusteredLayout(nodes, FIXTURE_EPOCH_SEC + 60, 4);
-    expect(layout).toMatchObject({ generation: 4, level: UNCLUSTERED_LEVEL, count: 3, visible: 2 });
-    expect(Array.from(layout.roles)).toEqual([
-      CLUSTER_ROLE.pin,
-      CLUSTER_ROLE.pin,
-      CLUSTER_ROLE.hidden,
-    ]);
-    expect(Array.from(layout.groups)).toEqual([0, 1, -1]);
+    expect(layout).toMatchObject({
+      generation: 4,
+      level: UNCLUSTERED_LEVEL,
+      open: false,
+      count: 3,
+      visible: 2,
+    });
+    expect(Array.from(layout.roles)).toEqual(new Array(3).fill(CLUSTER_ROLE.pin));
+    expect(Array.from(layout.groups)).toEqual([0, 1, 2]);
     expect(Array.from(layout.anchors)).toEqual(Array.from(nodes.positions.subarray(0, 9)));
   });
 
