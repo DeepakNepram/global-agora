@@ -143,6 +143,21 @@ export {
 } from './permalink';
 export type { CameraView, Permalink } from './permalink';
 
+export {
+  categoryMask,
+  decodeFilters,
+  isFilterActive,
+  matchesFilter,
+  normalizeCategories,
+  sameFilter,
+  toggleCategory,
+  windowChoices,
+  withFilters,
+  FILTER_PARAMS,
+  NO_FILTER,
+} from './filters';
+export type { StoryFilter } from './filters';
+
 export { createFrameStats, percentile } from './frameStats';
 export type { FrameStats, FrameSummary } from './frameStats';
 

@@ -15,7 +15,11 @@ import { describe, expect, it } from 'vitest';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const srcDir = resolve(repoRoot, 'src');
-const ALLOWED = new Map([['src/core/config.ts', 1]]);
+const ALLOWED = new Map([
+  ['src/core/config.ts', 1],
+  // A time-window choice ("last 24 h"), offered only when the history is deeper.
+  ['src/core/filters.ts', 1],
+]);
 
 /** A standalone 24: not part of 0.24, 1024, 24px or an identifier. */
 const LITERAL_24_RE = /(?<![\w.])24(?![\w.])/g;
