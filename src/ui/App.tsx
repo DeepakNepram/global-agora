@@ -1,7 +1,9 @@
 import { useMemo, useState, type JSX } from 'react';
 
 import { decodePermalink, type AppConfig } from '@/core';
+import type { DbConfig } from '@/core/db/config';
 
+import { useAccountSession } from './data/useAccountSession';
 import { useNodesFeed } from './data/useNodesFeed';
 import { GlobeCanvas } from './GlobeCanvas';
 import { NewsStatus } from './NewsStatus';
@@ -9,6 +11,8 @@ import { resolveQuality } from './platform/capabilities';
 
 export interface AppProps {
   readonly config: AppConfig;
+  /** Supabase, for a signed-in reader's library; null runs without a backend. */
+  readonly dbConfig?: DbConfig | null;
 }
 
 /**
@@ -16,11 +20,12 @@ export interface AppProps {
  * tier so the texture choice is verifiable in a real browser rather than only in
  * unit tests.
  */
-export function App({ config }: AppProps): JSX.Element {
+export function App({ config, dbConfig = null }: AppProps): JSX.Element {
   // Probing creates and discards a GL context, so do it once per mount.
   const quality = useMemo(() => resolveQuality(), []);
   // Read once: the globe applies it and then clears it from the address bar.
   const [link] = useState(() => decodePermalink(window.location.search));
+  useAccountSession(dbConfig);
   useNodesFeed({
     baseUrl: config.apiBaseUrl,
     hours: config.historyWindowHours,
