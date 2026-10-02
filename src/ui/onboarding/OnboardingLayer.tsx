@@ -39,8 +39,7 @@ function tabbable(root: HTMLElement): HTMLElement[] {
  * First-run onboarding (Prompt 3.4): interests, home city, alerts, as a
  * modal sheet on the story sheet's spring. Skip on every step keeps what was
  * already chosen; Escape skips too. Focus is held inside while it is up and
- * returns to wherever it was when it closes. Its own chunk: most visits
- * never show it.
+ * returns to wherever it was when it closes.
  */
 export default function OnboardingLayer({
   target,

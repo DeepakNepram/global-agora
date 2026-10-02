@@ -20,7 +20,7 @@ import { useLiveClock } from './globe/useLiveClock';
 import { usePinNodes } from './globe/usePinNodes';
 import { usePrefersReducedMotion } from './globe/usePrefersReducedMotion';
 import { vignetteCssGradient } from './globe/vignette';
-import { LazyLayers } from './LazyLayers';
+import { SecondarySheets } from './SecondarySheets';
 import { LibraryButtons } from './library/LibraryButtons';
 import type { GlobeTarget } from './nav/globeNavigation';
 import { NavLayer } from './nav/NavLayer';
@@ -192,7 +192,7 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
         actions={<LibraryButtons />}
       />
       <TimeScrubber nodes={pinNodes} historyHours={historyWindowHours} hidden={sheetOpen} />
-      <LazyLayers
+      <SecondarySheets
         nodes={pinNodes}
         target={target}
         historyHours={historyWindowHours}

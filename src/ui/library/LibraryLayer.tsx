@@ -24,9 +24,6 @@ export interface LibraryLayerProps {
  * which never shares the screen with a story's. Opening it closes the story;
  * opening a story (from a list or the globe) closes it. Closing hands focus
  * back to whatever opened it.
- *
- * A separate chunk (GlobeCanvas loads it lazily): no reader needs it to see
- * the globe.
  */
 export default function LibraryLayer(props: LibraryLayerProps): JSX.Element {
   const { nodes, target, historyHours, savedStoryLimit, reducedMotion } = props;
