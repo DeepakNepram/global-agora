@@ -1,4 +1,4 @@
-import { useId, type JSX } from 'react';
+import { useEffect, useId, useRef, type JSX } from 'react';
 
 import { isFilterActive, windowChoices, CATEGORY_LABELS, NEWS_CATEGORIES } from '@/core';
 import { CATEGORY_HUES } from '@/globe';
@@ -28,9 +28,19 @@ export function FilterBar({ historyHours }: FilterBarProps): JSX.Element {
   const active = isFilterActive(filter);
   const choices = windowChoices(historyHours);
   const store = filterStore.getState();
+  const row = useRef<HTMLDivElement>(null);
+
+  // A page opened with filters (a shared link, a reload) shows the first
+  // pressed chip: on a phone the row scrolls, and it may sit off the edge.
+  useEffect(() => {
+    const element = row.current;
+    const pressed = element?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (!element || !pressed) return;
+    element.scrollLeft = Math.max(0, pressed.offsetLeft - element.offsetLeft - 12);
+  }, []);
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+    <div ref={row} className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
       <div role="group" aria-label="Show only these categories" className="flex gap-1.5">
         {NEWS_CATEGORIES.map((category) => {
           const on = filter.categories.includes(category);
