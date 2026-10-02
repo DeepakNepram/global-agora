@@ -1,10 +1,8 @@
-import { useMemo, useState, type JSX, type ReactNode } from 'react';
+import { useState, type JSX, type ReactNode } from 'react';
 
 import type { NodeBuffer } from '@/core';
-import type { OrbitGlobeControls } from '@/globe';
 
 import { nextAnnouncement } from '../announce';
-import type { PinPicker } from '../globe/pinPicker';
 import { FilterBar } from './FilterBar';
 import type { GlobeTarget } from './globeNavigation';
 import { SearchBox } from './SearchBox';
@@ -12,9 +10,8 @@ import { useFilterUrl } from './useFilterUrl';
 
 export interface NavLayerProps {
   readonly nodes: NodeBuffer | null;
-  readonly controls: OrbitGlobeControls | null;
-  /** For the canvas's size, which framing a place needs. */
-  readonly picker: PinPicker;
+  /** The camera, and the canvas's size, which framing a place needs. */
+  readonly target: GlobeTarget;
   readonly apiBaseUrl: string;
   /** AppConfig.historyWindowHours. */
   readonly historyHours: number;
@@ -28,14 +25,9 @@ export interface NavLayerProps {
  * stays draggable between and around them.
  */
 export function NavLayer(props: NavLayerProps): JSX.Element {
-  const { nodes, controls, picker, apiBaseUrl, historyHours, actions } = props;
+  const { nodes, target, apiBaseUrl, historyHours, actions } = props;
   const [announcement, setAnnouncement] = useState('');
   useFilterUrl(historyHours);
-
-  const target = useMemo(
-    (): GlobeTarget => ({ controls, viewport: picker.viewport }),
-    [controls, picker],
-  );
   const announce = (text: string): void =>
     setAnnouncement((previous) => nextAnnouncement(previous, text));
 

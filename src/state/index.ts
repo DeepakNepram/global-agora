@@ -86,4 +86,12 @@ export {
   type FilterState,
   type FilterStore,
 } from './filterStore';
+export {
+  createPanelStore,
+  panelStore,
+  usePanelStore,
+  type LibraryPanel,
+  type PanelState,
+  type PanelStore,
+} from './panelStore';
 export type { KeyValueStorage } from './persist';

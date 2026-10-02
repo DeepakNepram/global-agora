@@ -8,6 +8,7 @@ import {
   type StoryDetail,
 } from '@/core';
 
+import { FollowRow } from './FollowRow';
 import { formatAgo, formatKm } from './format';
 import type { DetailState } from './useStoryDetail';
 
@@ -24,6 +25,9 @@ export interface StoryDetailsProps {
   readonly report: ReportState;
   readonly onReport: () => void;
   readonly onNearby: (row: number) => void;
+  /** The sheet is drawn up (the follow row loads the gazetteer only then). */
+  readonly expanded: boolean;
+  readonly announce: (text: string) => void;
 }
 
 const SECTION = 'flex flex-col gap-2 border-t border-ink/10 pt-4';
@@ -162,14 +166,18 @@ function Nearby(props: Omit<StoryDetailsProps, 'detail' | 'report' | 'onReport'>
 }
 
 /**
- * The full sheet below the peek card: the summary, "why this location" with
- * its report link, every article grouped by outlet, and nearby stories.
+ * The full sheet below the peek card: what to follow, the summary, "why this
+ * location" with its report link, every article grouped by outlet, and
+ * nearby stories.
  * Article links open in a new tab and send no referrer.
  */
 export function StoryDetails(props: StoryDetailsProps): JSX.Element {
-  const { detail } = props;
+  const { detail, nodes, row } = props;
   return (
     <div className="mt-5 flex flex-col gap-5">
+      {nodes && row >= 0 && (
+        <FollowRow nodes={nodes} row={row} expanded={props.expanded} announce={props.announce} />
+      )}
       {detail.status === 'loading' && <p className="text-sm text-muted">Loading the coverage…</p>}
       {detail.status === 'error' && (
         <p className="text-sm text-muted">

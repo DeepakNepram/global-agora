@@ -1,10 +1,10 @@
 import { Canvas } from '@react-three/fiber';
-import { useMemo, useState, type JSX } from 'react';
+import { lazy, Suspense, useMemo, useState, type ComponentType, type JSX } from 'react';
 import { Color } from 'three';
 
 import { previewTextureSet, textureSetForTier, type Permalink, type QualityTier } from '@/core';
 import { CAMERA_FOV_DEG, renderSettingsForTier, VIGNETTE, type OrbitGlobeControls } from '@/globe';
-import { useStoryStore } from '@/state';
+import { usePanelStore, useStoryStore } from '@/state';
 
 import { createPresentLog } from './globe/bloomReport';
 import { ControlsHost, PipelineHost } from './globe/canvasHosts';
@@ -20,6 +20,10 @@ import { useLiveClock } from './globe/useLiveClock';
 import { usePinNodes } from './globe/usePinNodes';
 import { usePrefersReducedMotion } from './globe/usePrefersReducedMotion';
 import { vignetteCssGradient } from './globe/vignette';
+import { LibraryButtons } from './library/LibraryButtons';
+import type { LibraryLayerProps } from './library/LibraryLayer';
+import { useIdlePreload } from './library/useIdlePreload';
+import type { GlobeTarget } from './nav/globeNavigation';
 import { NavLayer } from './nav/NavLayer';
 import { TimeDriver } from './scrubber/TimeDriver';
 import { TimeScrubber } from './scrubber/TimeScrubber';
@@ -45,6 +49,11 @@ function voidColor(): string {
 }
 
 const CAMERA = { fov: CAMERA_FOV_DEG } as const;
+
+/** The Following and Saved sheet: its own chunk, fetched when the browser is idle. */
+const loadLibrary = (): Promise<{ default: ComponentType<LibraryLayerProps> }> =>
+  import('./library/LibraryLayer');
+const LibraryLayer = lazy(loadLibrary);
 
 const GLOBE_LABEL =
   'Globe of Earth with news stories as pins, grouped into numbered clusters that open as you zoom in. ' +
@@ -77,7 +86,17 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
   const motion = reducedMotionPreferred && !dev.fullMotion ? 'reduced' : 'full';
   const picker = useMemo(() => createPinPicker(), []);
   const selection = useGlobeSelection(controls, picker);
-  const sheetOpen = useStoryStore((state) => state.sheet !== 'closed');
+  const storyOpen = useStoryStore((state) => state.sheet !== 'closed');
+  const panelOpen = usePanelStore((state) => state.panel !== null);
+  const sheetOpen = storyOpen || panelOpen;
+  // Mounted on first use; preloaded before that so the first open is instant.
+  const [libraryUsed, setLibraryUsed] = useState(false);
+  if (panelOpen && !libraryUsed) setLibraryUsed(true);
+  useIdlePreload(loadLibrary);
+  const target = useMemo(
+    (): GlobeTarget => ({ controls, viewport: picker.viewport }),
+    [controls, picker],
+  );
   useLiveClock();
   useOpenPermalink(link, historyWindowHours);
 
@@ -173,12 +192,23 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
 
       <NavLayer
         nodes={pinNodes}
-        controls={controls}
-        picker={picker}
+        target={target}
         apiBaseUrl={apiBaseUrl}
         historyHours={historyWindowHours}
+        actions={<LibraryButtons />}
       />
       <TimeScrubber nodes={pinNodes} historyHours={historyWindowHours} hidden={sheetOpen} />
+      {libraryUsed && (
+        <Suspense fallback={null}>
+          <LibraryLayer
+            nodes={pinNodes}
+            target={target}
+            historyHours={historyWindowHours}
+            savedStoryLimit={savedStoryLimit}
+            reducedMotion={motion === 'reduced'}
+          />
+        </Suspense>
+      )}
       <StoryLayer
         nodes={pinNodes}
         controls={controls}

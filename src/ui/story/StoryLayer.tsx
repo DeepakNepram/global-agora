@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState, type JSX } from 'react';
 import { reportStoryLocation, vec3ToLatLon, type NodeBuffer } from '@/core';
 import type { OrbitGlobeControls } from '@/globe';
 import {
+  libraryStatus,
   reportedStore,
   savedStore,
   storyStore,
@@ -105,7 +106,9 @@ export function StoryLayer(props: StoryLayerProps): JSX.Element {
       .toggle({ id, headline, place, publishedAtMs }, savedStoryLimit);
     announce(
       result === 'saved'
-        ? 'Saved on this device.'
+        ? libraryStatus.getState().mode === 'account'
+          ? 'Saved to your account.'
+          : 'Saved on this device.'
         : result === 'removed'
           ? 'Removed from saved.'
           : `Your saved list is full (${savedStoryLimit}). Remove one to save another.`,
@@ -181,6 +184,8 @@ export function StoryLayer(props: StoryLayerProps): JSX.Element {
               report={report}
               onReport={onReport}
               onNearby={onNearby}
+              expanded={sheet === 'full'}
+              announce={announce}
             />
           )
         }
