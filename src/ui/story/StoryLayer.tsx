@@ -4,6 +4,7 @@ import { reportStoryLocation, vec3ToLatLon, type NodeBuffer } from '@/core';
 import type { OrbitGlobeControls } from '@/globe';
 import {
   libraryStatus,
+  onboardingStore,
   reportedStore,
   savedStore,
   storyStore,
@@ -104,6 +105,8 @@ export function StoryLayer(props: StoryLayerProps): JSX.Element {
     const result = savedStore
       .getState()
       .toggle({ id, headline, place, publishedAtMs }, savedStoryLimit);
+    // The first save is a moment to offer the onboarding (Prompt 3.4).
+    if (result === 'saved') onboardingStore.getState().show();
     announce(
       result === 'saved'
         ? libraryStatus.getState().mode === 'account'

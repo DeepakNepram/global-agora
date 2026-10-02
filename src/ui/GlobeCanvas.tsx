@@ -1,10 +1,10 @@
 import { Canvas } from '@react-three/fiber';
-import { lazy, Suspense, useMemo, useState, type ComponentType, type JSX } from 'react';
+import { useMemo, useState, type JSX } from 'react';
 import { Color } from 'three';
 
 import { previewTextureSet, textureSetForTier, type Permalink, type QualityTier } from '@/core';
 import { CAMERA_FOV_DEG, renderSettingsForTier, VIGNETTE, type OrbitGlobeControls } from '@/globe';
-import { usePanelStore, useStoryStore } from '@/state';
+import { onboardingStore, usePanelStore, useStoryStore } from '@/state';
 
 import { createPresentLog } from './globe/bloomReport';
 import { ControlsHost, PipelineHost } from './globe/canvasHosts';
@@ -20,11 +20,11 @@ import { useLiveClock } from './globe/useLiveClock';
 import { usePinNodes } from './globe/usePinNodes';
 import { usePrefersReducedMotion } from './globe/usePrefersReducedMotion';
 import { vignetteCssGradient } from './globe/vignette';
+import { LazyLayers } from './LazyLayers';
 import { LibraryButtons } from './library/LibraryButtons';
-import type { LibraryLayerProps } from './library/LibraryLayer';
-import { useIdlePreload } from './library/useIdlePreload';
 import type { GlobeTarget } from './nav/globeNavigation';
 import { NavLayer } from './nav/NavLayer';
+import { useOnboardingTrigger } from './onboarding/useOnboardingTrigger';
 import { TimeDriver } from './scrubber/TimeDriver';
 import { TimeScrubber } from './scrubber/TimeScrubber';
 import { useOpenPermalink } from './story/permalinkLink';
@@ -50,15 +50,11 @@ function voidColor(): string {
 
 const CAMERA = { fov: CAMERA_FOV_DEG } as const;
 
-/** The Following and Saved sheet: its own chunk, fetched when the browser is idle. */
-const loadLibrary = (): Promise<{ default: ComponentType<LibraryLayerProps> }> =>
-  import('./library/LibraryLayer');
-const LibraryLayer = lazy(loadLibrary);
-
 const GLOBE_LABEL =
   'Globe of Earth with news stories as pins, grouped into numbered clusters that open as you zoom in. ' +
   'Drag to rotate, scroll or pinch to zoom, tap a pin to read its story. When focused, arrow keys ' +
-  'rotate, plus or minus zoom, and Enter opens the story nearest the centre.';
+  'rotate, plus or minus zoom, Enter opens the story nearest the centre, and Home returns to the ' +
+  'resting view.';
 
 /**
  * The one <Canvas> in the app.
@@ -89,10 +85,7 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
   const storyOpen = useStoryStore((state) => state.sheet !== 'closed');
   const panelOpen = usePanelStore((state) => state.panel !== null);
   const sheetOpen = storyOpen || panelOpen;
-  // Mounted on first use; preloaded before that so the first open is instant.
-  const [libraryUsed, setLibraryUsed] = useState(false);
-  if (panelOpen && !libraryUsed) setLibraryUsed(true);
-  useIdlePreload(loadLibrary);
+  useOnboardingTrigger(sheetOpen);
   const target = useMemo(
     (): GlobeTarget => ({ controls, viewport: picker.viewport }),
     [controls, picker],
@@ -175,6 +168,7 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
           onReady={setControls}
           input={selection.input}
           initialPose={link.camera}
+          restingCenter={onboardingStore.getState().homeCity}
         />
         <PipelineHost settings={settings} bloomEnabled={dev.bloomEnabled} probe={probe} />
       </Canvas>
@@ -198,17 +192,13 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
         actions={<LibraryButtons />}
       />
       <TimeScrubber nodes={pinNodes} historyHours={historyWindowHours} hidden={sheetOpen} />
-      {libraryUsed && (
-        <Suspense fallback={null}>
-          <LibraryLayer
-            nodes={pinNodes}
-            target={target}
-            historyHours={historyWindowHours}
-            savedStoryLimit={savedStoryLimit}
-            reducedMotion={motion === 'reduced'}
-          />
-        </Suspense>
-      )}
+      <LazyLayers
+        nodes={pinNodes}
+        target={target}
+        historyHours={historyWindowHours}
+        savedStoryLimit={savedStoryLimit}
+        reducedMotion={motion === 'reduced'}
+      />
       <StoryLayer
         nodes={pinNodes}
         controls={controls}

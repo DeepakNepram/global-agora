@@ -4,10 +4,11 @@ import { PETAL_LEVEL } from '@/core';
 import {
   ACTIVATE_RADIUS_CSS_PX,
   altitudeKmForZoom,
+  fitAltitudeKm,
   type OrbitGlobeControls,
   type PinPick,
 } from '@/globe';
-import { storyStore } from '@/state';
+import { onboardingStore, storyStore } from '@/state';
 
 import { nextAnnouncement } from '../announce';
 import type { GlobeInputHandlers } from './bindControlInput';
@@ -33,7 +34,8 @@ export interface GlobeSelection {
  *   - a story's pin opens its peek card, or switches the open sheet to it;
  *   - a cluster's orb flies the camera to it, two levels deeper, so it blooms;
  *   - nothing closes a peek card (a full sheet stays: it covers the globe).
- * Escape steps an open sheet down.
+ * Escape steps an open sheet down; Home flies back to the resting view,
+ * centred on the reader's home city when they gave one.
  */
 export function useGlobeSelection(
   controls: OrbitGlobeControls | null,
@@ -74,6 +76,18 @@ export function useGlobeSelection(
         const story = storyStore.getState();
         if (story.sheet === 'closed') return false;
         story.collapse();
+        return true;
+      },
+      onHome: () => {
+        if (!controls) return false;
+        const home = onboardingStore.getState().homeCity;
+        const { width, height } = picker.viewport();
+        void controls.flyTo(
+          home?.lat ?? 0,
+          home?.lon ?? 0,
+          fitAltitudeKm(width / Math.max(1, height)),
+        );
+        announce(home ? `Back to ${home.label}.` : 'Back to the world view.');
         return true;
       },
     };

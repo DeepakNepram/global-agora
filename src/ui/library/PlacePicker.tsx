@@ -9,6 +9,8 @@ export interface PlacePickerProps {
   readonly label: string;
   readonly placeholder?: string;
   readonly onChoose: (place: PlaceResult) => void;
+  /** Cities alone (a home city), no countries. */
+  readonly citiesOnly?: boolean;
 }
 
 /** Places only, five at most: a follow or a home city needs no more. */
@@ -19,7 +21,8 @@ const LIMIT = 5;
  * "Follow a place" and the onboarding's home city. An ARIA 1.2 combobox, like
  * search. Typing is all it takes: no location permission, no IP guess.
  */
-export function PlacePicker({ label, placeholder, onChoose }: PlacePickerProps): JSX.Element {
+export function PlacePicker(props: PlacePickerProps): JSX.Element {
+  const { label, placeholder, onChoose, citiesOnly = false } = props;
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(-1);
   const [open, setOpen] = useState(false);
@@ -31,13 +34,11 @@ export function PlacePicker({ label, placeholder, onChoose }: PlacePickerProps):
   const found = useMemo(
     () =>
       index
-        ? search(
-            { places: index, stories: null, nodes: null, outlets: null },
-            query,
-            0,
-          ).places.slice(0, LIMIT)
+        ? search({ places: index, stories: null, nodes: null, outlets: null }, query, 0)
+            .places.filter((place) => !citiesOnly || place.kind === 'city')
+            .slice(0, LIMIT)
         : [],
-    [index, query],
+    [index, query, citiesOnly],
   );
   const showing = open && query.trim() !== '';
 

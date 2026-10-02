@@ -31,6 +31,8 @@ export interface GlobeInputHandlers {
   onActivate(x: number, y: number): void;
   /** Escape on the focused globe. Returns true if it closed something. */
   onEscape(): boolean;
+  /** Home on the focused globe: back to the resting view. Returns true if it moved. */
+  onHome(): boolean;
 }
 
 /**
@@ -113,6 +115,8 @@ export function bindControlInput(
     else if (ACTIVATE_KEYS.has(event.key) && handlers) {
       rect = element.getBoundingClientRect();
       handlers.onActivate(rect.width / 2, rect.height / 2);
+    } else if (event.key === 'Home' && handlers) {
+      handled = handlers.onHome();
     } else handled = event.key === 'Escape' && handlers !== null && handlers.onEscape();
     // Space would otherwise scroll the page.
     if (handled) event.preventDefault();

@@ -2,6 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef, useState } from 'react';
 import { PerspectiveCamera } from 'three';
 
+import type { LatLon } from '@/core';
 import {
   createOrbitGlobeControls,
   type CameraPose,
@@ -27,6 +28,8 @@ export interface GlobeControlsOptions {
   readonly input?: GlobeInputHandlers;
   /** Where the camera starts (a shared link's view); the world view when absent. */
   readonly initialPose?: CameraPose | null;
+  /** The world view's centre: the reader's home city, else 0°, 0°. */
+  readonly restingCenter?: LatLon | null;
 }
 
 /**
@@ -46,6 +49,7 @@ export function useGlobeControls(options: GlobeControlsOptions): void {
   const inputRef = useRef(input);
   // Read once, at creation: a later change of link must not rebuild the controls.
   const [initialPose] = useState(options.initialPose ?? null);
+  const [restingCenter] = useState(options.restingCenter ?? null);
 
   useEffect(() => {
     inputRef.current = input;
@@ -59,8 +63,8 @@ export function useGlobeControls(options: GlobeControlsOptions): void {
       bodyOrientation: earthTiltQuaternion(),
       requestFrame: invalidate,
       initialPose: initialPose ?? {
-        lat: 0,
-        lon: 0,
+        lat: restingCenter?.lat ?? 0,
+        lon: restingCenter?.lon ?? 0,
         altitudeKm: fitAltitudeKm(size.width / Math.max(1, size.height)),
       },
     });
@@ -71,7 +75,7 @@ export function useGlobeControls(options: GlobeControlsOptions): void {
       setControls(null);
       created.dispose();
     };
-  }, [camera, invalidate, get, onReady, initialPose]);
+  }, [camera, invalidate, get, onReady, initialPose, restingCenter]);
 
   useEffect(() => {
     controls?.setViewport(width, height);
@@ -88,6 +92,7 @@ export function useGlobeControls(options: GlobeControlsOptions): void {
       onTap: (x, y) => inputRef.current?.onTap(x, y),
       onActivate: (x, y) => inputRef.current?.onActivate(x, y),
       onEscape: () => inputRef.current?.onEscape() ?? false,
+      onHome: () => inputRef.current?.onHome() ?? false,
     });
   }, [controls, eventTarget]);
 
