@@ -300,8 +300,8 @@ validate what it serves and by the client to validate what it decodes.
   Everything else loads on tap from `/api/story/:id`.
 
 Measured end to end on a real 24 h window: 3000 nodes are 134,646 bytes
-(131.5 KB) with Brotli 11; 415.7 KB decoded. `cc` adds 2,727 bytes at
-Brotli 11 (measured on 3000 nodes from four real hours), about 134 KB in all.
+(131.5 KB) with Brotli 11; 415.7 KB decoded. `cc` adds 2,557 bytes at
+Brotli 11, measured on a full real day: 136,529 bytes (133.3 KB) in all.
 
 **HTTP:** `Content-Encoding: br` when accepted (identity JSON otherwise),
 weak `ETag`, `If-None-Match` → 304, and
@@ -321,9 +321,9 @@ snippet), capped at `API_STORY_ARTICLE_LIMIT` (1000). 404 when unknown.
 **`GET /api/outlets?hours=N`** (Prompt 3.4) lists the outlets covering the
 payload's stories for outlet search, fetched when search first opens:
 `{v: 1, generated_at, window_hours, outlets: [name…], n: [stories…]}`, most
-stories first. Brotli and cached like the payload. On four real hours it
-listed 1,606 outlets in 9.3 KB; carrying every outlet's story ids as well
-would have cost 20 KB there and more than its 40 KB budget for a full day,
+stories first. Brotli and cached like the payload. On a full real day it
+listed 3,459 outlets in 19.1 KB; carrying every outlet's story ids as well
+would have taken 54.4 KB, over its 40 KB budget,
 so the ids come separately, for the outlet chosen:
 
 **`GET /api/outlets/:outlet?hours=N`** returns `{outlet, ids}`, that outlet's

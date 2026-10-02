@@ -6,6 +6,141 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-10-02 — Secondary navigation: search on the device, filters in the shader, a library that moves up
+
+Prompt 3.4 adds search, filters, the Following feed, the Saved list and a
+first-run onboarding.
+
+**Your four calls.**
+
+- **Accounts:** the account side is built now (tables, sync, moving the
+  device's library up on sign-in). Nobody can sign in until Prompt 4.1 adds
+  the button.
+- **Interests** picked in onboarding are followed categories.
+- **The alerts opt-in** is recorded and nothing more; the browser is asked
+  for permission when alerts exist.
+- **The time window** counts back from the time shown on the scrubber.
+
+**Search runs on what the app already holds, never a server per keystroke**
+(`src/core/search.ts`).
+
+- **Sources:** a gazetteer of 244 countries and 7,342 cities from Natural
+  Earth (public domain, `npm run places:build`); the payload's headlines,
+  places and categories; the outlet index. The gazetteer is columnar JSON,
+  85 KB with Brotli (113 KB as lines of text), fetched on the first focus of
+  search, never at start.
+- **Matching:** text is normalised (case, accents, punctuation), and a name
+  ranks exact, then prefix, then word start, then inside a word. A headline
+  needs every query word.
+- **Measured:** 0.5 ms a query at p50 and 1.1 ms at p95 over the real
+  gazetteer and 3,000 stories; in the browser, results show 93 ms after the
+  last keystroke at p50 and 97 ms at p95, the 80 ms debounce included
+  (12 queries, typed 40 ms a key). The budget is 150 ms.
+- **The outlet index is split.** On a full real day, 3,459 outlets with
+  their counts are 19.1 KB with Brotli; carrying every outlet's story ids too
+  is 54.4 KB, over the 40 KB budget. So search gets names and counts, and an
+  outlet's ids come when it is chosen (`/api/outlets/:outlet`).
+- **One window:** `api_window` defines the payload's stories once, and
+  `api_nodes` and both outlet reads use it, so search never points at a story
+  the globe does not have.
+- **Flying there:** a country is framed whole from its reach, the distance
+  from its label point that takes in 80 % of its area (so Alaska does not
+  stretch the United States): `d = cos θ + sin θ / tan(0.85 φ)`, φ the
+  narrower half-angle of the view. A city, or a story, is framed with its
+  region (2°, about 800 km up on a desktop). The petal level, where a stack
+  fans out, is 75 km up and showed nothing around the pin; a story still
+  clustered at regional height rings its orb.
+
+**Filters dim and shrink in the shader** (`src/globe/pins/pinFilter.ts`).
+
+- **Pins** check their category against eight uniforms and their age
+  (`uNow` − publish time) against a window uniform, so scrubbing with a
+  window active still writes no per-pin data.
+- **Orbs** match when any member does. The shader cannot see members, so
+  that is worked out on the CPU from the layout's groups into one more
+  instanced attribute on the same mesh, and only when a layout or the filter
+  changes: orbs exist only while the time rests.
+- **What a filtered story looks like:** 30 % of its brightness and 60 % of
+  its size, no halo, no pulse. A change cross-fades over 250 ms (at once
+  under reduced motion). The open story is never dimmed, and a shown pin wins
+  a near-tie on a tap.
+- **The URL** carries `cats` and `within`, and share links keep them. Writing
+  them by hand also stopped URLSearchParams escaping a permalink's camera.
+- **On a phone** the chip row scrolls, so a page opened with filters starts
+  scrolled to the first pressed chip.
+
+Measured in headless Chrome on the Iris Xe, **on battery**, 1408 × 655 at
+1.25, 3,000 mock stories at world view, in full motion; 24 filter changes
+each held 500 ms, then a 3 s scrub with a 3 h window:
+
+| Tier   | Globe alone, p95 / slower than 60 fps | Filter changes, p95 / slower | Scrub with a window, p95 / slower |
+| ------ | ------------------------------------- | ---------------------------- | --------------------------------- |
+| MEDIUM | 7.3 ms / 0 of 1,244                   | 7.2 ms / 0 of 1,654          | 13.8 ms / 1 of 404                |
+| HIGH   | 13.9 ms / 1 of 1,104                  | 14.0 ms / 8 of 1,431         | 14.0 ms / 2 of 358                |
+
+- A filter change costs MEDIUM nothing measurable. HIGH sits at the edge of
+  144 Hz with 3,000 pins, as 3.2 and 3.3 found; a second HIGH run had the
+  globe alone throttled too (31 slow frames before any filter changed), which
+  is the battery, not the filters.
+
+**Countries in the payload.** `api_nodes` adds `cc`, each story's ISO country,
+so following a country matches exactly instead of guessing GDELT's English
+names. Measured on a full real day: +2,557 bytes, 136,529 bytes (133.3 KB) of
+the 150 KB budget.
+
+**Follows and saves have one shape on the device and in the account.**
+
+- **No coordinates in the database** (CLAUDE.md #5): a followed place is
+  `city:<ne_id>` or `country:<ISO-2>`, resolved by the app's gazetteer. One
+  spelling per target, so the same follow from two devices is one row.
+- **The home city never leaves the device.** It is where the reader lives;
+  it only decides where the globe rests.
+- **Moving up on sign-in** adds the device's lists to the account (rows it
+  already has are ignored, so a retry is harmless), forgets only what was
+  sent, and repeats if the reader added more meanwhile. Nothing is dropped,
+  not even past the saved limit (Prompt 4.1, "nothing lost"); the limit, a
+  tier boundary in AppConfig, only blocks new saves. If the account cannot be
+  reached, the device keeps everything and the next start tries again.
+- **Account writes show at once**, and a failed one reads the list back
+  rather than claim what the account does not hold.
+- **The database bounds abuse**, not the product: 1,000 rows per person per
+  table, by trigger.
+- **The SDK (55.7 KB gzip) loads only for a stored session.** The session
+  lives under a fixed storage key, so the app can tell without the SDK.
+  Checked in headless Chrome against the local stack with a throwaway user:
+  a guest's load never fetched it; signing in moved two follows and a save up
+  and cleared them from the device; a follow made signed in went to the
+  account; a reload resumed the session; signing out returned to the
+  device's (now empty) lists. `db:smoke` repeats the move-up and the
+  isolation between two users on every run.
+
+**The Following feed is finite by construction.** It is the payload's
+stories that match any follow, newest first, then "That's everything from
+the last 24 hours": no paging, no infinite scroll. A city matches within
+50 km, so Yokohama counts as Tokyo; a country by code; a category; a
+followed story, with the sources it gained since. Rows use
+`content-visibility: auto`, so following everything (3,000 rows) stays cheap.
+
+**Onboarding asks once, when the reader is free.** After 60 s of visible use,
+counted across visits and waiting while any sheet is open, or straight
+after the first save. It is a modal sheet (focus held inside, Escape skips),
+and every step keeps what was already chosen. The home city is typed, never
+located: no location permission, no IP guess. It becomes the resting view,
+and Home on the focused globe flies back to it.
+
+**The library and onboarding ship in the main chunk.** As lazy chunks, the
+bundler (rolldown) moved 139 KB gzip of modules they share with the app into
+a separate chunk that every start fetched anyway: 375.0 KB in four requests
+against 372.4 KB in one, to defer 8.5 KB. It is the 3.3 lesson again.
+
+- **Size:** 3.4 adds 15.8 KB gzip to the start, from 356.6 to 372.4 KB.
+- **Cold start**, production build, Earth on screen: 0.31–0.36 s locally;
+  1.68–1.70 s on the phone profile (fast 4G, CPU slowed 4×). The budget is
+  2 s.
+- **Not measured on the phone.**
+
+---
+
 ## 2026-10-01 — Story UI: picking on the CPU, one spring for the sheet, links that carry the view
 
 Prompt 3.3 adds the peek card, the full sheet, Save, Share and Discuss.

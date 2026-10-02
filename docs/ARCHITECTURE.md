@@ -63,6 +63,14 @@ browser <──Brotli, ETag, SWR── API Worker <─────────�
    `GET /api/story/:id`, revalidated on every ask. Share copies a permalink
    (`src/core/permalink.ts`) of the camera, the instant and the story, and a
    page opened with one starts on that view.
+7. Search, filters and the library (Prompt 3.4, `src/ui/nav/`,
+   `src/ui/library/`). Search runs in the client over the gazetteer
+   (`public/data/places.v1.json`, fetched on first use), the payload and the
+   outlet index (`GET /api/outlets`). Filters live in the URL and reach the
+   pin shader as uniforms. Follows and saves live in localStorage for a
+   guest and in Supabase (`follows`, `saved_stories`) once signed in; the SDK
+   loads only to resume a stored session, and signing in moves the device's
+   lists up (`src/state/library.ts`).
 
 The wire format is defined once, in `src/core/data/payload.ts`, and both the
 Worker and the client validate against it.
@@ -75,6 +83,9 @@ Worker and the client validate against it.
   transition once, not every frame.
 - Time is a uniform: scrubbing never rewrites per-pin data.
 - Selection is a uniform too: one slot index the shader rings.
+- Filters are uniforms as well: a category mask and a window. Only orbs,
+  which match through their members, take per-slot data, and only when the
+  filter or the layout changes.
 - Render on demand: stop the loop when nothing is moving.
 - Frame-rate-independent smoothing only — see `src/globe/smoothing.ts`.
 

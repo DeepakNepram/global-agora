@@ -13,7 +13,10 @@ payload, clustered in a Web Worker, and opened with an animated bloom as you
 zoom in. A time scrubber drags or plays back through the last 24 hours, with
 the pins and the day/night line moving together. Tapping a pin opens its
 story: a peek card, a full sheet of every outlet's coverage, Save, and Share
-links that reopen the same view. No discussions yet.
+links that reopen the same view. Search finds places, topics, stories and
+outlets; filters dim what they leave out; a Following tab and a Saved list
+keep what you care about, on your device or (once sign-in exists) in your
+account. No discussions yet.
 
 ## Requirements
 
