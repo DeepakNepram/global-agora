@@ -6,7 +6,7 @@ import {
   type AccountController,
   type AccountEnvironment,
 } from './accountController';
-import { hasStoredSession, loadAccountSession } from './accountSession';
+import { hasStoredSession, loadAccountSession, type AccountSession } from './accountSession';
 import { accountStore } from './accountStore';
 
 /**
@@ -44,6 +44,26 @@ export function browserAccountEnvironment(): AccountEnvironment {
 
 let current: AccountController | null = null;
 
+/**
+ * One SDK client per backend, however often the controller is remade
+ * (React StrictMode mounts effects twice in development). Two clients on one
+ * stored session would each exchange a returning sign-in code and each
+ * refresh the token.
+ */
+const sessions = new Map<string, Promise<AccountSession>>();
+
+function sharedSession(config: DbConfig): Promise<AccountSession> {
+  const key = `${config.url} ${config.anonKey}`;
+  let session = sessions.get(key);
+  if (session === undefined) {
+    session = loadAccountSession(config);
+    // A chunk that failed to load is tried again next time.
+    session.catch(() => sessions.delete(key));
+    sessions.set(key, session);
+  }
+  return session;
+}
+
 /** The controller, or null when this build has no backend. */
 export function getAccountController(): AccountController | null {
   return current;
@@ -54,7 +74,7 @@ export function startAccounts(config: DbConfig | null): () => void {
   if (config === null) return () => {};
   const controller = createAccountController({
     store: accountStore,
-    load: () => loadAccountSession(config),
+    load: () => sharedSession(config),
     environment: browserAccountEnvironment(),
   });
   current = controller;
