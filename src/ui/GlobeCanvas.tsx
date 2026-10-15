@@ -2,10 +2,17 @@ import { Canvas } from '@react-three/fiber';
 import { useMemo, useState, type JSX } from 'react';
 import { Color } from 'three';
 
-import { previewTextureSet, textureSetForTier, type Permalink, type QualityTier } from '@/core';
+import {
+  previewTextureSet,
+  textureSetForTier,
+  type AuthProvider,
+  type Permalink,
+  type QualityTier,
+} from '@/core';
 import { CAMERA_FOV_DEG, renderSettingsForTier, VIGNETTE, type OrbitGlobeControls } from '@/globe';
-import { onboardingStore, usePanelStore, useStoryStore } from '@/state';
+import { onboardingStore, useAccountStore, usePanelStore, useStoryStore } from '@/state';
 
+import { AccountButton } from './account/AccountButton';
 import { createPresentLog } from './globe/bloomReport';
 import { ControlsHost, PipelineHost } from './globe/canvasHosts';
 import { createFrameProbe } from './globe/frameProbe';
@@ -40,6 +47,8 @@ export interface GlobeCanvasProps {
   readonly savedStoryLimit: number;
   /** The shared view this page was opened with, if any (see src/core/permalink.ts). */
   readonly link: Permalink;
+  /** Ways to sign in, or null when this build has no backend (then there is no Sign in). */
+  readonly authProviders: readonly AuthProvider[] | null;
 }
 
 /** Matches --color-void, so the opaque canvas is indistinguishable from the page. */
@@ -73,7 +82,7 @@ const GLOBE_LABEL =
  *   for no visible gain on a sphere.
  */
 export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
-  const { tier, historyWindowHours, apiBaseUrl, savedStoryLimit, link } = props;
+  const { tier, historyWindowHours, apiBaseUrl, savedStoryLimit, link, authProviders } = props;
   const settings = renderSettingsForTier(tier);
   const dev = useDevSettings(settings);
   const [controls, setControls] = useState<OrbitGlobeControls | null>(null);
@@ -85,7 +94,8 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
   const storyOpen = useStoryStore((state) => state.sheet !== 'closed');
   const panelOpen = usePanelStore((state) => state.panel !== null);
   const sheetOpen = storyOpen || panelOpen;
-  useOnboardingTrigger(sheetOpen);
+  const accountOpen = useAccountStore((state) => state.sheet !== null);
+  useOnboardingTrigger(sheetOpen || accountOpen);
   const target = useMemo(
     (): GlobeTarget => ({ controls, viewport: picker.viewport }),
     [controls, picker],
@@ -189,7 +199,12 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
         target={target}
         apiBaseUrl={apiBaseUrl}
         historyHours={historyWindowHours}
-        actions={<LibraryButtons />}
+        actions={
+          <>
+            <LibraryButtons />
+            {authProviders !== null && <AccountButton />}
+          </>
+        }
       />
       <TimeScrubber nodes={pinNodes} historyHours={historyWindowHours} hidden={sheetOpen} />
       <SecondarySheets
@@ -198,6 +213,7 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
         historyHours={historyWindowHours}
         savedStoryLimit={savedStoryLimit}
         reducedMotion={motion === 'reduced'}
+        authProviders={authProviders}
       />
       <StoryLayer
         nodes={pinNodes}

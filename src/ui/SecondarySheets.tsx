@@ -1,8 +1,9 @@
 import { useState, type JSX } from 'react';
 
-import type { NodeBuffer } from '@/core';
+import type { AuthProvider, NodeBuffer } from '@/core';
 import { useOnboardingStore, usePanelStore } from '@/state';
 
+import { AccountLayer } from './account/AccountLayer';
 import LibraryLayer from './library/LibraryLayer';
 import type { GlobeTarget } from './nav/globeNavigation';
 import OnboardingLayer from './onboarding/OnboardingLayer';
@@ -13,17 +14,19 @@ export interface SecondarySheetsProps {
   readonly historyHours: number;
   readonly savedStoryLimit: number;
   readonly reducedMotion: boolean;
+  /** Ways to sign in, or null without a backend. */
+  readonly authProviders: readonly AuthProvider[] | null;
 }
 
 /**
- * The library (Following, Saved) and the onboarding, each mounted the first
- * time it opens and kept after, so closing can slide it away and hand focus
+ * The library (Following, Saved), the onboarding and the account's sheets,
+ * each mounted the first time it opens and kept after, so closing can slide it away and hand focus
  * back. In the main chunk on purpose: as lazy chunks, the bundler moved
  * 139 KB of modules they share with the app into a separate startup chunk,
  * which cost more than the 8.5 KB they saved (docs/DECISIONS.md).
  */
 export function SecondarySheets(props: SecondarySheetsProps): JSX.Element {
-  const { nodes, target, historyHours, savedStoryLimit, reducedMotion } = props;
+  const { nodes, target, historyHours, savedStoryLimit, reducedMotion, authProviders } = props;
   const panelOpen = usePanelStore((state) => state.panel !== null);
   const onboardingOpen = useOnboardingStore((state) => state.open);
   const [libraryUsed, setLibraryUsed] = useState(false);
@@ -43,6 +46,9 @@ export function SecondarySheets(props: SecondarySheetsProps): JSX.Element {
         />
       )}
       {onboardingUsed && <OnboardingLayer target={target} reducedMotion={reducedMotion} />}
+      {authProviders !== null && (
+        <AccountLayer providers={authProviders} reducedMotion={reducedMotion} />
+      )}
     </>
   );
 }

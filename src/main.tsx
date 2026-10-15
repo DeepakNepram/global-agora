@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { App } from '@/ui';
-import { resolveConfig } from '@/core';
+import { authProvidersFromEnv, resolveConfig } from '@/core';
 // The Supabase settings without the SDK: it loads only for a signed-in reader.
 import { dbConfigFromEnv } from '@/core/db/config';
 
@@ -18,9 +18,10 @@ if (!container) {
 const env = import.meta.env as unknown as Record<string, string | undefined>;
 const config = resolveConfig(env);
 const dbConfig = dbConfigFromEnv(env);
+const authProviders = authProvidersFromEnv(env);
 
 createRoot(container).render(
   <StrictMode>
-    <App config={config} dbConfig={dbConfig} />
+    <App config={config} dbConfig={dbConfig} authProviders={authProviders} />
   </StrictMode>,
 );
