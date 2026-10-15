@@ -2,7 +2,7 @@
 -- Run with `npm run db:test`. Each file runs in a transaction that rolls back.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(38);
+select plan(40);
 
 -- CLAUDE.md #8, checked generically so a table added later is covered too.
 select is(
@@ -42,7 +42,7 @@ select table_privs_are('public', 'posts',         'anon', '{}'::text[],   'anon:
 select table_privs_are('public', 'votes',         'anon', '{}'::text[],   'anon: nothing on votes');
 select table_privs_are('public', 'reports',       'anon', '{}'::text[],   'anon: nothing on reports');
 select table_privs_are('public', 'blocks',        'anon', '{}'::text[],   'anon: nothing on blocks');
-select table_privs_are('public', 'profiles',      'anon', '{}'::text[],   'anon: nothing on profiles');
+select table_privs_are('public', 'profiles',      'anon', '{}'::text[],   'anon: no table-wide grant on profiles');
 select table_privs_are('public', 'feature_flags', 'anon', '{}'::text[],   'anon: nothing on feature_flags');
 select table_privs_are('public', 'story_signals', 'anon', '{}'::text[],   'anon: nothing on story_signals');
 select table_privs_are('public', 'ingest_runs',   'anon', '{}'::text[],   'anon: nothing on ingest_runs');
@@ -58,7 +58,12 @@ select table_privs_are('public', 'posts',         'authenticated', array['SELECT
 select table_privs_are('public', 'votes',         'authenticated', array['SELECT'], 'signed in: read votes (RLS: own)');
 select table_privs_are('public', 'reports',       'authenticated', '{}'::text[],   'signed in: nothing on reports');
 select table_privs_are('public', 'blocks',        'authenticated', array['SELECT'], 'signed in: read blocks (RLS: own)');
-select table_privs_are('public', 'profiles',      'authenticated', array['SELECT'], 'signed in: read profiles (RLS: own)');
+select table_privs_are('public', 'profiles',      'authenticated', '{}'::text[],   'signed in: no table-wide grant on profiles');
+-- Profiles are read by column (Prompt 4.1): the public fields, never the private ones.
+select column_privs_are('public', 'profiles', 'handle', 'anon', array['SELECT'],
+  'anyone reads a profile''s handle');
+select column_privs_are('public', 'profiles', 'strikes', 'authenticated', '{}'::text[],
+  'nobody reads strikes from the table');
 select table_privs_are('public', 'feature_flags', 'authenticated', array['SELECT'], 'signed in: read feature_flags');
 select table_privs_are('public', 'story_signals', 'authenticated', '{}'::text[],   'signed in: nothing on story_signals');
 select table_privs_are('public', 'ingest_runs',   'authenticated', '{}'::text[],   'signed in: nothing on ingest_runs');
@@ -84,8 +89,9 @@ select is(
 
 -- Exactly the API's functions: the two reads (Prompt 2.3), the participant
 -- count api_story calls and the location report (Prompt 3.3), and outlet
--- search with the window it shares with the payload (Prompt 3.4). Anything
--- else a client could call is a mistake.
+-- search with the window it shares with the payload (Prompt 3.4), and the
+-- first sign-in's flow and account deletion (Prompt 4.1). Anything else a
+-- client could call is a mistake.
 select is(
   (select coalesce(array_agg(p.proname::text order by p.proname), '{}')
      from pg_proc p
@@ -93,8 +99,9 @@ select is(
     where n.nspname = 'public'
       and (has_function_privilege('anon', p.oid, 'execute')
            or has_function_privilege('authenticated', p.oid, 'execute'))),
-  array['api_nodes', 'api_outlet_stories', 'api_outlets', 'api_report_location', 'api_story',
-        'api_window', 'discussion_participants'],
+  array['accept_rules', 'api_nodes', 'api_outlet_stories', 'api_outlets', 'api_report_location',
+        'api_story', 'api_window', 'claim_handle', 'delete_my_account', 'discussion_participants',
+        'handles_available', 'my_profile'],
   'client roles can call exactly the API functions'
 );
 

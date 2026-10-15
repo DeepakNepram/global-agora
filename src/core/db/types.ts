@@ -544,6 +544,7 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      accept_rules: { Args: never; Returns: string };
       api_nodes: {
         Args: { p_hours: number; p_known?: string; p_limit: number };
         Returns: Json;
@@ -573,7 +574,14 @@ export type Database = {
           window_end: string;
         }[];
       };
+      claim_handle: {
+        Args: { p_handle: string; p_is_adult: boolean };
+        Returns: string;
+      };
+      delete_my_account: { Args: never; Returns: undefined };
       discussion_participants: { Args: { p_story: string }; Returns: number };
+      handle_reserved: { Args: { p_handle: string }; Returns: boolean };
+      handles_available: { Args: { p_handles: string[] }; Returns: string[] };
       ingest_apply: { Args: { p_batch: Json }; Returns: Json };
       ingest_candidates: {
         Args: { p_clusters: Json; p_min_overlap?: number; p_since: string };
@@ -610,6 +618,17 @@ export type Database = {
           p_story_cutoff: string;
         };
         Returns: Json;
+      };
+      my_profile: {
+        Args: never;
+        Returns: {
+          created_at: string;
+          display_name: string;
+          handle: string;
+          is_adult: boolean;
+          rules_accepted_at: string;
+          tier: string;
+        }[];
       };
     };
     Enums: {

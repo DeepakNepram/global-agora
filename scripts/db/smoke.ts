@@ -88,9 +88,22 @@ record(
   articleCount.error?.message ?? `${articleCount.count} articles`,
 );
 
+// Profiles are public by column (Prompt 4.1): handles yes, private fields no.
+const handles = await db.from('profiles').select('id, handle, display_name').limit(1);
+record(
+  "anon reads profiles' public fields",
+  handles.error === null,
+  handles.error?.message ?? `${handles.data?.length ?? 0} rows`,
+);
+const privateFields = await db.from('profiles').select('strikes').limit(1);
+record(
+  "anon is refused profiles' private fields",
+  privateFields.error?.code === DENIED,
+  privateFields.error?.message ?? 'READABLE',
+);
+
 // --- Signed out, everything else is refused. --------------------------------
 const closed: readonly TableName[] = [
-  'profiles',
   'feature_flags',
   'discussions',
   'posts',

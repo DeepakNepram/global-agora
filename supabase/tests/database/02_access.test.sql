@@ -4,7 +4,7 @@
 -- posts ...e1 (A, approved), ...e2 (B, pending), ...e3 (A, hidden).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(30);
+select plan(32);
 
 -- Fixtures, written as the table owner (as the ingest Worker's service role would).
 insert into auth.users (id, email) values
@@ -46,7 +46,10 @@ select ok(exists (select 1 from public.stories where id = '00000000-0000-4000-80
 select ok(exists (select 1 from public.articles where story_id = '00000000-0000-4000-8000-000000000051'),
   'anon reads articles');
 
-select throws_ok('select 1 from public.profiles',      '42501', null, 'anon cannot read profiles');
+select is((select array_agg(handle order by handle) from public.profiles),
+  array['reader_a', 'reader_b'], 'anon reads profiles'' public fields');
+select throws_ok('select tier from public.profiles', '42501', null,
+  'anon cannot read a profile''s private fields');
 select throws_ok('select 1 from public.feature_flags', '42501', null, 'anon cannot read feature_flags');
 select throws_ok('select 1 from public.discussions',   '42501', null, 'anon cannot read discussions');
 select throws_ok('select 1 from public.posts',         '42501', null, 'anon cannot read posts');
@@ -78,9 +81,10 @@ select ok(exists (select 1 from public.discussions where story_id = '00000000-00
 select ok(exists (select 1 from public.feature_flags where key = 'fixture.flag'),
   'signed in: reads feature flags');
 
-select is((select array_agg(id) from public.profiles),
-  array['00000000-0000-4000-8000-00000000000a']::uuid[],
-  'signed in: reads only their own profile');
+select is((select count(*) from public.profiles), 2::bigint,
+  'signed in: reads everyone''s public fields');
+select throws_ok('select strikes from public.profiles', '42501', null,
+  'signed in: cannot read strikes from the table, not even their own');
 select is((select array_agg(body order by body) from public.posts),
   array['approved post by a', 'hidden post by a'],
   'signed in: reads approved posts plus their own in any state, not others'' pending ones');
