@@ -31,6 +31,8 @@ export interface ModalSheetProps {
   readonly children: ReactNode;
   /** 'alertdialog' while it asks to confirm something that cannot be undone. */
   readonly role?: 'dialog' | 'alertdialog';
+  /** Where focus goes on closing when nothing had it at opening (a sheet that opened itself). */
+  readonly fallbackFocus?: () => HTMLElement | null;
 }
 
 /** Everything Tab can reach inside `root`, in order. */
@@ -50,11 +52,17 @@ function tabbable(root: HTMLElement): HTMLElement[] {
  */
 export function ModalSheet(props: ModalSheetProps): JSX.Element {
   const { open, titleId, heading, focusKey, reducedMotion, onDismiss, header, children } = props;
+  const fallbackFocus = useRef(props.fallbackFocus);
   const [height, setHeight] = useState(0);
   const host = useRef<HTMLDivElement>(null);
   const sheet = useRef<HTMLElement>(null);
   const opener = useRef<HTMLElement | null>(null);
+  const wasOpen = useRef(false);
   const state: SheetState = open ? 'full' : 'closed';
+
+  useLayoutEffect(() => {
+    fallbackFocus.current = props.fallbackFocus;
+  });
 
   useLayoutEffect(() => {
     const element = host.current;
@@ -67,13 +75,17 @@ export function ModalSheet(props: ModalSheetProps): JSX.Element {
     return () => observer.disconnect();
   }, []);
 
-  // Read before anything inside takes focus; given back on closing.
+  // Read before anything inside takes focus; given back on closing, or to
+  // the fallback when the sheet opened by itself (nothing had focus).
   useLayoutEffect(() => {
     if (open) {
       const active = document.activeElement;
-      opener.current = active instanceof HTMLElement ? active : null;
-    } else {
-      opener.current?.focus({ preventScroll: true });
+      opener.current = active instanceof HTMLElement && active !== document.body ? active : null;
+      wasOpen.current = true;
+    } else if (wasOpen.current) {
+      wasOpen.current = false;
+      const back = opener.current?.isConnected ? opener.current : fallbackFocus.current?.();
+      back?.focus({ preventScroll: true });
     }
   }, [open]);
 

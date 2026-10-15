@@ -4,6 +4,7 @@ import type { AuthProvider, OAuthProvider } from '@/core';
 import { accountStore, getAccountController, useAccountStore, wallClockNow } from '@/state';
 
 import { ModalSheet } from '../sheets/ModalSheet';
+import { accountButtonElement } from './accountFocus';
 import { BODY, HEADING, INPUT, LABEL, PRIMARY, QUIET, SECONDARY } from './accountStyles';
 
 export interface SignInSheetProps {
@@ -91,6 +92,7 @@ export function SignInSheet({ providers, reducedMotion }: SignInSheetProps): JSX
       heading={heading}
       focusKey={sentTo === null ? 'email' : 'code'}
       reducedMotion={reducedMotion}
+      fallbackFocus={accountButtonElement}
       onDismiss={close}
       header={
         <>

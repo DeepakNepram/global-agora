@@ -58,6 +58,7 @@ export function AccountButton(): JSX.Element {
   return (
     <button
       type="button"
+      data-account-button
       aria-haspopup="dialog"
       aria-expanded={open}
       onClick={onClick}

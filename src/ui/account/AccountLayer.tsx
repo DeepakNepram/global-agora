@@ -4,6 +4,7 @@ import type { AuthProvider } from '@/core';
 import { useAccountStore, type AccountState } from '@/state';
 
 import { nextAnnouncement } from '../announce';
+import { SetupSheet } from './SetupSheet';
 import { SignInSheet } from './SignInSheet';
 
 export interface AccountLayerProps {
@@ -46,6 +47,7 @@ export function AccountLayer({ providers, reducedMotion }: AccountLayerProps): J
   return (
     <>
       {used.has('sign-in') && <SignInSheet providers={providers} reducedMotion={reducedMotion} />}
+      {used.has('setup') && <SetupSheet reducedMotion={reducedMotion} />}
       <p role="status" className="sr-only">
         {announcement}
       </p>
