@@ -71,6 +71,12 @@ browser <──Brotli, ETag, SWR── API Worker <─────────�
    guest and in Supabase (`follows`, `saved_stories`) once signed in; the SDK
    loads only to resume a stored session, and signing in moves the device's
    lists up (`src/state/library.ts`).
+8. Accounts (Prompt 4.1, `src/state/accountController.ts`,
+   `src/ui/account/`). Sign-in is Supabase Auth with PKCE: an emailed link
+   and 6-digit code, or Google and Apple when configured. A first sign-in
+   runs a required setup (17+, a handle, the community rules) through the
+   profile functions, and only then moves the library up. Deleting the
+   account deletes the auth user, and the cascades take everything else.
 
 The wire format is defined once, in `src/core/data/payload.ts`, and both the
 Worker and the client validate against it.

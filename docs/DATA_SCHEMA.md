@@ -17,6 +17,7 @@ truth; the original design is the build plan's §3
 | `20261002100000_payload_country.sql`        | `api_nodes` adds each story's country (`cc`)              |
 | `20261002110000_outlets.sql`                | `api_window`, outlet search's two reads                   |
 | `20261002120000_library.sql`                | `follows`, `saved_stories`                                |
+| `20261016100000_profiles.sql`               | handles, the first sign-in's functions, account deletion  |
 
 Each table ships with its RLS policies and grants in the same file: a table and
 its access rules are one change. Migrations are timestamped and forward-only.
@@ -31,16 +32,19 @@ its access rules are one change. Migrations are timestamped and forward-only.
   grants is closed rather than open. Functions are closed too, because
   PostgREST exposes them as RPC endpoints: the ingest migration revokes
   PUBLIC's EXECUTE by default and on each function by name. Client roles may
-  call exactly seven, and a pgTAP test fails if that list changes:
+  call exactly twelve, and a pgTAP test fails if that list changes:
   - the API's read-only `api_nodes` and `api_story`;
   - `discussion_participants`, the count `api_story` calls as the caller;
   - `api_report_location`, which can only add one to a counter;
   - outlet search's read-only `api_outlets` and `api_outlet_stories`, and
     `api_window`, the payload's stories, which they and `api_nodes` call as
-    the caller.
+    the caller;
+  - the first sign-in's `handles_available`, `claim_handle`, `accept_rules`
+    and `my_profile`, and `delete_my_account` (Prompt 4.1), signed in only.
 - **Only the service role writes news.** The ingest Worker holds the service
-  key and bypasses RLS (CLAUDE.md #9). The one thing a client writes is a
-  signed-in reader's own library: `follows` and `saved_stories` (Prompt 3.4).
+  key and bypasses RLS (CLAUDE.md #9). A client writes only what is its
+  own: a signed-in reader's library, `follows` and `saved_stories` (Prompt
+  3.4), and their profile, through the functions above (Prompt 4.1).
 - **No precise user location, ever.** No coordinates on any user-written table.
   `posts.region_label` is coarse text from the Cloudflare IP header, capped at
   64 characters (#5). A unit test scans the user tables for coordinate columns.
@@ -61,7 +65,7 @@ Grants and policies agree; `npm run db:test` checks both.
 | `discussions`            | none       | read                                    | service role (admin, Prompt 4.6) |
 | `feature_flags`          | none       | read                                    | service role                     |
 | `posts`                  | none       | read if `mod_state = 'ok'`, or your own | none yet (Prompt 4.2)            |
-| `profiles`               | none       | your own row                            | none yet (Prompt 4.1)            |
+| `profiles`               | public     | public; your own private via function   | your own, through functions      |
 | `votes`                  | none       | your own votes                          | none yet (Prompt 4.2)            |
 | `blocks`                 | none       | blocks you made                         | none yet (Prompt 4.3)            |
 | `reports`                | none       | none (explicit restrictive deny)        | service role only                |
@@ -74,10 +78,12 @@ Grants and policies agree; `npm run db:test` checks both.
 Open questions left for the prompts that own them:
 
 - **Guests reading discussions.** Prompt 4.1 says reading stays fully
-  anonymous; Prompt 2.1 allows anon reads on stories and articles only. 4.1
-  decides whether discussions and approved posts become readable signed out.
-- **Public profile fields.** Only your own profile is readable today. 4.1
-  decides which columns (handle, display name) others may see.
+  anonymous. 4.1 kept discussions signed-in only, because 4.2 rewrites the
+  posts read policy (blocks); 4.2 opens discussions and approved posts to
+  guests with it.
+- **Profiles without a finished setup.** A reader who leaves setup is signed
+  out, and their auth user stays without a profile: an email address and
+  nothing else. Nothing removes these yet.
 - **Flags before sign-in.** Guests cannot read `feature_flags`. If the app needs
   flags before sign-in, the API Worker reads them with the service key and
   serves them.
@@ -123,6 +129,23 @@ account, so the moderation record survives.
 **`profiles`**: cascades from `auth.users`, so deleting an account deletes the
 profile and, through it, that user's posts, votes and blocks (Prompt 4.1:
 deletion that actually deletes). `tier` is the monetization hook, unused in v1.
+
+- **Public fields, by column:** `id`, `handle` and `display_name`, readable
+  signed out too, so handles can show on posts to anyone. The rest is the
+  account's own, read through `my_profile()`.
+- **Handles:** 3 to 20 lower-case letters, digits or `_`, starting with a
+  letter, not reserved (CHECKs: `handle_reserved()` holds the words and
+  staff-looking prefixes). `src/core/handles.ts` repeats the rules for the
+  UI, and `tests/handles-sql.test.ts` keeps them in step.
+- **Written only by the first sign-in's functions** (no INSERT or UPDATE
+  grant):
+  - `claim_handle(handle, is_adult)` makes the profile, or changes the
+    handle until the rules are agreed (then 55000). It refuses without the
+    17+ answer (22023); a taken handle is 23505.
+  - `accept_rules()` sets `rules_accepted_at` to the database's time.
+    Posting will require it (Prompt 4.2).
+- **`delete_my_account()`** deletes the caller's `auth.users` row. Its
+  identities and sessions go with it, and everything above cascades.
 
 **`feature_flags`**: `key`, `enabled`, an optional `value` payload.
 

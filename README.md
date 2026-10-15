@@ -7,7 +7,7 @@ discussions.
 Web first. Native mobile is a later phase, so the code stays portable — see
 [the boundary](#the-boundary-that-matters).
 
-**Status: Phase 3 in progress.** The globe shows real news from GDELT:
+**Status: Phase 4 in progress.** The globe shows real news from GDELT:
 ingested every 15 minutes, grouped into stories, served as one compact
 payload, clustered in a Web Worker, and opened with an animated bloom as you
 zoom in. A time scrubber drags or plays back through the last 24 hours, with
@@ -15,8 +15,10 @@ the pins and the day/night line moving together. Tapping a pin opens its
 story: a peek card, a full sheet of every outlet's coverage, Save, and Share
 links that reopen the same view. Search finds places, topics, stories and
 outlets; filters dim what they leave out; a Following tab and a Saved list
-keep what you care about, on your device or (once sign-in exists) in your
-account. No discussions yet.
+keep what you care about, on your device or in your account. Signing in (an
+emailed link or code; Google and Apple once set up) asks once for 17+, a
+handle and the community rules, and an account can be deleted from the
+account sheet in three taps. Reading never needs one. No discussions yet.
 
 ## Requirements
 
@@ -78,9 +80,12 @@ Docker Desktop must be running.
 ```bash
 npm run db:start   # first run downloads about 1 GB of images
 npm run db:reset   # migrations + 200 fictional seed stories from the last 24 h
-npm run db:test    # 173 pgTAP assertions: RLS, constraints, ingest, API
-npm run db:smoke   # the stories come back; every other table refuses
+npm run db:test    # 276 pgTAP assertions: RLS, constraints, ingest, API, accounts
+npm run db:smoke   # the stories come back, other tables refuse, an account's life
 ```
+
+Sign-in emails never leave the machine: the local stack catches them in
+Mailpit at http://127.0.0.1:54324, link and code included.
 
 The schema and the access matrix are in
 [`docs/DATA_SCHEMA.md`](docs/DATA_SCHEMA.md). After changing a migration, run

@@ -6,6 +6,104 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-10-16 — Accounts: no SDK until needed, a setup that moves nothing until "I agree", deletion that deletes
+
+Prompt 4.1 adds sign-in, the first sign-in's required setup, profiles and
+account deletion.
+
+**Your two calls.**
+
+- **Guests keep their device lists.** "Sign-in required for following and
+  saving" is read as: the account's copy needs sign-in. A guest still follows
+  and saves on the device, and signing in moves both up (3.4).
+- **The 17+ check is two buttons**, "I'm 17 or older" and "I'm under 17".
+
+**Profiles are written only through five functions**
+(`20261016100000_profiles.sql`).
+
+- **No INSERT or UPDATE grants.** Each function is SECURITY DEFINER and takes
+  the user from `auth.uid()`, never as an argument, so `tier`, `strikes` and
+  `trust_level` cannot be self-written and nobody can act for someone else.
+- **`claim_handle(handle, is_adult)`** makes the profile, or changes the
+  handle until the rules are agreed. It refuses without the 17+ answer.
+- **`accept_rules()`** records the database's time, never the client's.
+- **`my_profile()`** returns the account's private fields, and
+  **`handles_available(text[])`** checks up to ten handles at once.
+- **`delete_my_account()`** deletes the `auth.users` row. The cascades take
+  the profile, follows, saves, posts, votes and blocks, and Supabase Auth's
+  identities and sessions; reports keep their row with a null reporter.
+  - Locally the `postgres` role is not a superuser and holds an explicit
+    DELETE on `auth.users`, as on hosted projects.
+  - Supabase's April 2025 restrictions on the auth schema block writes only
+    to its migration tables.
+  - The deploy runbook repeats the check on the hosted project.
+- **Public fields are granted by column:** `id`, `handle` and `display_name`
+  to `anon` and `authenticated`. `select *` is refused, so the app always
+  names its columns.
+
+**Handles.**
+
+- 3 to 20 lower-case letters, digits or `_`, starting with a letter.
+- Reserved words and staff-looking prefixes (admin, agora, official,
+  support, team_ …) are refused by CHECKs on the table.
+- `src/core/handles.ts` repeats the rules for feedback while typing;
+  `tests/handles-sql.test.ts` keeps the two in step.
+- Suggestions are random `word_word_00`, never built from a name or email:
+  a handle is public, and an email-shaped one says who someone is.
+- Handles are not checked for offensive words until 4.3's moderation.
+
+**Signing in.**
+
+- **PKCE.** An email link, Google or Apple returns a one-time code, never a
+  token in the address bar.
+- **The email carries a 6-digit code as well as the link.** A phone's mail
+  app often opens links in its own browser, which would sign in the wrong one.
+  The code typed into the app's tab avoids that.
+- **The SDK still loads only when needed:** a stored session, a returning
+  code whose verifier this browser holds, or a press of Sign in. A code with
+  no verifier means the link was opened in another browser, and the app says
+  so without loading the SDK.
+- **Error text from the URL is never shown.** Anyone can craft a link with
+  any `error_description` ("call this number"), so the reader sees our own
+  words, chosen by error code.
+- **Buttons follow `VITE_AUTH_PROVIDERS`**, email alone by default. A provider
+  enabled in the app but not in Supabase sends the reader to a raw 400 from
+  the auth server (Apple did, locally).
+- **One SDK client per backend.** StrictMode's double mount made two in
+  development, and both exchanged the same returning code.
+
+**Setup.**
+
+- **The steps:** 17+, then the handle, then the rules. The sheet cannot be
+  swiped or escaped away; "Not now" signs out, and the next sign-in resumes
+  at the first unfinished step.
+- **The library moves up only at "I agree".** An under-17 answer deletes the
+  new account at once, and an abandoned setup signs out, so in neither case
+  has anything left the device.
+- **The rules can be re-agreed.** Moving `RULES_UPDATED_AT_MS` forward asks
+  every account to agree again. The rules text is a draft for the owner to
+  edit (`src/core/communityRules.ts`).
+- **An abandoned setup leaves an auth user without a profile:** an email
+  address and nothing else. Nothing cleans these up yet.
+
+**Deletion is three taps:** the account button, Delete account, then Delete
+in an alertdialog that says what goes and starts focus on Cancel. In the
+browser against the local stack, it left no user, identity, profile,
+follows, saves or session.
+
+**Measured.**
+
+- **Size:** the main chunk grew 7.9 KB gzip (372.4 to 380.3 KB). The SDK
+  chunk is 56.4 KB (+0.7) and still loads only when needed.
+- **Cold start**, production build, Earth on screen, plugged in: 0.26–0.32 s
+  locally; 1.59–1.82 s on the phone profile (fast 4G, CPU slowed 4×; six
+  runs, five at 1.67 s or less). The budget is 2 s.
+- **Not measured on the phone.** Google and Apple are untested end to end:
+  with a dummy client id, the auth server sent Google's button to
+  accounts.google.com with its callback, and no further.
+
+---
+
 ## 2026-10-02 — Secondary navigation: search on the device, filters in the shader, a library that moves up
 
 Prompt 3.4 adds search, filters, the Following feed, the Saved list and a
