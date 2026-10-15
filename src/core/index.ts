@@ -175,6 +175,36 @@ export type { OutletsIndex, OutletStories } from './data/outlets';
 export { categoryAt, isNewsCategory, CATEGORY_LABELS } from './categories';
 export { AUTH_STORAGE_KEY } from './auth';
 export {
+  authReturnProblem,
+  isCodeVerifierKey,
+  readAuthReturn,
+  stripAuthHash,
+  stripAuthParams,
+} from './authReturn';
+export type { AuthReturn } from './authReturn';
+export { AccountError, authProvidersFromEnv } from './account';
+export type {
+  AccountErrorCode,
+  AccountRemote,
+  AuthProvider,
+  OAuthProvider,
+  Profile,
+} from './account';
+export {
+  handleProblem,
+  isHandleReserved,
+  normalizeHandle,
+  suggestHandles,
+  HANDLE_MAX_LENGTH,
+  HANDLE_MIN_LENGTH,
+  HANDLE_PATTERN,
+  RESERVED_HANDLE_PREFIXES,
+  RESERVED_HANDLES,
+} from './handles';
+export type { Random } from './handles';
+export { needsRulesAgreement, COMMUNITY_RULES, RULES_UPDATED_AT_MS } from './communityRules';
+export type { CommunityRule } from './communityRules';
+export {
   cityTarget,
   countryTarget,
   followKey,

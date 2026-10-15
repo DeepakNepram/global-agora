@@ -34,7 +34,9 @@ export function createDbClient(config: DbConfig, options: DbClientOptions = {}):
   }
 
   // A fixed key, so the app can tell a session is stored without the SDK.
-  const auth: AuthOptions = { storageKey: AUTH_STORAGE_KEY };
+  // PKCE: a sign-in link or Google/Apple returns a one-time code, never a
+  // token in the address bar (src/core/authReturn.ts).
+  const auth: AuthOptions = { storageKey: AUTH_STORAGE_KEY, flowType: 'pkce' };
   if (options.storage !== undefined) auth.storage = options.storage;
   if (options.persistSession !== undefined) auth.persistSession = options.persistSession;
   return createClient<Database>(config.url, config.anonKey, { auth });

@@ -14,13 +14,13 @@ import type { SavedStory } from '../../src/core/library.ts';
 
 export type Record = (check: string, ok: boolean, detail: string) => void;
 
-interface TestUser {
+export interface TestUser {
   readonly id: string;
   readonly email: string;
   readonly password: string;
 }
 
-async function admin(
+export async function admin(
   config: DbConfig,
   serviceKey: string,
   path: string,
@@ -36,7 +36,11 @@ async function admin(
   });
 }
 
-async function createUser(config: DbConfig, serviceKey: string, name: string): Promise<TestUser> {
+export async function createUser(
+  config: DbConfig,
+  serviceKey: string,
+  name: string,
+): Promise<TestUser> {
   const email = `smoke-${name}-${randomUUID().slice(0, 8)}@test.example`;
   const password = randomUUID();
   const response = await admin(config, serviceKey, 'users', {
@@ -49,7 +53,7 @@ async function createUser(config: DbConfig, serviceKey: string, name: string): P
   return { id: body.id, email, password };
 }
 
-async function signedIn(
+export async function signedIn(
   config: DbConfig,
   user: TestUser,
 ): Promise<ReturnType<typeof createDbClient>> {

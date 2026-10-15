@@ -10,5 +10,6 @@
  */
 export { assertPublicKey, createDbClient, dbConfigFromEnv } from './client';
 export type { DbClient, DbClientOptions, DbConfig } from './client';
+export { accountErrorCode, createAccountRemote } from './account';
 export { createLibraryRemote, LibraryError } from './library';
 export type { Database, Json, Tables, TablesInsert, TablesUpdate } from './types';
