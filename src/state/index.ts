@@ -66,10 +66,34 @@ export {
 } from './library';
 export {
   hasStoredSession,
-  openAccountSession,
-  resumeAccountSession,
+  loadAccountSession,
   type AccountSession,
+  type SessionUser,
 } from './accountSession';
+export {
+  accountStore,
+  createAccountStore,
+  useAccountStore,
+  type AccountSheet,
+  type AccountState,
+  type AccountStatus,
+  type AccountStore,
+  type SetupStep,
+} from './accountStore';
+export {
+  accountProblem,
+  DELETED_NOTICE,
+  UNDER_AGE_NOTICE,
+  UNREACHABLE_NOTICE,
+} from './accountMessages';
+export {
+  createAccountController,
+  type AccountController,
+  type AccountControllerOptions,
+  type AccountEnvironment,
+  type LibraryLink,
+} from './accountController';
+export { browserAccountEnvironment, getAccountController, startAccounts } from './accounts';
 export {
   createReportedStore,
   reportedStore,

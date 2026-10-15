@@ -1,21 +1,27 @@
-import { AUTH_STORAGE_KEY } from '@/core';
-import type { DbClient, DbConfig } from '@/core/db';
+import { AUTH_STORAGE_KEY, type AccountRemote, type LibraryRemote } from '@/core';
+import type { DbConfig } from '@/core/db';
 
-import { enterAccount, leaveAccount } from './library';
 import { browserStorage, type KeyValueStorage } from './persist';
 
 /**
- * The signed-in session, and with it the Supabase SDK (~54 kB gzip), which
- * loads only when there is a session to resume: a guest's cold start never
- * downloads it. Prompt 4.1's sign-in opens a session the same way.
- *
- * Signing in moves the device's library to the account (library.ts);
- * signing out returns to the device's.
+ * The Supabase SDK (~54 kB gzip), loaded only when there is an account to
+ * talk to: a stored session to resume, a sign-in to finish (the return from
+ * an email link, Google or Apple), or a reader pressing Sign in. A guest's
+ * cold start never downloads it.
  */
 
+export interface SessionUser {
+  readonly id: string;
+  readonly email: string | null;
+}
+
 export interface AccountSession {
-  readonly client: DbClient;
-  dispose(): void;
+  readonly account: AccountRemote;
+  readonly library: LibraryRemote;
+  /** Calls back with the signed-in user (or null) now, then on every change. */
+  onUser(listener: (user: SessionUser | null) => void): () => void;
+  /** Once the SDK has read storage and the URL (a sign-in return is exchanged by then): who is signed in. */
+  ready(): Promise<SessionUser | null>;
 }
 
 /** True when the SDK left a session in storage: worth loading it to resume. */
@@ -27,31 +33,29 @@ export function hasStoredSession(storage: KeyValueStorage | null = browserStorag
   }
 }
 
-export async function openAccountSession(config: DbConfig): Promise<AccountSession> {
+export async function loadAccountSession(config: DbConfig): Promise<AccountSession> {
   const db = await import('@/core/db');
   const client = db.createDbClient(config);
-  const remote = db.createLibraryRemote(client);
-  let userId: string | null = null;
+  const toUser = (
+    session: { user: { id: string; email?: string | undefined } } | null,
+  ): SessionUser | null =>
+    session === null ? null : { id: session.user.id, email: session.user.email ?? null };
 
-  const { data } = client.auth.onAuthStateChange((_event, session) => {
-    const next = session?.user.id ?? null;
-    if (next === userId) return;
-    userId = next;
-    // Out of the callback: the SDK holds its auth lock while it runs, and a
-    // query made inside would wait on that lock.
-    setTimeout(() => {
-      if (next === null) leaveAccount();
-      else void enterAccount(remote);
-    }, 0);
-  });
-  return { client, dispose: () => data.subscription.unsubscribe() };
-}
-
-/** Resumes a stored session on start; null (and no SDK) for a guest. */
-export async function resumeAccountSession(
-  config: DbConfig | null,
-  storage: KeyValueStorage | null = browserStorage(),
-): Promise<AccountSession | null> {
-  if (config === null || !hasStoredSession(storage)) return null;
-  return openAccountSession(config);
+  return {
+    account: db.createAccountRemote(client),
+    library: db.createLibraryRemote(client),
+    onUser(listener) {
+      const { data } = client.auth.onAuthStateChange((_event, session) => {
+        const user = toUser(session);
+        // Out of the callback: the SDK holds its auth lock while it runs, and a
+        // query made inside would wait on that lock.
+        setTimeout(() => listener(user), 0);
+      });
+      return () => data.subscription.unsubscribe();
+    },
+    async ready() {
+      const { data } = await client.auth.getSession();
+      return toUser(data.session);
+    },
+  };
 }
