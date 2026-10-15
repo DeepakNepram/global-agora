@@ -31,6 +31,11 @@ export interface ModalSheetProps {
   readonly children: ReactNode;
   /** 'alertdialog' while it asks to confirm something that cannot be undone. */
   readonly role?: 'dialog' | 'alertdialog';
+  /**
+   * Takes focus instead of the heading when set: the least destructive
+   * choice of a confirmation (WAI-ARIA alertdialog).
+   */
+  readonly focusTarget?: RefObject<HTMLElement | null> | null;
   /** Where focus goes on closing when nothing had it at opening (a sheet that opened itself). */
   readonly fallbackFocus?: () => HTMLElement | null;
 }
@@ -102,9 +107,11 @@ export function ModalSheet(props: ModalSheetProps): JSX.Element {
     return () => document.removeEventListener('focusin', onFocusIn);
   }, [open, heading]);
 
+  const { focusTarget } = props;
   useEffect(() => {
-    if (open && height > 0) heading.current?.focus({ preventScroll: true });
-  }, [open, focusKey, height, heading]);
+    if (open && height > 0)
+      (focusTarget?.current ?? heading.current)?.focus({ preventScroll: true });
+  }, [open, focusKey, height, heading, focusTarget]);
 
   const stops = useMemo(() => {
     const all = sheetStops(height);
