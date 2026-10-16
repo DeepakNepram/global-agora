@@ -3,3 +3,8 @@
 # publishable (anon) key. This Worker never needs the secret key.
 SUPABASE_URL=http://127.0.0.1:54321
 SUPABASE_ANON_KEY=
+# The local badge (Prompt 4.4): the same value as the local Vault entry in
+# supabase/seeds/local-region-label.sql. Public, so the Worker refuses it
+# against any project but the local stack; a hosted one sets its own with
+# `wrangler secret put REGION_LABEL_SECRET`.
+REGION_LABEL_SECRET=local-only-region-label

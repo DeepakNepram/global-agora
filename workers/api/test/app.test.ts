@@ -102,6 +102,9 @@ function deps(overrides: Partial<ApiDeps> = {}, config: Partial<ApiConfig> = {})
     now: () => clock.now,
     waitUntil: (promise) => background.push(promise),
     log: createLogger({}, (line) => lines.push(line)),
+    posting: null,
+    network: { city: null, country: null },
+    fetch: () => Promise.reject(new Error('these routes never call Supabase directly')),
     ...overrides,
   };
   return { d, clock, background, lines };

@@ -7,10 +7,12 @@
  *   GET|HEAD /api/story/:id                      one story in full; :id is the payload's id or the UUID
  *   POST     /api/story/:id/location-report      one "wrong location" report: 204, or 404
  *   GET      /api/health                         200 when configured
+ *   GET      /api/local-badge                    what a post's local badge would say (posts.ts)
+ *   POST     /api/posts                          a post, as its author, with the badge if asked
  *
  * Wrong methods get 405, anything else 404. Reads carry an ETag and
  * Cache-Control with stale-while-revalidate, and come from the SWR cache; the
- * report is never cached.
+ * report and the posting routes are never cached.
  */
 
 import { errorFields, type Logger } from '../../shared/log.ts';
@@ -19,10 +21,12 @@ import type { EntryStore, SwrCache } from './cache.ts';
 import { GoneError } from './cache.ts';
 import type { ApiConfig } from './config.ts';
 import { isOutletName } from '../../../src/core/data/outlets.ts';
+import type { NetworkPlace } from '../../../src/core/localBadge.ts';
 
-import type { ApiDb, StoryRef } from './db.ts';
+import type { ApiDb, Fetch, StoryRef } from './db.ts';
 import { buildNodes, buildOutlets, buildOutletStories, buildStory } from './entries.ts';
 import { corsHeaders, jsonError, jsonReply, preflight, serveEntry } from './http.ts';
+import { routePosting, type PostingConfig } from './posts.ts';
 
 export interface ApiDeps {
   readonly config: ApiConfig;
@@ -36,6 +40,11 @@ export interface ApiDeps {
   readonly now: () => number;
   readonly waitUntil: (promise: Promise<unknown>) => void;
   readonly log: Logger;
+  /** Posting (Prompt 4.4); null when SUPABASE_URL or SUPABASE_ANON_KEY is missing. */
+  readonly posting: PostingConfig | null;
+  /** Cloudflare's city and country for this request, and nothing else from request.cf. */
+  readonly network: NetworkPlace;
+  readonly fetch: Fetch;
 }
 
 const STORY_PATH = /^\/api\/story\/([^/]+)$/;
@@ -181,6 +190,9 @@ async function reportLocation(
 
 async function route(request: Request, url: URL, deps: ApiDeps): Promise<Response> {
   const { pathname } = url;
+  const allowedOrigins = deps.config.allowedOrigins;
+  const posting = routePosting(request, pathname, { ...deps, allowedOrigins });
+  if (posting !== null) return posting;
   const report = REPORT_PATH.exec(pathname);
   if (report) {
     if (request.method === 'OPTIONS') {

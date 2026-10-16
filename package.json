@@ -32,7 +32,7 @@
     "ingest:dev": "wrangler dev -c workers/ingest/wrangler.jsonc --test-scheduled",
     "ingest:replay": "node --experimental-strip-types scripts/ingest/replay.ts",
     "ingest:data": "node --experimental-strip-types scripts/ingest/build-data.ts",
-    "api:dev": "wrangler dev -c workers/api/wrangler.jsonc",
+    "api:dev": "node --experimental-strip-types scripts/api/dev.ts",
     "api:measure": "node --experimental-strip-types scripts/api/measure.ts",
     "places:build": "node --experimental-strip-types scripts/places/build.ts"
   },
