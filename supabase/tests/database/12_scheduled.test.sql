@@ -1,5 +1,6 @@
 -- Scheduled jobs (pg_cron): closing discussions 48 hours after opening
 -- (Prompt 4.2), forgetting abandoned sign-ups (4.1), pruning the run log.
+-- The moderation retry (4.3) is checked in 13_moderation.
 -- The jobs' functions are called directly here; pg_cron's own timing is
 -- checked by hand (docs/DECISIONS.md). Run with `npm run db:test`.
 begin;
@@ -11,8 +12,9 @@ select results_eq(
   'select jobname::text, schedule::text, command::text from cron.job order by jobname',
   $$values ('close-discussions'::text, '*/5 * * * *'::text, 'select private.close_due_discussions()'::text),
            ('forget-abandoned-signups', '17 3 * * *', 'select private.forget_abandoned_signups()'),
-           ('prune-cron-history', '23 3 * * *', 'select private.prune_cron_history()')$$,
-  'three jobs, each calling one function'
+           ('prune-cron-history', '23 3 * * *', 'select private.prune_cron_history()'),
+           ('retry-moderation', '* * * * *', 'select private.retry_moderation()')$$,
+  'four jobs, each calling one function'
 );
 
 -- ---------------------------------------------------------------------------

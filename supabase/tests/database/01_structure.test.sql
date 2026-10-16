@@ -2,7 +2,7 @@
 -- Run with `npm run db:test`. Each file runs in a transaction that rolls back.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(44);
+select plan(51);
 
 -- CLAUDE.md #8, checked generically so a table added later is covered too.
 select is(
@@ -29,9 +29,26 @@ select is(
 select tables_are(
   'public',
   array['articles', 'blocks', 'discussion_stances', 'discussions', 'feature_flags', 'follows',
-        'ingest_runs', 'posts', 'profiles', 'reports', 'saved_stories', 'stories',
-        'story_location_reports', 'story_signals', 'votes'],
-  'public holds exactly the v1 tables, the ingest ledger, the location reports, the library and stances'
+        'ingest_runs', 'notifications', 'posts', 'profiles', 'reports', 'saved_stories', 'stories',
+        'story_location_reports', 'story_signals', 'strikes', 'votes'],
+  'public holds exactly the v1 tables, the ingest ledger, the location reports, the library, '
+  'stances, strikes and notifications'
+);
+
+-- The private schema's tables (settings) are for definer functions only.
+select is(
+  (select coalesce(array_agg(c.relname::text order by c.relname), '{}')
+     from pg_class c
+     join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'private' and c.relkind in ('r', 'p') and not c.relrowsecurity),
+  '{}'::text[],
+  'every table in private has row-level security enabled'
+);
+select is(
+  (select count(*) from information_schema.role_table_grants
+    where table_schema = 'private' and grantee in ('anon', 'authenticated', 'service_role')),
+  0::bigint,
+  'no API role holds any privilege on a private table'
 );
 
 -- The grant matrix (docs/DATA_SCHEMA.md). Grants are the first lock, RLS the second.
@@ -50,6 +67,8 @@ select table_privs_are('public', 'story_location_reports', 'anon', '{}'::text[],
   'anon: nothing on story_location_reports');
 select table_privs_are('public', 'follows',       'anon', '{}'::text[],   'anon: nothing on follows');
 select table_privs_are('public', 'saved_stories', 'anon', '{}'::text[],   'anon: nothing on saved_stories');
+select table_privs_are('public', 'strikes',       'anon', '{}'::text[],   'anon: nothing on strikes');
+select table_privs_are('public', 'notifications', 'anon', '{}'::text[],   'anon: nothing on notifications');
 
 select table_privs_are('public', 'stories',       'authenticated', array['SELECT'], 'signed in: read stories');
 select table_privs_are('public', 'articles',      'authenticated', array['SELECT'], 'signed in: read articles');
@@ -68,6 +87,10 @@ select column_privs_are('public', 'profiles', 'handle', 'anon', array['SELECT'],
 select column_privs_are('public', 'profiles', 'strikes', 'authenticated', '{}'::text[],
   'nobody reads strikes from the table');
 select table_privs_are('public', 'feature_flags', 'authenticated', array['SELECT'], 'signed in: read feature_flags');
+select table_privs_are('public', 'strikes',       'authenticated', '{}'::text[],
+  'signed in: nothing on strikes (the count comes through my_profile)');
+select table_privs_are('public', 'notifications', 'authenticated', array['SELECT'],
+  'signed in: read notifications (RLS: own); mark read by column');
 select table_privs_are('public', 'story_signals', 'authenticated', '{}'::text[],   'signed in: nothing on story_signals');
 select table_privs_are('public', 'ingest_runs',   'authenticated', '{}'::text[],   'signed in: nothing on ingest_runs');
 select table_privs_are('public', 'story_location_reports', 'authenticated', '{}'::text[],
@@ -91,7 +114,8 @@ select is(
 );
 
 -- Column-level writes (Prompt 4.2), exactly these: what a post, a vote and a
--- stance may say. Never moderation state, counts, rank or the region label.
+-- stance may say, and marking your notices read (4.3). Never moderation
+-- state, counts, rank or the region label.
 select is(
   (select array_agg(format('%s.%s:%s', table_name, column_name, privilege_type)
                     order by table_name, column_name, privilege_type)
@@ -101,6 +125,7 @@ select is(
       and table_name not in ('follows', 'saved_stories')),
   array['discussion_stances.stance:INSERT', 'discussion_stances.stance:UPDATE',
         'discussion_stances.story_id:INSERT',
+        'notifications.read_at:UPDATE',
         'posts.body:INSERT', 'posts.evidence_url:INSERT', 'posts.kind:INSERT',
         'posts.stance:INSERT', 'posts.story_id:INSERT',
         'votes.kind:INSERT', 'votes.post_id:INSERT'],
@@ -136,6 +161,12 @@ select is(
         'api_story', 'api_window', 'claim_handle', 'delete_my_account', 'discussion_participants',
         'handles_available', 'my_profile'],
   'client roles can call exactly the API functions'
+);
+
+-- The moderation function answers with the service role (Prompt 4.3).
+select ok(
+  has_function_privilege('service_role', 'public.record_moderation(uuid, jsonb)', 'execute'),
+  'the service role records moderation answers'
 );
 
 -- The ingest Worker writes with the service role, so it must keep its grants.

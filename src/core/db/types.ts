@@ -241,6 +241,61 @@ export type Database = {
         };
         Relationships: [];
       };
+      notifications: {
+        Row: {
+          created_at: string;
+          detail: Json;
+          id: string;
+          kind: string;
+          post_id: string | null;
+          read_at: string | null;
+          story_id: string | null;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          detail?: Json;
+          id?: string;
+          kind: string;
+          post_id?: string | null;
+          read_at?: string | null;
+          story_id?: string | null;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          detail?: Json;
+          id?: string;
+          kind?: string;
+          post_id?: string | null;
+          read_at?: string | null;
+          story_id?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'notifications_post_id_fkey';
+            columns: ['post_id'];
+            isOneToOne: false;
+            referencedRelation: 'posts';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'notifications_story_id_fkey';
+            columns: ['story_id'];
+            isOneToOne: false;
+            referencedRelation: 'discussions';
+            referencedColumns: ['story_id'];
+          },
+          {
+            foreignKeyName: 'notifications_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       posts: {
         Row: {
           author_id: string;
@@ -252,8 +307,11 @@ export type Database = {
           helpful_count: number;
           id: string;
           kind: string;
+          mod_attempts: number;
+          mod_requested_at: string | null;
           mod_scores: Json | null;
           mod_state: string;
+          moderated_at: string | null;
           rank_score: number;
           region_label: string | null;
           stance: string;
@@ -269,8 +327,11 @@ export type Database = {
           helpful_count?: number;
           id?: string;
           kind: string;
+          mod_attempts?: number;
+          mod_requested_at?: string | null;
           mod_scores?: Json | null;
           mod_state?: string;
+          moderated_at?: string | null;
           rank_score?: number;
           region_label?: string | null;
           stance: string;
@@ -286,8 +347,11 @@ export type Database = {
           helpful_count?: number;
           id?: string;
           kind?: string;
+          mod_attempts?: number;
+          mod_requested_at?: string | null;
           mod_scores?: Json | null;
           mod_state?: string;
+          moderated_at?: string | null;
           rank_score?: number;
           region_label?: string | null;
           stance?: string;
@@ -319,6 +383,7 @@ export type Database = {
           is_adult: boolean;
           rules_accepted_at: string | null;
           strikes: number;
+          suspended_at: string | null;
           tier: string;
           trust_level: number;
         };
@@ -330,6 +395,7 @@ export type Database = {
           is_adult?: boolean;
           rules_accepted_at?: string | null;
           strikes?: number;
+          suspended_at?: string | null;
           tier?: string;
           trust_level?: number;
         };
@@ -341,6 +407,7 @@ export type Database = {
           is_adult?: boolean;
           rules_accepted_at?: string | null;
           strikes?: number;
+          suspended_at?: string | null;
           tier?: string;
           trust_level?: number;
         };
@@ -539,6 +606,55 @@ export type Database = {
           },
         ];
       };
+      strikes: {
+        Row: {
+          created_at: string;
+          id: string;
+          issued_by: string | null;
+          post_id: string | null;
+          source: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          issued_by?: string | null;
+          post_id?: string | null;
+          source: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          issued_by?: string | null;
+          post_id?: string | null;
+          source?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'strikes_issued_by_fkey';
+            columns: ['issued_by'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'strikes_post_id_fkey';
+            columns: ['post_id'];
+            isOneToOne: true;
+            referencedRelation: 'posts';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'strikes_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       votes: {
         Row: {
           created_at: string;
@@ -668,6 +784,10 @@ export type Database = {
           rules_accepted_at: string;
           tier: string;
         }[];
+      };
+      record_moderation: {
+        Args: { p_post: string; p_scores: Json };
+        Returns: string;
       };
     };
     Enums: {
