@@ -205,6 +205,23 @@ export type { Random } from './handles';
 export { needsRulesAgreement, COMMUNITY_RULES, RULES_UPDATED_AT_MS } from './communityRules';
 export type { CommunityRule } from './communityRules';
 export {
+  describeNotice,
+  rateLimitWait,
+  ModerationError,
+  HELP_LINK,
+  REPORT_REASONS,
+} from './moderation';
+export type {
+  AppNotice,
+  BlockedAccount,
+  ModerationErrorCode,
+  ModerationRemote,
+  NoticeText,
+  PostRemovedNotice,
+  ReportOutcomeNotice,
+  ReportReason,
+} from './moderation';
+export {
   cityTarget,
   countryTarget,
   followKey,

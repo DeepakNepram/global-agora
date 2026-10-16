@@ -93,7 +93,23 @@ export {
   type AccountEnvironment,
   type LibraryLink,
 } from './accountController';
-export { browserAccountEnvironment, getAccountController, startAccounts } from './accounts';
+export {
+  browserAccountEnvironment,
+  getAccountController,
+  getUpdatesController,
+  startAccounts,
+} from './accounts';
+export {
+  createUpdatesController,
+  createUpdatesStore,
+  updatesStore,
+  useUpdatesStore,
+  UPDATES_SHOWN,
+  type UpdatesController,
+  type UpdatesControllerOptions,
+  type UpdatesState,
+  type UpdatesStore,
+} from './updates';
 export {
   createReportedStore,
   reportedStore,

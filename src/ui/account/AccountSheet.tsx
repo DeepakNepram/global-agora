@@ -1,8 +1,10 @@
-import { useLayoutEffect, useRef, useState, type JSX } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type JSX } from 'react';
 
+import type { Profile } from '@/core';
 import {
   accountStore,
   getAccountController,
+  getUpdatesController,
   useAccountStore,
   useLibraryStatus,
   DELETED_NOTICE,
@@ -11,12 +13,32 @@ import {
 import { ModalSheet } from '../sheets/ModalSheet';
 import { accountButtonElement } from './accountFocus';
 import { BODY, DANGER, HEADING, PRIMARY, QUIET, SECONDARY } from './accountStyles';
+import { UpdatesList } from './UpdatesList';
 
 export interface AccountSheetProps {
   readonly reducedMotion: boolean;
 }
 
 type View = 'account' | 'confirm' | 'deleted' | 'unreachable';
+
+/** Where the account stands after strikes (Prompt 4.3); nothing for a clean record. */
+function Standing({ profile }: { profile: Profile }): JSX.Element | null {
+  if (profile.suspendedAtMs !== null) {
+    return (
+      <p className="rounded-xl border border-red-400/50 px-3 py-2 text-sm text-ink">
+        Posting, voting and taking sides are suspended on this account after {profile.strikes}{' '}
+        strikes for removed posts. You can still read, report, block and delete your account.
+      </p>
+    );
+  }
+  if (profile.strikes === 0) return null;
+  return (
+    <p className={BODY}>
+      This account has {profile.strikes} {profile.strikes === 1 ? 'strike' : 'strikes'} for removed
+      posts.
+    </p>
+  );
+}
 
 /**
  * The account's settings (Prompt 4.1): who is signed in, Sign out (this
@@ -41,6 +63,11 @@ export function AccountSheet({ reducedMotion }: AccountSheetProps): JSX.Element 
   useLayoutEffect(() => {
     if (open) setConfirming(false);
   }, [open]);
+
+  // Opening the sheet shows the reader's updates, which marks them read.
+  useEffect(() => {
+    if (open && status === 'signed-in') void getUpdatesController()?.show();
+  }, [open, status]);
 
   const view: View =
     notice === DELETED_NOTICE && status === 'signed-out'
@@ -101,7 +128,14 @@ export function AccountSheet({ reducedMotion }: AccountSheetProps): JSX.Element 
           <p className={BODY}>
             {libraryProblem ?? 'Your follows and saves are kept in your account, on every device.'}
           </p>
+          {profile !== null && <Standing profile={profile} />}
+          {status === 'signed-in' && <UpdatesList />}
           <div className="flex flex-wrap gap-2">
+            {profile?.isAdmin === true && (
+              <a href="/admin" className={`${SECONDARY} inline-flex items-center`}>
+                Moderation queue
+              </a>
+            )}
             <button
               type="button"
               className={SECONDARY}

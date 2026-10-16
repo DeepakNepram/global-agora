@@ -53,6 +53,9 @@ interface ProfileRow {
   readonly rules_accepted_at: string | null;
   readonly tier: string;
   readonly created_at: string;
+  readonly strikes: number;
+  readonly suspended_at: string | null;
+  readonly is_admin: boolean;
 }
 
 function toProfile(row: ProfileRow): Profile {
@@ -62,6 +65,9 @@ function toProfile(row: ProfileRow): Profile {
     rulesAcceptedAtMs: row.rules_accepted_at === null ? null : Date.parse(row.rules_accepted_at),
     tier: row.tier,
     createdAtMs: Date.parse(row.created_at),
+    strikes: row.strikes,
+    suspendedAtMs: row.suspended_at === null ? null : Date.parse(row.suspended_at),
+    isAdmin: row.is_admin,
   };
 }
 

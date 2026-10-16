@@ -1,4 +1,9 @@
-import { AUTH_STORAGE_KEY, type AccountRemote, type LibraryRemote } from '@/core';
+import {
+  AUTH_STORAGE_KEY,
+  type AccountRemote,
+  type LibraryRemote,
+  type ModerationRemote,
+} from '@/core';
 import type { DbConfig } from '@/core/db';
 
 import { browserStorage, type KeyValueStorage } from './persist';
@@ -18,6 +23,8 @@ export interface SessionUser {
 export interface AccountSession {
   readonly account: AccountRemote;
   readonly library: LibraryRemote;
+  /** Reports, blocks and the reader's notices (Prompt 4.3). */
+  readonly moderation: ModerationRemote;
   /** Calls back with the signed-in user (or null) now, then on every change. */
   onUser(listener: (user: SessionUser | null) => void): () => void;
   /** Once the SDK has read storage and the URL (a sign-in return is exchanged by then): who is signed in. */
@@ -44,6 +51,7 @@ export async function loadAccountSession(config: DbConfig): Promise<AccountSessi
   return {
     account: db.createAccountRemote(client),
     library: db.createLibraryRemote(client),
+    moderation: db.createModerationRemote(client),
     onUser(listener) {
       const { data } = client.auth.onAuthStateChange((_event, session) => {
         const user = toUser(session);

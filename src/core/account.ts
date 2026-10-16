@@ -39,6 +39,12 @@ export interface Profile {
   /** The monetization hook (CLAUDE.md); 'free' throughout v1. */
   readonly tier: string;
   readonly createdAtMs: number;
+  /** Strikes for removed posts (Prompt 4.3); enough of them suspend. */
+  readonly strikes: number;
+  /** When posting, voting and taking sides were suspended, or null. */
+  readonly suspendedAtMs: number | null;
+  /** Whether this account moderates (the queue at /admin). */
+  readonly isAdmin: boolean;
 }
 
 export type AccountErrorCode =

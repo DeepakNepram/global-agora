@@ -1,9 +1,9 @@
 import type { JSX } from 'react';
 
-import { accountStore, useAccountStore, type AccountState } from '@/state';
+import { accountStore, useAccountStore, useUpdatesStore, type AccountState } from '@/state';
 
 const BUTTON =
-  'flex h-10 max-w-44 shrink-0 items-center justify-center gap-2 rounded-full border border-ink/20 bg-panel/90 px-4 text-sm font-medium text-ink hover:bg-white/10 max-sm:size-11 max-sm:px-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-expanded:border-accent aria-expanded:text-accent';
+  'relative flex h-10 max-w-44 shrink-0 items-center justify-center gap-2 rounded-full border border-ink/20 bg-panel/90 px-4 text-sm font-medium text-ink hover:bg-white/10 max-sm:size-11 max-sm:px-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-expanded:border-accent aria-expanded:text-accent';
 
 function PersonIcon(): JSX.Element {
   return (
@@ -40,12 +40,14 @@ function label(state: Pick<AccountState, 'status' | 'profile'>): string {
  * Sign in, or the signed-in handle, at the end of the search row. It opens
  * the sign-in sheet for a guest, the setup still to finish, or the account
  * sheet (sign out, delete). On a phone it is a 44 px icon with its name in
- * the accessible name, like Following and Saved.
+ * the accessible name, like Following and Saved. A dot marks unread updates
+ * (Prompt 4.3), which the accessible name counts.
  */
 export function AccountButton(): JSX.Element {
   const status = useAccountStore((state) => state.status);
   const profile = useAccountStore((state) => state.profile);
   const open = useAccountStore((state) => state.sheet !== null);
+  const unread = useUpdatesStore((state) => state.unread);
   const text = label({ status, profile });
 
   const onClick = (): void => {
@@ -66,6 +68,17 @@ export function AccountButton(): JSX.Element {
     >
       <PersonIcon />
       <span className="truncate max-sm:sr-only">{text}</span>
+      {unread > 0 && (
+        <>
+          <span
+            aria-hidden="true"
+            className="absolute right-1 top-1 size-2.5 rounded-full bg-accent ring-2 ring-panel"
+          />
+          <span className="sr-only">
+            , {unread} new {unread === 1 ? 'update' : 'updates'}
+          </span>
+        </>
+      )}
     </button>
   );
 }

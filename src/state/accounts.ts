@@ -8,6 +8,7 @@ import {
 } from './accountController';
 import { hasStoredSession, loadAccountSession, type AccountSession } from './accountSession';
 import { accountStore } from './accountStore';
+import { createUpdatesController, updatesStore, type UpdatesController } from './updates';
 
 /**
  * The app's one account controller, made at start when the build has a
@@ -43,6 +44,7 @@ export function browserAccountEnvironment(): AccountEnvironment {
 }
 
 let current: AccountController | null = null;
+let currentUpdates: UpdatesController | null = null;
 
 /**
  * One SDK client per backend, however often the controller is remade
@@ -69,18 +71,28 @@ export function getAccountController(): AccountController | null {
   return current;
 }
 
+/** The reader's notices (Prompt 4.3), or null when this build has no backend. */
+export function getUpdatesController(): UpdatesController | null {
+  return currentUpdates;
+}
+
 /** Makes and starts the controller; the returned function stops it. */
 export function startAccounts(config: DbConfig | null): () => void {
   if (config === null) return () => {};
+  const load = (): Promise<AccountSession> => sharedSession(config);
   const controller = createAccountController({
     store: accountStore,
-    load: () => sharedSession(config),
+    load,
     environment: browserAccountEnvironment(),
   });
+  const updates = createUpdatesController({ store: updatesStore, accounts: accountStore, load });
   current = controller;
+  currentUpdates = updates;
   void controller.start();
   return () => {
     controller.dispose();
+    updates.dispose();
     if (current === controller) current = null;
+    if (currentUpdates === updates) currentUpdates = null;
   };
 }

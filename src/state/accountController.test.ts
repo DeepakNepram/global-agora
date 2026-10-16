@@ -5,6 +5,7 @@ import {
   RULES_UPDATED_AT_MS,
   type AccountRemote,
   type LibraryRemote,
+  type ModerationRemote,
   type Profile,
 } from '@/core';
 
@@ -17,7 +18,16 @@ const USER: SessionUser = { id: 'user-1', email: 'reader@test.example' };
 const AGREED = RULES_UPDATED_AT_MS + 60_000;
 
 function profileOf(handle: string, rulesAcceptedAtMs: number | null): Profile {
-  return { handle, isAdult: true, rulesAcceptedAtMs, tier: 'free', createdAtMs: 0 };
+  return {
+    handle,
+    isAdult: true,
+    rulesAcceptedAtMs,
+    tier: 'free',
+    createdAtMs: 0,
+    strikes: 0,
+    suspendedAtMs: null,
+    isAdmin: false,
+  };
 }
 
 /** Lets queued callbacks and promise chains run. */
@@ -66,6 +76,7 @@ function fakeServer(start: { user?: SessionUser | null; profile?: Profile | null
   const session: AccountSession = {
     account,
     library: {} as LibraryRemote,
+    moderation: {} as ModerationRemote,
     onUser(listener) {
       listeners.add(listener);
       const now = user;
