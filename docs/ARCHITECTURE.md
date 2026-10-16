@@ -78,8 +78,9 @@ browser <──Brotli, ETag, SWR── API Worker <─────────�
    profile functions, and only then moves the library up. Deleting the
    account deletes the auth user, and the cascades take everything else.
 9. Discussions (Prompt 4.2, database only so far). A reader takes one side
-   per discussion (`discussion_stances`); posts and votes go straight to
-   Supabase under RLS and take that side from the record. Vote triggers keep
+   per discussion (`discussion_stances`); votes go straight to Supabase under
+   RLS, posts through the API Worker (step 11), and both take that side from
+   the record. Vote triggers keep
    the counts, `rank_score` is generated from them, and pg_cron closes
    discussions 48 hours after they open.
 10. Moderation (Prompt 4.3). A new post waits, pending, while a trigger
@@ -90,6 +91,13 @@ browser <──Brotli, ETag, SWR── API Worker <─────────�
     pg_cron retries what the models did not answer. Readers report and block
     through RLS and `report_post()`; posting limits answer HTTP 429. Admins
     work the queue at `/admin`, a separate chunk loaded instead of the globe.
+11. The local badge (Prompt 4.4). The app posts through the API Worker
+    (`POST /api/posts`, `workers/api/src/posts.ts`), which inserts as the
+    reader with their own token. When the author turns the badge on for that
+    post, the Worker adds a label made from `request.cf.city` and `.country`
+    alone (`src/core/localBadge.ts`) and a secret the database checks against
+    Vault before writing `region_label`. `GET /api/local-badge` tells the
+    toggle what it would show. No GPS, no prompt, no coordinates.
 
 The wire format is defined once, in `src/core/data/payload.ts`, and both the
 Worker and the client validate against it.

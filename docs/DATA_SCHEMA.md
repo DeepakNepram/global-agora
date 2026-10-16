@@ -25,6 +25,7 @@ truth; the original design is the build plan's §3
 | `20261017110000_reports_blocks.sql`         | `report_post`, blocks both ways                           |
 | `20261017120000_posting_limits.sql`         | posting limits per tier (HTTP 429)                        |
 | `20261017130000_moderation_queue.sql`       | `admins`, the queue and its actions, `my_profile` fields  |
+| `20261018100000_local_badge.sql`            | `region_label` written only by the API Worker, its shape  |
 
 Each table ships with its RLS policies and grants in the same file: a table and
 its access rules are one change. Migrations are timestamped and forward-only.
@@ -72,7 +73,9 @@ its access rules are one change. Migrations are timestamped and forward-only.
   and their blocks, and their notices' `read_at` (Prompt 4.3).
 - **No precise user location, ever.** No coordinates on any user-written table.
   `posts.region_label` is coarse text from the Cloudflare IP header, capped at
-  64 characters (#5). A unit test scans the user tables for coordinate columns.
+  64 characters (#5). Only the API Worker writes it (a secret checked against
+  Vault, Prompt 4.4), and a CHECK keeps it to `<city> area[, <country>]` with
+  no decimal numbers, so never a coordinate. A unit test scans the user tables for coordinate columns.
 - **No full article text.** Title and headline ≤ 300 characters, summary ≤ 600,
   snippet ≤ 400: enough for a headline and a lede, never a body (#6).
 - **500 character limit** on `posts.body`, enforced by a CHECK constraint _and_
@@ -165,7 +168,13 @@ evidence or expert, and `evidence` requires `evidence_url`.
 - **Written by those taking part** (rules agreed, not suspended, a side
   taken, the discussion open and not past `closes_at`): story, body, stance
   (it must be the author's side; left out, it is filled in), kind and
-  evidence. Not editable or deletable by clients.
+  evidence. Not editable or deletable by clients. The app posts through the
+  API Worker (`POST /api/posts`), which inserts as the reader.
+- **Local badge (Prompt 4.4):** `region_label` is never granted to clients.
+  The API Worker sends it as a base64 header with `REGION_LABEL_SECRET`; a
+  BEFORE INSERT trigger writes it only when the secret matches Vault's
+  `region_label_secret`, and refuses the post otherwise. It never affects
+  `rank_score` and is not sent to moderation.
 - **Moderation (Prompt 4.3):** inserted `pending` and handed to the
   moderate-post function; `record_moderation()` sets `ok`, `hidden` or
   `removed` and stores the full score object in `mod_scores`. A moderator

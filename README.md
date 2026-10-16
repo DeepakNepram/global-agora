@@ -80,9 +80,11 @@ Docker Desktop must be running.
 ```bash
 npm run db:start   # first run downloads about 1 GB of images
 npm run db:reset   # migrations + 200 fictional seed stories from the last 24 h
-npm run db:test    # 532 pgTAP assertions: RLS, constraints, ingest, API, accounts, discussions, moderation
+npm run db:test    # 558 pgTAP assertions: RLS, constraints, ingest, API, accounts, discussions,
+                   # moderation, the local badge
 npm run db:smoke   # the stories come back, other tables refuse, an account's life, a discussion,
-                   # known-toxic posts through the moderation pipeline
+                   # known-toxic posts through the moderation pipeline, the local badge
+                   # through the API Worker
 ```
 
 Sign-in emails never leave the machine: the local stack catches them in
@@ -186,8 +188,8 @@ cp workers/api/.dev.vars.example workers/api/.dev.vars
 ```
 
 Set `SUPABASE_ANON_KEY` in `.dev.vars` to the `PUBLISHABLE_KEY` from
-`npx supabase status`. Then run the Worker and the app side by side; Vite
-proxies `/api` to it:
+`npx supabase status`; `REGION_LABEL_SECRET` already matches the local seed.
+Then run the Worker and the app side by side; Vite proxies `/api` to it:
 
 ```bash
 npm run api:dev
@@ -195,6 +197,14 @@ npm run api:dev
 
 ```bash
 npm run dev
+```
+
+`api:dev` runs on a stand-in network in Bengaluru (`workers/api/dev/`), never
+your own: wrangler would otherwise hand the Worker your real city. For a
+network with no city, as the local badge's disabled state needs:
+
+```bash
+npm run api:dev -- --no-city
 ```
 
 Measure the payload from a second terminal. For a cold build, stop
@@ -214,8 +224,14 @@ domain beside the Pages app; `wrangler.jsonc` shows the shape.
 npx supabase db push
 npx wrangler secret put SUPABASE_URL -c workers/api/wrangler.jsonc
 npx wrangler secret put SUPABASE_ANON_KEY -c workers/api/wrangler.jsonc
+npx wrangler secret put REGION_LABEL_SECRET -c workers/api/wrangler.jsonc
 npx wrangler deploy -c workers/api/wrangler.jsonc
 ```
+
+`REGION_LABEL_SECRET` is a new random value (never the local
+`local-only-region-label`) that lets a post carry its local badge. Put the
+same value in the database's Vault, in the SQL editor:
+`select vault.create_secret('<the same value>', 'region_label_secret');`.
 
 ## Layout
 
