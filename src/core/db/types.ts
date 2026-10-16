@@ -3,6 +3,29 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      admins: {
+        Row: {
+          granted_at: string;
+          user_id: string;
+        };
+        Insert: {
+          granted_at?: string;
+          user_id: string;
+        };
+        Update: {
+          granted_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'admins_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: true;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       articles: {
         Row: {
           headline: string;
@@ -243,6 +266,45 @@ export type Database = {
           status?: string;
         };
         Relationships: [];
+      };
+      moderation_actions: {
+        Row: {
+          action: string;
+          actor_id: string | null;
+          created_at: string;
+          id: number;
+          post_id: string | null;
+        };
+        Insert: {
+          action: string;
+          actor_id?: string | null;
+          created_at?: string;
+          id?: never;
+          post_id?: string | null;
+        };
+        Update: {
+          action?: string;
+          actor_id?: string | null;
+          created_at?: string;
+          id?: never;
+          post_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'moderation_actions_actor_id_fkey';
+            columns: ['actor_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'moderation_actions_post_id_fkey';
+            columns: ['post_id'];
+            isOneToOne: false;
+            referencedRelation: 'posts';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       notifications: {
         Row: {
@@ -790,14 +852,47 @@ export type Database = {
         };
         Returns: Json;
       };
+      moderate_post: {
+        Args: { p_action: string; p_post: string };
+        Returns: string;
+      };
+      moderation_queue: {
+        Args: { p_limit?: number };
+        Returns: {
+          author_handle: string;
+          author_id: string;
+          author_strikes: number;
+          author_suspended: boolean;
+          body: string;
+          created_at: string;
+          evidence_url: string;
+          flagged: string[];
+          kind: string;
+          mod_scores: Json;
+          mod_state: string;
+          post_id: string;
+          prompt: string;
+          queued_for: string;
+          report_count: number;
+          report_reasons: Json;
+          side_label: string;
+          stance: string;
+          story_id: string;
+          toxicity: number;
+          waiting_since: string;
+        }[];
+      };
       my_profile: {
         Args: never;
         Returns: {
           created_at: string;
           display_name: string;
           handle: string;
+          is_admin: boolean;
           is_adult: boolean;
           rules_accepted_at: string;
+          strikes: number;
+          suspended_at: string;
           tier: string;
         }[];
       };
