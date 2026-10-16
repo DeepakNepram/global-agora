@@ -65,43 +65,27 @@ export function parseStoryRef(raw: string): StoryRef | null {
   return null;
 }
 
-async function nodes(request: Request, url: URL, deps: ApiDeps, db: ApiDb): Promise<Response> {
+/**
+ * A whole-window read: the payload, or every outlet covering its stories.
+ * Memory then edge, keyed by window and node limit.
+ */
+async function windowRead(
+  request: Request,
+  url: URL,
+  deps: ApiDeps,
+  db: ApiDb,
+  what: 'nodes' | 'outlets',
+): Promise<Response> {
   const { config } = deps;
   const hours = parseHours(url.searchParams.get('hours'), config.maxHours);
   if (hours === null)
     return jsonError(400, `hours must be a whole number from 1 to ${config.maxHours}`);
-
+  const build = what === 'nodes' ? buildNodes : buildOutlets;
   const { entry, status } = await deps.cache.get({
-    key: `nodes:v1:${hours}:${config.nodeLimit}`,
+    key: `${what}:v1:${hours}:${config.nodeLimit}`,
     stores: deps.nodeStores,
     build: (previous) =>
-      buildNodes(
-        { db, hours, limit: config.nodeLimit, brotliQuality: config.brotliQuality, now: deps.now },
-        previous,
-      ),
-    timings: config,
-    now: deps.now,
-    waitUntil: deps.waitUntil,
-    log: deps.log,
-  });
-  return serveEntry(request, entry, {
-    cacheControl: cacheControl(config),
-    status,
-    extraHeaders: corsHeaders(request, config.allowedOrigins),
-  });
-}
-
-/** Every outlet covering the window's stories: memory then edge, like the payload. */
-async function outlets(request: Request, url: URL, deps: ApiDeps, db: ApiDb): Promise<Response> {
-  const { config } = deps;
-  const hours = parseHours(url.searchParams.get('hours'), config.maxHours);
-  if (hours === null)
-    return jsonError(400, `hours must be a whole number from 1 to ${config.maxHours}`);
-  const { entry, status } = await deps.cache.get({
-    key: `outlets:v1:${hours}:${config.nodeLimit}`,
-    stores: deps.nodeStores,
-    build: (previous) =>
-      buildOutlets(
+      build(
         { db, hours, limit: config.nodeLimit, brotliQuality: config.brotliQuality, now: deps.now },
         previous,
       ),
@@ -225,8 +209,8 @@ async function route(request: Request, url: URL, deps: ApiDeps): Promise<Respons
   }
   if (deps.db === null)
     return jsonError(503, 'API not configured: set SUPABASE_URL and SUPABASE_ANON_KEY');
-  if (pathname === '/api/nodes') return nodes(request, url, deps, deps.db);
-  if (pathname === '/api/outlets') return outlets(request, url, deps, deps.db);
+  if (pathname === '/api/nodes') return windowRead(request, url, deps, deps.db, 'nodes');
+  if (pathname === '/api/outlets') return windowRead(request, url, deps, deps.db, 'outlets');
   const outlet = OUTLET_PATH.exec(pathname);
   if (outlet) return outletStories(request, url, outlet[1] ?? '', deps, deps.db);
   return story(request, STORY_PATH.exec(pathname)?.[1] ?? '', deps, deps.db);
