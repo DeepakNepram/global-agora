@@ -66,6 +66,7 @@ describe('migrations', () => {
       'blocks',
       'follows',
       'saved_stories',
+      'discussion_stances',
     ];
     for (const table of userTables) {
       const body = new RegExp(`create table public\\.${table} \\(([\\s\\S]*?)\\n\\);`).exec(
@@ -74,5 +75,16 @@ describe('migrations', () => {
       expect(body, table).toBeDefined();
       expect(body, table).not.toMatch(/\b(lat|lon|latitude|longitude|geog|geom|geography)\b/i);
     }
+  });
+});
+
+describe('the API', () => {
+  it('never exposes the private schema of policy helpers (Prompt 4.2)', () => {
+    const config = readFileSync(resolve(migrationsDir, '../config.toml'), 'utf8');
+    const schemas = /^\s*schemas\s*=\s*\[([^\]]*)\]/m.exec(config)?.[1];
+    expect(schemas).toBeDefined();
+    const names = [...(schemas ?? '').matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    expect(names).toContain('public');
+    expect(names).not.toContain('private');
   });
 });

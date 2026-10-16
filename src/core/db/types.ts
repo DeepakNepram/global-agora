@@ -80,6 +80,45 @@ export type Database = {
           },
         ];
       };
+      discussion_stances: {
+        Row: {
+          chosen_at: string;
+          locked_at: string | null;
+          stance: string;
+          story_id: string;
+          user_id: string;
+        };
+        Insert: {
+          chosen_at?: string;
+          locked_at?: string | null;
+          stance: string;
+          story_id: string;
+          user_id?: string;
+        };
+        Update: {
+          chosen_at?: string;
+          locked_at?: string | null;
+          stance?: string;
+          story_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'discussion_stances_story_id_fkey';
+            columns: ['story_id'];
+            isOneToOne: false;
+            referencedRelation: 'discussions';
+            referencedColumns: ['story_id'];
+          },
+          {
+            foreignKeyName: 'discussion_stances_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       discussions: {
         Row: {
           closes_at: string;
@@ -92,7 +131,7 @@ export type Database = {
           story_id: string;
         };
         Insert: {
-          closes_at: string;
+          closes_at?: string;
           opened_at?: string;
           post_count?: number;
           prompt: string;
@@ -221,7 +260,7 @@ export type Database = {
           story_id: string;
         };
         Insert: {
-          author_id: string;
+          author_id?: string;
           body: string;
           changed_mind_count?: number;
           created_at?: string;
@@ -512,7 +551,7 @@ export type Database = {
           created_at?: string;
           kind: string;
           post_id: string;
-          voter_id: string;
+          voter_id?: string;
           voter_stance?: string | null;
         };
         Update: {

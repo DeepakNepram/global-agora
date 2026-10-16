@@ -2,7 +2,7 @@
 -- Run with `npm run db:test`. Each file runs in a transaction that rolls back.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(40);
+select plan(44);
 
 -- CLAUDE.md #8, checked generically so a table added later is covered too.
 select is(
@@ -28,17 +28,17 @@ select is(
 -- A new table fails here until someone decides its row in the matrix below.
 select tables_are(
   'public',
-  array['articles', 'blocks', 'discussions', 'feature_flags', 'follows', 'ingest_runs', 'posts',
-        'profiles', 'reports', 'saved_stories', 'stories', 'story_location_reports',
-        'story_signals', 'votes'],
-  'public holds exactly the v1 tables, the ingest ledger, the location reports and the library'
+  array['articles', 'blocks', 'discussion_stances', 'discussions', 'feature_flags', 'follows',
+        'ingest_runs', 'posts', 'profiles', 'reports', 'saved_stories', 'stories',
+        'story_location_reports', 'story_signals', 'votes'],
+  'public holds exactly the v1 tables, the ingest ledger, the location reports, the library and stances'
 );
 
 -- The grant matrix (docs/DATA_SCHEMA.md). Grants are the first lock, RLS the second.
 select table_privs_are('public', 'stories',       'anon', array['SELECT'], 'anon: read stories');
 select table_privs_are('public', 'articles',      'anon', array['SELECT'], 'anon: read articles');
-select table_privs_are('public', 'discussions',   'anon', '{}'::text[],   'anon: nothing on discussions');
-select table_privs_are('public', 'posts',         'anon', '{}'::text[],   'anon: nothing on posts');
+select table_privs_are('public', 'discussions',   'anon', array['SELECT'], 'anon: read discussions (Prompt 4.2)');
+select table_privs_are('public', 'posts',         'anon', '{}'::text[],   'anon: no table-wide grant on posts (read by column)');
 select table_privs_are('public', 'votes',         'anon', '{}'::text[],   'anon: nothing on votes');
 select table_privs_are('public', 'reports',       'anon', '{}'::text[],   'anon: nothing on reports');
 select table_privs_are('public', 'blocks',        'anon', '{}'::text[],   'anon: nothing on blocks');
@@ -54,7 +54,10 @@ select table_privs_are('public', 'saved_stories', 'anon', '{}'::text[],   'anon:
 select table_privs_are('public', 'stories',       'authenticated', array['SELECT'], 'signed in: read stories');
 select table_privs_are('public', 'articles',      'authenticated', array['SELECT'], 'signed in: read articles');
 select table_privs_are('public', 'discussions',   'authenticated', array['SELECT'], 'signed in: read discussions');
-select table_privs_are('public', 'posts',         'authenticated', array['SELECT'], 'signed in: read posts (RLS filters)');
+select table_privs_are('public', 'posts',         'authenticated', '{}'::text[],   'signed in: posts by column only');
+select table_privs_are('public', 'discussion_stances', 'anon', '{}'::text[], 'anon: nothing on stances');
+select table_privs_are('public', 'discussion_stances', 'authenticated', array['SELECT'],
+  'signed in: read your stance (RLS: own); writes by column');
 select table_privs_are('public', 'votes',         'authenticated', array['SELECT'], 'signed in: read votes (RLS: own)');
 select table_privs_are('public', 'reports',       'authenticated', '{}'::text[],   'signed in: nothing on reports');
 select table_privs_are('public', 'blocks',        'authenticated', array['SELECT'], 'signed in: read blocks (RLS: own)');
@@ -85,6 +88,36 @@ select is(
                and privilege_type in ('INSERT', 'DELETE'))),
   0::bigint,
   'no client role holds a write privilege on any public table but its own library'
+);
+
+-- Column-level writes (Prompt 4.2), exactly these: what a post, a vote and a
+-- stance may say. Never moderation state, counts, rank or the region label.
+select is(
+  (select array_agg(format('%s.%s:%s', table_name, column_name, privilege_type)
+                    order by table_name, column_name, privilege_type)
+     from information_schema.column_privileges
+    where table_schema = 'public' and grantee in ('anon', 'authenticated')
+      and privilege_type <> 'SELECT'
+      and table_name not in ('follows', 'saved_stories')),
+  array['discussion_stances.stance:INSERT', 'discussion_stances.stance:UPDATE',
+        'discussion_stances.story_id:INSERT',
+        'posts.body:INSERT', 'posts.evidence_url:INSERT', 'posts.kind:INSERT',
+        'posts.stance:INSERT', 'posts.story_id:INSERT',
+        'votes.kind:INSERT', 'votes.post_id:INSERT'],
+  'clients write exactly these columns outside their library'
+);
+
+-- The policy helpers in private are not API endpoints (PostgREST exposes
+-- public only); client roles may call exactly these from policies.
+select is(
+  (select coalesce(array_agg(p.proname::text order by p.proname), '{}')
+     from pg_proc p
+     join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'private'
+      and (has_function_privilege('anon', p.oid, 'execute')
+           or has_function_privilege('authenticated', p.oid, 'execute'))),
+  array['can_take_part'],
+  'client roles can call exactly the policy helpers in private'
 );
 
 -- Exactly the API's functions: the two reads (Prompt 2.3), the participant

@@ -104,11 +104,30 @@ record(
   privateFields.error?.message ?? 'READABLE',
 );
 
+// Discussions and approved posts are public (Prompt 4.2); moderation scores never.
+const discussions = await db.from('discussions').select('story_id, prompt, state').limit(1);
+record(
+  'anon reads discussions',
+  discussions.error === null,
+  discussions.error?.message ?? `${discussions.data?.length ?? 0} rows`,
+);
+const posts = await db.from('posts').select('id, body, stance, kind, rank_score').limit(1);
+record(
+  'anon reads approved posts',
+  posts.error === null,
+  posts.error?.message ?? `${posts.data?.length ?? 0} rows`,
+);
+const scores = await db.from('posts').select('mod_scores').limit(1);
+record(
+  'anon is refused moderation scores',
+  scores.error?.code === DENIED,
+  scores.error?.message ?? 'READABLE',
+);
+
 // --- Signed out, everything else is refused. --------------------------------
 const closed: readonly TableName[] = [
   'feature_flags',
-  'discussions',
-  'posts',
+  'discussion_stances',
   'votes',
   'reports',
   'blocks',

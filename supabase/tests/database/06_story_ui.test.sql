@@ -53,8 +53,8 @@ select is(
   'the discussion state is still there');
 select is(public.discussion_participants('00000000-0000-4000-8000-000000000062'), 0,
   'a story without posts has no participants');
-select throws_ok('select count(*) from public.posts', '42501', null,
-  'the count does not open posts to anon');
+select is((select count(*) from public.posts), 3::bigint,
+  'anon reads the approved posts (Prompt 4.2), never the hidden one');
 reset role;
 
 update public.stories set discussion_state = 'closed' where id = '00000000-0000-4000-8000-000000000061';

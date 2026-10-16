@@ -51,8 +51,9 @@ select is((select array_agg(handle order by handle) from public.profiles),
 select throws_ok('select tier from public.profiles', '42501', null,
   'anon cannot read a profile''s private fields');
 select throws_ok('select 1 from public.feature_flags', '42501', null, 'anon cannot read feature_flags');
-select throws_ok('select 1 from public.discussions',   '42501', null, 'anon cannot read discussions');
-select throws_ok('select 1 from public.posts',         '42501', null, 'anon cannot read posts');
+select ok(exists (select 1 from public.discussions), 'anon reads discussions (Prompt 4.2)');
+select is((select array_agg(body) from public.posts), array['approved post by a'],
+  'anon reads approved posts only (Prompt 4.2)');
 select throws_ok('select 1 from public.votes',         '42501', null, 'anon cannot read votes');
 select throws_ok('select 1 from public.reports',       '42501', null, 'anon cannot read reports');
 select throws_ok('select 1 from public.blocks',        '42501', null, 'anon cannot read blocks');
@@ -96,17 +97,18 @@ select is((select array_agg(blocked_id) from public.blocks),
   'signed in: reads only the blocks they made');
 select throws_ok('select 1 from public.reports', '42501', null, 'signed in: cannot read reports');
 
--- No client writes until Prompts 4.1-4.3 add them with their own checks.
+-- Writes come with their own checks (Prompt 4.2: posts and votes; 4.3: the rest).
+-- Reader A has not agreed to the rules, so A can do neither.
 select throws_ok(
   $$insert into public.posts (story_id, author_id, body, stance, kind)
     values ('00000000-0000-4000-8000-000000000051', '00000000-0000-4000-8000-00000000000a', 'hi', 'a', 'argument')$$,
-  '42501', null, 'signed in: cannot post yet');
+  '42501', null, 'signed in: cannot post without agreeing to the rules');
 select throws_ok($$update public.profiles set tier = 'pro'$$, '42501', null,
   'signed in: cannot change their own tier');
 select throws_ok(
   $$insert into public.votes (post_id, voter_id, kind)
     values ('00000000-0000-4000-8000-0000000000e2', '00000000-0000-4000-8000-00000000000a', 'helpful')$$,
-  '42501', null, 'signed in: cannot vote yet');
+  '42501', null, 'signed in: cannot vote on a post that is not approved');
 select throws_ok(
   $$insert into public.reports (post_id, reporter_id, reason)
     values ('00000000-0000-4000-8000-0000000000e2', '00000000-0000-4000-8000-00000000000a', 'spam')$$,
@@ -120,14 +122,14 @@ select throws_ok($$update public.feature_flags set enabled = false$$, '42501', n
   'signed in: cannot flip feature flags');
 
 -- ---------------------------------------------------------------------------
--- Signed in as reader B: sees A's approved post, never A's hidden one.
+-- Signed in as reader B, who blocked A: none of A's posts, B's own pending one.
 -- ---------------------------------------------------------------------------
 select set_config('request.jwt.claims',
   '{"sub": "00000000-0000-4000-8000-00000000000b", "role": "authenticated"}', true);
 
 select is((select array_agg(body order by body) from public.posts),
-  array['approved post by a', 'pending post by b'],
-  'another reader sees approved posts and their own, never someone else''s hidden post');
+  array['pending post by b'],
+  'a reader who blocked the author sees none of their posts (Prompt 4.2), but their own pending one');
 
 reset role;
 
