@@ -116,8 +116,8 @@ select is(
     where n.nspname = 'private'
       and (has_function_privilege('anon', p.oid, 'execute')
            or has_function_privilege('authenticated', p.oid, 'execute'))),
-  array['can_take_part'],
-  'client roles can call exactly the policy helpers in private'
+  array['can_take_part', 'post_rank'],
+  'client roles can call exactly the policy helpers in private, and the rank a post insert computes'
 );
 
 -- Exactly the API's functions: the two reads (Prompt 2.3), the participant
