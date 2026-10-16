@@ -79,7 +79,8 @@ select table_privs_are('public', 'discussion_stances', 'authenticated', array['S
   'signed in: read your stance (RLS: own); writes by column');
 select table_privs_are('public', 'votes',         'authenticated', array['SELECT'], 'signed in: read votes (RLS: own)');
 select table_privs_are('public', 'reports',       'authenticated', '{}'::text[],   'signed in: nothing on reports');
-select table_privs_are('public', 'blocks',        'authenticated', array['SELECT'], 'signed in: read blocks (RLS: own)');
+select table_privs_are('public', 'blocks',        'authenticated', array['DELETE', 'SELECT'],
+  'signed in: read and remove blocks (RLS: own); add by column (Prompt 4.3)');
 select table_privs_are('public', 'profiles',      'authenticated', '{}'::text[],   'signed in: no table-wide grant on profiles');
 -- Profiles are read by column (Prompt 4.1): the public fields, never the private ones.
 select column_privs_are('public', 'profiles', 'handle', 'anon', array['SELECT'],
@@ -108,9 +109,10 @@ select is(
       and privilege_type <> 'SELECT'
       and not (grantee = 'authenticated'
                and table_name in ('follows', 'saved_stories')
-               and privilege_type in ('INSERT', 'DELETE'))),
+               and privilege_type in ('INSERT', 'DELETE'))
+      and not (grantee = 'authenticated' and table_name = 'blocks' and privilege_type = 'DELETE')),
   0::bigint,
-  'no client role holds a write privilege on any public table but its own library'
+  'no client role holds a table-wide write privilege but on its own library and blocks'
 );
 
 -- Column-level writes (Prompt 4.2), exactly these: what a post, a vote and a
@@ -123,7 +125,8 @@ select is(
     where table_schema = 'public' and grantee in ('anon', 'authenticated')
       and privilege_type <> 'SELECT'
       and table_name not in ('follows', 'saved_stories')),
-  array['discussion_stances.stance:INSERT', 'discussion_stances.stance:UPDATE',
+  array['blocks.blocked_id:INSERT',
+        'discussion_stances.stance:INSERT', 'discussion_stances.stance:UPDATE',
         'discussion_stances.story_id:INSERT',
         'notifications.read_at:UPDATE',
         'posts.body:INSERT', 'posts.evidence_url:INSERT', 'posts.kind:INSERT',
@@ -141,15 +144,15 @@ select is(
     where n.nspname = 'private'
       and (has_function_privilege('anon', p.oid, 'execute')
            or has_function_privilege('authenticated', p.oid, 'execute'))),
-  array['can_take_part', 'post_rank'],
+  array['blocked_either_way', 'can_take_part', 'post_rank'],
   'client roles can call exactly the policy helpers in private, and the rank a post insert computes'
 );
 
 -- Exactly the API's functions: the two reads (Prompt 2.3), the participant
 -- count api_story calls and the location report (Prompt 3.3), and outlet
 -- search with the window it shares with the payload (Prompt 3.4), and the
--- first sign-in's flow and account deletion (Prompt 4.1). Anything else a
--- client could call is a mistake.
+-- first sign-in's flow and account deletion (Prompt 4.1), and reporting a
+-- post (4.3). Anything else a client could call is a mistake.
 select is(
   (select coalesce(array_agg(p.proname::text order by p.proname), '{}')
      from pg_proc p
@@ -159,7 +162,7 @@ select is(
            or has_function_privilege('authenticated', p.oid, 'execute'))),
   array['accept_rules', 'api_nodes', 'api_outlet_stories', 'api_outlets', 'api_report_location',
         'api_story', 'api_window', 'claim_handle', 'delete_my_account', 'discussion_participants',
-        'handles_available', 'my_profile'],
+        'handles_available', 'my_profile', 'report_post'],
   'client roles can call exactly the API functions'
 );
 

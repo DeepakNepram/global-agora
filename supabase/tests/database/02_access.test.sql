@@ -112,8 +112,9 @@ select throws_ok(
 select throws_ok(
   $$insert into public.reports (post_id, reporter_id, reason)
     values ('00000000-0000-4000-8000-0000000000e2', '00000000-0000-4000-8000-00000000000a', 'spam')$$,
-  '42501', null, 'signed in: cannot report yet');
-select throws_ok('delete from public.blocks', '42501', null, 'signed in: cannot remove blocks yet');
+  '42501', null, 'signed in: reports go only through report_post (Prompt 4.3)');
+select throws_ok($$update public.blocks set blocked_id = blocker_id$$, '42501', null,
+  'signed in: cannot rewrite a block (only add or remove one)');
 select throws_ok(
   $$insert into public.stories (title, category, lat, lon, published_at) values ('x', 0, 0, 0, now())$$,
   '42501', null, 'signed in: cannot insert stories');

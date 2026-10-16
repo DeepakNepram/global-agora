@@ -54,14 +54,17 @@ export type Database = {
         Row: {
           blocked_id: string;
           blocker_id: string;
+          created_at: string;
         };
         Insert: {
           blocked_id: string;
-          blocker_id: string;
+          blocker_id?: string;
+          created_at?: string;
         };
         Update: {
           blocked_id?: string;
           blocker_id?: string;
+          created_at?: string;
         };
         Relationships: [
           {
@@ -420,6 +423,8 @@ export type Database = {
           post_id: string;
           reason: string;
           reporter_id: string | null;
+          resolved_at: string | null;
+          resolved_by: string | null;
           state: string;
         };
         Insert: {
@@ -428,6 +433,8 @@ export type Database = {
           post_id: string;
           reason: string;
           reporter_id?: string | null;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
           state?: string;
         };
         Update: {
@@ -436,6 +443,8 @@ export type Database = {
           post_id?: string;
           reason?: string;
           reporter_id?: string | null;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
           state?: string;
         };
         Relationships: [
@@ -449,6 +458,13 @@ export type Database = {
           {
             foreignKeyName: 'reports_reporter_id_fkey';
             columns: ['reporter_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'reports_resolved_by_fkey';
+            columns: ['resolved_by'];
             isOneToOne: false;
             referencedRelation: 'profiles';
             referencedColumns: ['id'];
@@ -788,6 +804,10 @@ export type Database = {
       record_moderation: {
         Args: { p_post: string; p_scores: Json };
         Returns: string;
+      };
+      report_post: {
+        Args: { p_post: string; p_reason: string };
+        Returns: undefined;
       };
     };
     Enums: {
