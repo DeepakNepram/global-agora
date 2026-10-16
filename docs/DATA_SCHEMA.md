@@ -18,6 +18,9 @@ truth; the original design is the build plan's §3
 | `20261002110000_outlets.sql`                | `api_window`, outlet search's two reads                   |
 | `20261002120000_library.sql`                | `follows`, `saved_stories`                                |
 | `20261016100000_profiles.sql`               | handles, the first sign-in's functions, account deletion  |
+| `20261016110000_discussions_access.sql`     | `discussion_stances`, posting and voting, the counts      |
+| `20261016120000_post_ranking.sql`           | `rank_score` generated from `private.post_rank`           |
+| `20261016130000_discussion_close.sql`       | pg_cron: closing, abandoned sign-ups, the run log         |
 
 Each table ships with its RLS policies and grants in the same file: a table and
 its access rules are one change. Migrations are timestamped and forward-only.
@@ -41,10 +44,16 @@ its access rules are one change. Migrations are timestamped and forward-only.
     the caller;
   - the first sign-in's `handles_available`, `claim_handle`, `accept_rules`
     and `my_profile`, and `delete_my_account` (Prompt 4.1), signed in only.
+- **Policy helpers live in `private`**, which the API does not expose (a
+  unit test reads `supabase/config.toml`). Client roles may execute exactly
+  two there, a pgTAP test says: `can_take_part()` (rules agreed), which
+  policies call, and `post_rank()`, which a post insert computes. The
+  triggers and the scheduled jobs' functions are closed to them.
 - **Only the service role writes news.** The ingest Worker holds the service
   key and bypasses RLS (CLAUDE.md #9). A client writes only what is its
   own: a signed-in reader's library, `follows` and `saved_stories` (Prompt
-  3.4), and their profile, through the functions above (Prompt 4.1).
+  3.4); their profile, through the functions above (Prompt 4.1); and, taking
+  part in a discussion, their side, posts and votes, by column (Prompt 4.2).
 - **No precise user location, ever.** No coordinates on any user-written table.
   `posts.region_label` is coarse text from the Cloudflare IP header, capped at
   64 characters (#5). A unit test scans the user tables for coordinate columns.
@@ -58,32 +67,29 @@ its access rules are one change. Migrations are timestamped and forward-only.
 
 Grants and policies agree; `npm run db:test` checks both.
 
-| Table                    | Signed out | Signed in                               | Writes                           |
-| ------------------------ | ---------- | --------------------------------------- | -------------------------------- |
-| `stories`                | read       | read                                    | service role (ingest Worker)     |
-| `articles`               | read       | read                                    | service role (ingest Worker)     |
-| `discussions`            | none       | read                                    | service role (admin, Prompt 4.6) |
-| `feature_flags`          | none       | read                                    | service role                     |
-| `posts`                  | none       | read if `mod_state = 'ok'`, or your own | none yet (Prompt 4.2)            |
-| `profiles`               | public     | public; your own private via function   | your own, through functions      |
-| `votes`                  | none       | your own votes                          | none yet (Prompt 4.2)            |
-| `blocks`                 | none       | blocks you made                         | none yet (Prompt 4.3)            |
-| `reports`                | none       | none (explicit restrictive deny)        | service role only                |
-| `story_signals`          | none       | none (explicit restrictive deny)        | service role (ingest Worker)     |
-| `ingest_runs`            | none       | none (explicit restrictive deny)        | service role (ingest Worker)     |
-| `story_location_reports` | none       | none (explicit restrictive deny)        | `api_report_location` only       |
-| `follows`                | none       | your own                                | add and remove your own          |
-| `saved_stories`          | none       | your own                                | add and remove your own          |
+| Table                    | Signed out | Signed in                              | Writes                           |
+| ------------------------ | ---------- | -------------------------------------- | -------------------------------- |
+| `stories`                | read       | read                                   | service role (ingest Worker)     |
+| `articles`               | read       | read                                   | service role (ingest Worker)     |
+| `discussions`            | read       | read                                   | service role (admin, Prompt 4.6) |
+| `feature_flags`          | none       | read                                   | service role                     |
+| `posts`                  | approved   | approved, author not blocked; your own | yours, by column (Prompt 4.2)    |
+| `profiles`               | public     | public; your own private via function  | your own, through functions      |
+| `votes`                  | none       | your own votes                         | yours, by column (Prompt 4.2)    |
+| `discussion_stances`     | none       | your own                               | yours, until you post or vote    |
+| `blocks`                 | none       | blocks you made                        | none yet (Prompt 4.3)            |
+| `reports`                | none       | none (explicit restrictive deny)       | service role only                |
+| `story_signals`          | none       | none (explicit restrictive deny)       | service role (ingest Worker)     |
+| `ingest_runs`            | none       | none (explicit restrictive deny)       | service role (ingest Worker)     |
+| `story_location_reports` | none       | none (explicit restrictive deny)       | `api_report_location` only       |
+| `follows`                | none       | your own                               | add and remove your own          |
+| `saved_stories`          | none       | your own                               | add and remove your own          |
 
 Open questions left for the prompts that own them:
 
-- **Guests reading discussions.** Prompt 4.1 says reading stays fully
-  anonymous. 4.1 kept discussions signed-in only, because 4.2 rewrites the
-  posts read policy (blocks); 4.2 opens discussions and approved posts to
-  guests with it.
-- **Profiles without a finished setup.** A reader who leaves setup is signed
-  out, and their auth user stays without a profile: an email address and
-  nothing else. Nothing removes these yet.
+- **Blocks both ways.** 4.2 hides a post from a reader who blocked its
+  author; Prompt 4.3 widens that to both directions when blocks become
+  writable.
 - **Flags before sign-in.** Guests cannot read `feature_flags`. If the app needs
   flags before sign-in, the API Worker reads them with the service key and
   serves them.
@@ -116,10 +122,42 @@ Open questions left for the prompts that own them:
   older than 48 hours, and a cascade would silently delete a live debate with
   everyone's posts. Prompt 2.2's cleanup must skip stories with a discussion.
 
+- `closes_at` defaults to 48 hours after opening; the `close-discussions`
+  job (every 5 minutes) closes the discussion and its story after it.
+  Posting and voting stop at `closes_at` by policy, whenever the job runs.
+- `post_count` is the approved posts, kept by trigger.
+- Guests read discussions (Prompt 4.2).
+
+**`discussion_stances`** (Prompt 4.2): the side each reader took in a
+discussion, `a`, `b` or `neutral`, one per reader (primary key `(story_id,
+user_id)`). Posts and votes take their side from here, never from the
+client. It can change until the reader's first post or vote sets
+`locked_at`. Only its owner reads it.
+
 **`posts`**: `stance` is a, b or neutral. `kind` is argument, eyewitness,
 evidence or expert, and `evidence` requires `evidence_url`.
 
+- **Read by column**: everything but `mod_scores`, which no client role
+  reads. Guests see approved posts; signed in, approved posts whose author
+  the reader has not blocked, and their own in any state.
+- **Written by those taking part** (rules agreed, a side taken, the
+  discussion open and not past `closes_at`): story, body, stance (it must be
+  the author's side; left out, it is filled in), kind and evidence. Inserted
+  `pending`; moderation (Prompt 4.3) approves. Not editable or deletable by
+  clients.
+- **`rank_score`** is generated, never written:
+  `ln(1 + helpful) * (0.5 + cross_side / greatest(helpful, 1)) + 1.5 * ln(1 +
+changed_mind)` from `private.post_rank`, which takes no `kind`, so Expert
+  posts get no boost. Indexed `(story_id, rank_score desc)`.
+
 **`votes`**: one per user, post and kind (primary key).
+
+- Clients send the post and kind; `voter_id` is the caller and
+  `voter_stance` is copied from their side.
+- Never on your own post, on one you cannot see, or after the close time.
+- A vote moves its post's counts: helpful, changed my mind, and cross-side
+  when a helpful vote comes from the opposite named side (a against b;
+  neutral is neither). A deleted vote moves them back.
 
 **`reports`**: `reporter_id` is set to null when the reporter deletes their
 account, so the moderation record survives.

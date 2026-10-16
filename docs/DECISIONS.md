@@ -6,6 +6,90 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-10-16 — Discussion backend: one side per reader, a rank no one can write, closing by pg_cron
+
+Prompt 4.2 adds who may read, post and vote, the ranking, and the 48-hour
+close.
+
+**Your two calls.**
+
+- **One side per reader per discussion, kept by the server**
+  (`discussion_stances`). Posts and votes take it from that record, and a
+  client never sends the side a vote counts with, so nobody can claim the
+  other side to inflate a post's cross-side count. The side can change until
+  the reader first posts or votes; then it is fixed.
+- **Only A against B is cross-side.** Neutral voters and neutral posts never
+  add to `cross_side_count`, so the rank rewards winning over the other camp.
+
+**Access** (`20261016110000_discussions_access.sql`).
+
+- **Guests** read discussions and approved posts.
+- **Signed in**, a post shows when it is approved and its author is not
+  blocked by the reader, or when it is your own (in any state). Prompt 4.3
+  widens blocks to both directions.
+- **`mod_scores` is granted to no client role**, the post's author included:
+  moderation scores are never public.
+- **Posting** needs agreed rules, a recorded side and an open discussion not
+  past `closes_at`. A client writes story, body, stance (which must match)
+  and kind and evidence only; never moderation state, counts, rank or the
+  region label (4.4's Worker writes that).
+- **Voting** is once per person, post and kind, needs a side (neutral is
+  one), and is never on your own post, on one you cannot see, or after the
+  close time.
+- **No editing, deleting or un-voting**: not asked for, so not granted.
+  Deleting an account still takes everything, and a deleted vote moves its
+  counts back, so the counts are always the votes that exist.
+- **`post_count`** counts approved posts, by trigger.
+- **Policy helpers live in a `private` schema.** PostgREST exposes only
+  `public` and `graphql_public`, so they are not API endpoints; a unit test
+  fails if `private` is ever exposed.
+- **Column grants.** Clients write exactly ten columns outside their
+  library, listed by a pgTAP test.
+
+**Ranking** (`20261016120000_post_ranking.sql`).
+
+- **The formula, as written:** `ln(1 + helpful) * (0.5 + cross_side /
+greatest(helpful, 1)) + 1.5 * ln(1 + changed_mind)`.
+- **Cross-side counts helpful votes only**, so the ratio stays between 0 and
+  1; changed my mind has its own term.
+- **`rank_score` is a generated column** over `private.post_rank(helpful,
+cross_side, changed_mind)`. A vote's trigger moves the counts and Postgres
+  recomputes the rank in the same statement; no role, the service role and
+  admin included, can write a rank any other way (428C9).
+- **No boost for Expert, in the ranking itself:** the function is given the
+  three counts and nothing else, so a post's kind cannot reach its rank.
+- **The proof**, with votes cast through the real triggers by 30 throwaway
+  readers: 20 one-sided helpful votes rank 1.52, below 4 from the other side
+  at 2.41.
+- **Clients need EXECUTE on `post_rank`**: a generated column is computed as
+  the inserting role. Revoking it made every client post fail.
+
+**Closing and clean-ups** (`20261016130000_discussion_close.sql`).
+
+- **pg_cron**, in Supabase's Postgres locally and hosted (free plan
+  included), runs three jobs, each one SECURITY DEFINER function in
+  `private` that no client may execute.
+- **`close-discussions`, every 5 minutes**, closes open discussions past
+  `closes_at` (which defaults to 48 hours after opening) and their stories,
+  so the payload's `disc` flag clears. Posting and voting already stop at
+  `closes_at` by policy, so the job only turns the state.
+- **`forget-abandoned-signups`, daily**, deletes auth users with no profile
+  and no sign-in for 7 days: 4.1's setups left at "Not now".
+- **`prune-cron-history`, daily**: pg_cron keeps every run otherwise, and
+  the close job alone adds 288 a day.
+- **Checked by hand:** the scheduler ran `close-discussions` at the 5-minute
+  mark ("succeeded, 1 row"), and `/api/nodes` flipped that story's `disc`
+  from 1 to 0 on the next rebuild.
+
+**Posts wait for moderation.** They are inserted `pending`, and nothing
+approves them until Prompt 4.3, so the tests and smoke approve as the owner.
+Nothing in Phase 4 ships before 4.3.
+
+**Measured:** no client change, so no bundle change. pgTAP 356 (+66), smoke
+42/42.
+
+---
+
 ## 2026-10-16 — Accounts: no SDK until needed, a setup that moves nothing until "I agree", deletion that deletes
 
 Prompt 4.1 adds sign-in, the first sign-in's required setup, profiles and

@@ -80,8 +80,8 @@ Docker Desktop must be running.
 ```bash
 npm run db:start   # first run downloads about 1 GB of images
 npm run db:reset   # migrations + 200 fictional seed stories from the last 24 h
-npm run db:test    # 276 pgTAP assertions: RLS, constraints, ingest, API, accounts
-npm run db:smoke   # the stories come back, other tables refuse, an account's life
+npm run db:test    # 356 pgTAP assertions: RLS, constraints, ingest, API, accounts, discussions
+npm run db:smoke   # the stories come back, other tables refuse, an account's life, a discussion
 ```
 
 Sign-in emails never leave the machine: the local stack catches them in
