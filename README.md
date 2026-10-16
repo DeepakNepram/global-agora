@@ -80,12 +80,22 @@ Docker Desktop must be running.
 ```bash
 npm run db:start   # first run downloads about 1 GB of images
 npm run db:reset   # migrations + 200 fictional seed stories from the last 24 h
-npm run db:test    # 356 pgTAP assertions: RLS, constraints, ingest, API, accounts, discussions
-npm run db:smoke   # the stories come back, other tables refuse, an account's life, a discussion
+npm run db:test    # 532 pgTAP assertions: RLS, constraints, ingest, API, accounts, discussions, moderation
+npm run db:smoke   # the stories come back, other tables refuse, an account's life, a discussion,
+                   # known-toxic posts through the moderation pipeline
 ```
 
 Sign-in emails never leave the machine: the local stack catches them in
 Mailpit at http://127.0.0.1:54324, link and code included.
+
+Moderation runs in a Supabase Edge Function, served by the local stack. Copy
+`supabase/functions/.env.example` to `supabase/functions/.env` and restart the
+stack (`npm run db:stop && npm run db:start`). With no model keys there,
+db:smoke stands in for the models with recorded replies; put an OpenAI key
+(and a Google Cloud key) there to run the known-toxic posts live, and
+`npm run db:smoke -- --record` to save the live replies. Admins are added by
+SQL (`insert into public.admins (user_id) select id from public.profiles where
+handle = '…'`) and work the queue at `/admin`.
 
 The schema and the access matrix are in
 [`docs/DATA_SCHEMA.md`](docs/DATA_SCHEMA.md). After changing a migration, run

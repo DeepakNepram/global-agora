@@ -82,6 +82,14 @@ browser <──Brotli, ETag, SWR── API Worker <─────────�
    Supabase under RLS and take that side from the record. Vote triggers keep
    the counts, `rank_score` is generated from them, and pg_cron closes
    discussions 48 hours after they open.
+10. Moderation (Prompt 4.3). A new post waits, pending, while a trigger
+    hands it through pg_net to the `moderate-post` Edge Function
+    (`supabase/functions/`), which asks OpenAI and Google and gives both
+    replies to `record_moderation()`; the database decides (ok, hidden,
+    removed with a strike), suspends at three strikes, and tells the author.
+    pg_cron retries what the models did not answer. Readers report and block
+    through RLS and `report_post()`; posting limits answer HTTP 429. Admins
+    work the queue at `/admin`, a separate chunk loaded instead of the globe.
 
 The wire format is defined once, in `src/core/data/payload.ts`, and both the
 Worker and the client validate against it.

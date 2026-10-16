@@ -21,6 +21,10 @@ truth; the original design is the build plan's §3
 | `20261016110000_discussions_access.sql`     | `discussion_stances`, posting and voting, the counts      |
 | `20261016120000_post_ranking.sql`           | `rank_score` generated from `private.post_rank`           |
 | `20261016130000_discussion_close.sql`       | pg_cron: closing, abandoned sign-ups, the run log         |
+| `20261017100000_moderation.sql`             | verdicts, strikes, suspension, notices, the hand-off      |
+| `20261017110000_reports_blocks.sql`         | `report_post`, blocks both ways                           |
+| `20261017120000_posting_limits.sql`         | posting limits per tier (HTTP 429)                        |
+| `20261017130000_moderation_queue.sql`       | `admins`, the queue and its actions, `my_profile` fields  |
 
 Each table ships with its RLS policies and grants in the same file: a table and
 its access rules are one change. Migrations are timestamped and forward-only.
@@ -35,7 +39,7 @@ its access rules are one change. Migrations are timestamped and forward-only.
   grants is closed rather than open. Functions are closed too, because
   PostgREST exposes them as RPC endpoints: the ingest migration revokes
   PUBLIC's EXECUTE by default and on each function by name. Client roles may
-  call exactly twelve, and a pgTAP test fails if that list changes:
+  call exactly fifteen, and a pgTAP test fails if that list changes:
   - the API's read-only `api_nodes` and `api_story`;
   - `discussion_participants`, the count `api_story` calls as the caller;
   - `api_report_location`, which can only add one to a counter;
@@ -43,17 +47,29 @@ its access rules are one change. Migrations are timestamped and forward-only.
     `api_window`, the payload's stories, which they and `api_nodes` call as
     the caller;
   - the first sign-in's `handles_available`, `claim_handle`, `accept_rules`
-    and `my_profile`, and `delete_my_account` (Prompt 4.1), signed in only.
+    and `my_profile`, and `delete_my_account` (Prompt 4.1), signed in only;
+  - `report_post`, and the admins' `moderation_queue` and `moderate_post`,
+    which refuse anyone who is not an admin (Prompt 4.3).
+
+  `record_moderation` is the service role's alone: the moderate-post Edge
+  Function answers through it.
+
 - **Policy helpers live in `private`**, which the API does not expose (a
   unit test reads `supabase/config.toml`). Client roles may execute exactly
-  two there, a pgTAP test says: `can_take_part()` (rules agreed), which
-  policies call, and `post_rank()`, which a post insert computes. The
-  triggers and the scheduled jobs' functions are closed to them.
+  four there, a pgTAP test says: `can_take_part()` (rules agreed, not
+  suspended), `blocked_either_way()` and `is_admin()`, which policies call,
+  and `post_rank()`, which a post insert computes. The triggers, the
+  scheduled jobs' functions and the moderation decision are closed to them.
+- **Settings tables live in `private` too** (Prompt 4.3):
+  `moderation_settings` (thresholds, strikes to suspend, retries) and
+  `posting_limits` (per tier). RLS is on and no API role holds any privilege
+  on them; the owner tunes them in SQL.
 - **Only the service role writes news.** The ingest Worker holds the service
   key and bypasses RLS (CLAUDE.md #9). A client writes only what is its
   own: a signed-in reader's library, `follows` and `saved_stories` (Prompt
-  3.4); their profile, through the functions above (Prompt 4.1); and, taking
-  part in a discussion, their side, posts and votes, by column (Prompt 4.2).
+  3.4); their profile, through the functions above (Prompt 4.1); taking
+  part in a discussion, their side, posts and votes, by column (Prompt 4.2);
+  and their blocks, and their notices' `read_at` (Prompt 4.3).
 - **No precise user location, ever.** No coordinates on any user-written table.
   `posts.region_label` is coarse text from the Cloudflare IP header, capped at
   64 characters (#5). A unit test scans the user tables for coordinate columns.
@@ -67,29 +83,33 @@ its access rules are one change. Migrations are timestamped and forward-only.
 
 Grants and policies agree; `npm run db:test` checks both.
 
-| Table                    | Signed out | Signed in                              | Writes                           |
-| ------------------------ | ---------- | -------------------------------------- | -------------------------------- |
-| `stories`                | read       | read                                   | service role (ingest Worker)     |
-| `articles`               | read       | read                                   | service role (ingest Worker)     |
-| `discussions`            | read       | read                                   | service role (admin, Prompt 4.6) |
-| `feature_flags`          | none       | read                                   | service role                     |
-| `posts`                  | approved   | approved, author not blocked; your own | yours, by column (Prompt 4.2)    |
-| `profiles`               | public     | public; your own private via function  | your own, through functions      |
-| `votes`                  | none       | your own votes                         | yours, by column (Prompt 4.2)    |
-| `discussion_stances`     | none       | your own                               | yours, until you post or vote    |
-| `blocks`                 | none       | blocks you made                        | none yet (Prompt 4.3)            |
-| `reports`                | none       | none (explicit restrictive deny)       | service role only                |
-| `story_signals`          | none       | none (explicit restrictive deny)       | service role (ingest Worker)     |
-| `ingest_runs`            | none       | none (explicit restrictive deny)       | service role (ingest Worker)     |
-| `story_location_reports` | none       | none (explicit restrictive deny)       | `api_report_location` only       |
-| `follows`                | none       | your own                               | add and remove your own          |
-| `saved_stories`          | none       | your own                               | add and remove your own          |
+| Table                    | Signed out | Signed in                             | Writes                           |
+| ------------------------ | ---------- | ------------------------------------- | -------------------------------- |
+| `stories`                | read       | read                                  | service role (ingest Worker)     |
+| `articles`               | read       | read                                  | service role (ingest Worker)     |
+| `discussions`            | read       | read                                  | service role (admin, Prompt 4.6) |
+| `feature_flags`          | none       | read                                  | service role                     |
+| `posts`                  | approved   | approved, no block either way; yours  | yours, by column (Prompt 4.2)    |
+| `profiles`               | public     | public; your own private via function | your own, through functions      |
+| `votes`                  | none       | your own votes                        | yours, by column (Prompt 4.2)    |
+| `discussion_stances`     | none       | your own                              | yours, until you post or vote    |
+| `blocks`                 | none       | blocks you made                       | add by column, remove your own   |
+| `reports`                | none       | none (explicit restrictive deny)      | `report_post` only               |
+| `strikes`                | none       | none (explicit restrictive deny)      | moderation's functions           |
+| `notifications`          | none       | your own                              | `read_at` on your own            |
+| `admins`                 | none       | none (explicit restrictive deny)      | service role (SQL)               |
+| `moderation_actions`     | none       | none (explicit restrictive deny)      | `moderate_post` only             |
+| `story_signals`          | none       | none (explicit restrictive deny)      | service role (ingest Worker)     |
+| `ingest_runs`            | none       | none (explicit restrictive deny)      | service role (ingest Worker)     |
+| `story_location_reports` | none       | none (explicit restrictive deny)      | `api_report_location` only       |
+| `follows`                | none       | your own                              | add and remove your own          |
+| `saved_stories`          | none       | your own                              | add and remove your own          |
 
 Open questions left for the prompts that own them:
 
-- **Blocks both ways.** 4.2 hides a post from a reader who blocked its
-  author; Prompt 4.3 widens that to both directions when blocks become
-  writable.
+- **Coming back after a suspension.** A suspended reader can delete their
+  account and sign up again; closing that needs data kept after deletion
+  (Prompt 5.2, with appeals).
 - **Flags before sign-in.** Guests cannot read `feature_flags`. If the app needs
   flags before sign-in, the API Worker reads them with the service key and
   serves them.
@@ -137,14 +157,21 @@ client. It can change until the reader's first post or vote sets
 **`posts`**: `stance` is a, b or neutral. `kind` is argument, eyewitness,
 evidence or expert, and `evidence` requires `evidence_url`.
 
-- **Read by column**: everything but `mod_scores`, which no client role
-  reads. Guests see approved posts; signed in, approved posts whose author
-  the reader has not blocked, and their own in any state.
-- **Written by those taking part** (rules agreed, a side taken, the
-  discussion open and not past `closes_at`): story, body, stance (it must be
-  the author's side; left out, it is filled in), kind and evidence. Inserted
-  `pending`; moderation (Prompt 4.3) approves. Not editable or deletable by
-  clients.
+- **Read by column**: everything but `mod_scores` and the moderation
+  bookkeeping (`mod_attempts`, `mod_requested_at`, `moderated_at`), which no
+  client role reads. Guests see approved posts; signed in, approved posts
+  with no block between reader and author either way, and their own in any
+  state.
+- **Written by those taking part** (rules agreed, not suspended, a side
+  taken, the discussion open and not past `closes_at`): story, body, stance
+  (it must be the author's side; left out, it is filled in), kind and
+  evidence. Not editable or deletable by clients.
+- **Moderation (Prompt 4.3):** inserted `pending` and handed to the
+  moderate-post function; `record_moderation()` sets `ok`, `hidden` or
+  `removed` and stores the full score object in `mod_scores`. A moderator
+  can approve or remove a hidden, reported or unchecked post.
+- **Posting limits:** 5 an hour, 30 seconds apart, 2 an hour for accounts
+  under a day old, per tier; refused with HTTP 429 (`PT429`).
 - **`rank_score`** is generated, never written:
   `ln(1 + helpful) * (0.5 + cross_side / greatest(helpful, 1)) + 1.5 * ln(1 +
 changed_mind)` from `private.post_rank`, which takes no `kind`, so Expert
@@ -162,11 +189,33 @@ changed_mind)` from `private.post_rank`, which takes no `kind`, so Expert
 **`reports`**: `reporter_id` is set to null when the reporter deletes their
 account, so the moderation record survives.
 
-**`blocks`**: a user cannot block themselves.
+- One of `harassment`, `hate`, `threat`, `spam`, `false_expertise`,
+  `off_topic` (CHECK; a unit test keeps the app's list in step); once per
+  reader and post.
+- Written only by `report_post()`, read only by moderators' functions.
+  `resolved_at` and `resolved_by` record who dealt with it, and when.
+
+**`blocks`**: a user cannot block themselves. The blocker is the caller (the
+column's default; RLS checks it). A block hides posts both ways.
+
+**`strikes`** (Prompt 4.3): one per removed post at most (unique `post_id`),
+`auto` or `moderator`. A trigger keeps `profiles.strikes` and sets
+`profiles.suspended_at` at `moderation_settings.strikes_to_suspend`.
+
+**`notifications`** (Prompt 4.3): `report_outcome` (`detail.outcome`: kept
+or removed) and `post_removed` (`detail`: source, flagged, strike, strikes,
+strikes_to_suspend, suspended). Their owner reads them and sets `read_at`.
+
+**`admins`** (Prompt 4.3): who may moderate, added by SQL;
+`private.is_admin()` checks it. **`moderation_actions`**: each approve,
+remove and strike, by whom and when.
 
 **`profiles`**: cascades from `auth.users`, so deleting an account deletes the
 profile and, through it, that user's posts, votes and blocks (Prompt 4.1:
-deletion that actually deletes). `tier` is the monetization hook, unused in v1.
+deletion that actually deletes). `tier` is the monetization hook, unused in v1,
+though `posting_limits` already has a row per tier. `strikes` and
+`suspended_at` (Prompt 4.3) reach their owner through `my_profile()`, with
+whether they are an admin.
 
 - **Public fields, by column:** `id`, `handle` and `display_name`, readable
   signed out too, so handles can show on posts to anyone. The rest is the

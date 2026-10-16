@@ -6,6 +6,134 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-10-17 — Moderation: two models in an Edge Function, decisions in the database
+
+Prompt 4.3 adds the moderation pipeline, the readers' tools (reports,
+blocks), the posting limits, strikes and suspension, and the admins' queue.
+
+**Your four calls.**
+
+- **Google Cloud text moderation in Perspective's place.** Perspective took
+  no new users after February 2026 and ends on 31 December 2026. Google's
+  `moderateText` (v1) gives a `Toxic` confidence from 0 to 1, which plays
+  Perspective's toxicity role: 0.65 to 0.85 hides, above 0.85 removes. It has
+  no severe-toxicity score, so the line above 0.85 stands in for it. Its
+  other 15 categories (Insult, Derogatory, Violent, War & Conflict...) are
+  stored for moderators and decide nothing: a news debate touches war and
+  death all day. Cost: free to 50,000 units a month (a unit is 100
+  characters, so a full post is 5), then $0.0005 a unit; it needs billing on
+  the Google Cloud project.
+- **Self-harm removes without a strike.** OpenAI's `self-harm`,
+  `self-harm/intent` and `self-harm/instructions` flags remove the post (it
+  is never public) but give no strike, unless something else in it would.
+  The author's notice points to findahelpline.com.
+- **Report and Block buttons come with the posts in 4.5.** Everything
+  behind them is built and tested here.
+- **The known-toxic test runs live** once an OpenAI key is in
+  `supabase/functions/.env` (you add it; it never passes through chat).
+
+**The pipeline.**
+
+1. A post is inserted `pending`, visible to its author only.
+2. An AFTER INSERT trigger hands `{post_id, body}` to the `moderate-post`
+   Edge Function through **pg_net**, with a hook secret. The function's
+   address and the secret live in **Supabase Vault**, set per project.
+3. The function asks both models in parallel (8 seconds each), then gives
+   both whole replies and the signals (`{flagged, toxicity}`) to
+   `record_moderation()`, executable by the service role only.
+4. `record_moderation()` stores the full score object in `mod_scores` and
+   decides by `private.moderation_verdict()`:
+   - any OpenAI flag, or Toxic above 0.85: removed, and a strike;
+   - Toxic from 0.65 to 0.85: hidden, for a human;
+   - otherwise ok.
+
+   The first decision stands: it only acts on a pending post, so a late or
+   repeated answer changes nothing.
+
+**Why decide in the database, not the function.** The thresholds are a
+settings row (`private.moderation_settings`) the owner tunes with one
+`update`, with no redeploy, and the decision, the strike, the suspension and
+the notice happen in one transaction. pgTAP tests the boundaries: exactly
+0.65 hides, exactly 0.85 still hides, above it removes.
+
+**Fail closed, never silently.** No Vault entries, a model down, a timeout
+or a function error all leave the post pending. A pg_cron job,
+`retry-moderation`, resends pending posts every minute after 2 minutes, up
+to 5 tries. After that, or after as long as the retries would take for a
+post never sent, it waits in the queue as "Not checked by the models". So
+nothing is published unchecked, and nothing is stuck unseen.
+
+**The function is plain TypeScript.** The Deno entry
+(`moderate-post/index.ts`) only reads env; the logic in
+`_shared/moderation/` uses fetch alone, so tsc, eslint and Vitest cover it
+like the rest of the repo, and a lint rule keeps it from importing app or
+Worker code. No packages: the deploy bundles nothing it did not write.
+The hook secret is compared in constant time, and post text never reaches
+a log or an error reply.
+
+**Testing without every key.** Locally, a model with no key goes to a
+stand-in (`MODERATION_STAND_IN_URL`, refused against a hosted project, as is
+the public local hook secret) that replays `fixtures.json`. The scores
+record which replies were stood in (`stand_ins`), and db:smoke says so per
+check. `npm run db:smoke -- --record` saves live replies over the
+hand-written ones. The Supabase network does not resolve
+`host.docker.internal`, so the local `.env` uses Docker Desktop's host
+address, 192.168.65.254.
+
+**Strikes and suspension.** One strike per post (unique), automatic or
+moderator's, in `strikes`; a trigger keeps `profiles.strikes` and sets
+`profiles.suspended_at` at the setting (3). `can_take_part()` refuses a
+suspended account, so every 4.2 policy (post, vote, take a side) holds at
+once. A suspended reader can still read, report, block, see their notices
+and delete their account. Strikes never expire; lifting a suspension is an
+SQL update for now (appeals are Prompt 5.2).
+
+**A known gap.** A suspended reader can delete their account and sign up
+again with the same email. Closing that needs something kept after
+deletion, which Prompt 4.1's deletion that actually deletes rules out;
+Prompt 5.2 should decide.
+
+**Notices are in-app.** `notifications` (own rows only; clients may set
+`read_at` and nothing else): a reporter hears the outcome (removed, or
+reviewed and kept, nothing about the author); an author hears of a
+removal, its strike, their count and whether they are suspended. The
+account sheet lists them and the account button carries a dot.
+
+**Reports and blocks.** `report_post()` (a definer function; the table stays
+unreadable to clients, as 4.2 required): once per reader and post, a post
+you can see that is not yours, one of six reasons, closed debates included.
+Blocks: add by naming whom, remove your own; `private.blocked_either_way()`
+hides posts both ways, and votes and reports follow because they need a
+visible post. A profile is enough: no agreed rules needed.
+
+**Posting limits.** 5 an hour, 30 seconds apart, 2 an hour for accounts
+under 24 hours old (`auth.users.created_at`), per tier in
+`private.posting_limits` with 'free' as the fallback. Every post the author
+inserted counts, removed ones included. An AFTER INSERT trigger, under a
+per-author advisory lock, so RLS and CHECKs speak first (a closed debate is
+refused as closed) and two posts sent at once cannot both pass. It raises
+SQLSTATE `PT429`, which PostgREST answers as HTTP 429, with
+`retry_after_seconds` in the detail for 4.5's composer.
+
+**The queue.** Admins are rows in `admins`, added by SQL;
+`private.is_admin()` is the role check 4.6 reuses. `moderation_queue()` and
+`moderate_post()` refuse anyone else. Approve publishes (reports
+dismissed), remove removes, strike removes with a strike (reports
+actioned); reporters and author are told, and `moderation_actions` logs who
+did what for 4.6's counters. `/admin` loads the queue page in its own chunk
+(3.2 KB gzip) in place of the globe. three.js still downloads there, in the
+main chunk, but never starts: keeping it out would take a second HTML
+entry, which would reshuffle the reader's main chunk.
+
+**Privacy.** Post text goes to OpenAI and Google to be scored. The privacy
+policy (Prompt 5.2) must name both.
+
+**Measured:** main chunk +2.1 KB gzip (380.3 to 382.3: notices, the
+account sheet's updates, the route); SDK chunk +1.0 KB. pgTAP 532 (+176),
+db:smoke 62/62 (with stand-ins), unit tests 988.
+
+---
+
 ## 2026-10-16 — Discussion backend: one side per reader, a rank no one can write, closing by pg_cron
 
 Prompt 4.2 adds who may read, post and vote, the ranking, and the 48-hour
