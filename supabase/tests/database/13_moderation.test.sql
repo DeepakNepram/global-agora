@@ -10,6 +10,11 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(62);
 
+-- Fixtures write several posts per author at once; the posting limits have
+-- their own test (15_posting_limits).
+update private.posting_limits
+   set posts_per_hour = 1000, seconds_between_posts = 0, new_account_posts_per_hour = 1000;
+
 insert into auth.users (id, email) values
   ('00000000-0000-4000-8000-0000000004a1', 'mod-author@test.example'),
   ('00000000-0000-4000-8000-0000000004a2', 'mod-reader@test.example');

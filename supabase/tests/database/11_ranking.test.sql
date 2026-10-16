@@ -9,6 +9,11 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(14);
 
+-- Fixtures write several posts per author at once; the posting limits have
+-- their own test (15_posting_limits).
+update private.posting_limits
+   set posts_per_hour = 1000, seconds_between_posts = 0, new_account_posts_per_hour = 1000;
+
 -- 30 readers who agreed to the rules: 1-24 on side b, 25-30 neutral.
 insert into auth.users (id, email)
   select format('00000000-0000-4000-8000-%s', lpad(to_hex(4096 + n), 12, '0'))::uuid,
