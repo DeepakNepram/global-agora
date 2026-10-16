@@ -103,6 +103,27 @@ const workersFromApp = {
   message: 'src/ must not import workers/. Worker code holds service keys (CLAUDE.md #9).',
 };
 
+/**
+ * Edge Functions deploy from supabase/functions alone and hold the service
+ * key and the model keys: they import nothing from the app, the Workers or
+ * npm, and the app imports nothing from them.
+ */
+const functionsForbidden = [
+  {
+    group: ['@/*', '**/src', '**/src/**', '**/workers', '**/workers/**', '**/scripts/**'],
+    message: 'Edge Functions deploy on their own: import only from supabase/functions.',
+  },
+  {
+    group: ['@supabase/*', 'react', 'react-dom', 'three', 'zustand'],
+    message: 'Edge Functions use fetch only; no packages (see docs/DECISIONS.md).',
+  },
+];
+
+const functionsFromApp = {
+  group: ['**/supabase/functions', '**/supabase/functions/**'],
+  message: 'src/ must not import Edge Function code. It holds service keys (CLAUDE.md #9).',
+};
+
 const clockMessage =
   'Do not read the wall clock here. Render the time store value (src/state/timeStore.ts); ' +
   'only src/state/clock.ts may call wallClockNow().';
@@ -153,7 +174,7 @@ export default tseslint.config(
       'no-restricted-imports': 'off',
       '@typescript-eslint/no-restricted-imports': [
         'error',
-        { patterns: [...coreForbidden, supabaseSeam, workersFromApp] },
+        { patterns: [...coreForbidden, supabaseSeam, workersFromApp, functionsFromApp] },
       ],
     },
   },
@@ -163,7 +184,7 @@ export default tseslint.config(
       'no-restricted-imports': 'off',
       '@typescript-eslint/no-restricted-imports': [
         'error',
-        { patterns: [...coreForbidden, workersFromApp] },
+        { patterns: [...coreForbidden, workersFromApp, functionsFromApp] },
       ],
     },
   },
@@ -174,7 +195,7 @@ export default tseslint.config(
       'no-restricted-imports': 'off',
       '@typescript-eslint/no-restricted-imports': [
         'error',
-        { patterns: [supabaseSeam, workersFromApp] },
+        { patterns: [supabaseSeam, workersFromApp, functionsFromApp] },
       ],
     },
   },
@@ -184,7 +205,7 @@ export default tseslint.config(
       'no-restricted-imports': 'off',
       '@typescript-eslint/no-restricted-imports': [
         'error',
-        { patterns: [...globeForbidden, workersFromApp] },
+        { patterns: [...globeForbidden, workersFromApp, functionsFromApp] },
       ],
     },
   },
@@ -194,6 +215,14 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': 'off',
       '@typescript-eslint/no-restricted-imports': ['error', { patterns: workersForbidden }],
+    },
+  },
+  {
+    files: ['supabase/functions/**/*.ts'],
+    ignores: ['supabase/functions/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: functionsForbidden }],
     },
   },
 
@@ -234,6 +263,7 @@ export default tseslint.config(
       'workers/**/*.ts',
       'tests/**/*.ts',
       'scripts/**/*.ts',
+      'supabase/functions/**/*.test.ts',
       'vite.config.ts',
       '*.config.{js,ts}',
     ],

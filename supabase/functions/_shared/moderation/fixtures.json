@@ -1,0 +1,1172 @@
+{
+  "threat": {
+    "openai": {
+      "source": "hand-written",
+      "reply": {
+        "id": "modr-hand-written-threat",
+        "model": "omni-moderation-2024-09-26",
+        "results": [
+          {
+            "flagged": true,
+            "categories": {
+              "harassment": true,
+              "harassment/threatening": true,
+              "hate": false,
+              "hate/threatening": false,
+              "illicit": false,
+              "illicit/violent": false,
+              "self-harm": false,
+              "self-harm/instructions": false,
+              "self-harm/intent": false,
+              "sexual": false,
+              "sexual/minors": false,
+              "violence": true,
+              "violence/graphic": false
+            },
+            "category_scores": {
+              "harassment": 0.72,
+              "harassment/threatening": 0.91,
+              "hate": 0.0006,
+              "hate/threatening": 0.0007,
+              "illicit": 0.0008,
+              "illicit/violent": 0.0009,
+              "self-harm": 0.001,
+              "self-harm/instructions": 0.0011,
+              "self-harm/intent": 0.0012,
+              "sexual": 0.0004,
+              "sexual/minors": 0.0005,
+              "violence": 0.88,
+              "violence/graphic": 0.0007
+            },
+            "category_applied_input_types": {
+              "harassment": ["text"],
+              "harassment/threatening": ["text"],
+              "hate": ["text"],
+              "hate/threatening": ["text"],
+              "illicit": ["text"],
+              "illicit/violent": ["text"],
+              "self-harm": ["text"],
+              "self-harm/instructions": ["text"],
+              "self-harm/intent": ["text"],
+              "sexual": ["text"],
+              "sexual/minors": ["text"],
+              "violence": ["text"],
+              "violence/graphic": ["text"]
+            }
+          }
+        ]
+      }
+    },
+    "google": {
+      "source": "hand-written",
+      "reply": {
+        "moderationCategories": [
+          {
+            "name": "Toxic",
+            "confidence": 0.92
+          },
+          {
+            "name": "Insult",
+            "confidence": 0.41
+          },
+          {
+            "name": "Profanity",
+            "confidence": 0.03
+          },
+          {
+            "name": "Derogatory",
+            "confidence": 0.04
+          },
+          {
+            "name": "Sexual",
+            "confidence": 0.05
+          },
+          {
+            "name": "Death, Harm & Tragedy",
+            "confidence": 0.44
+          },
+          {
+            "name": "Violent",
+            "confidence": 0.86
+          },
+          {
+            "name": "Firearms & Weapons",
+            "confidence": 0.03
+          },
+          {
+            "name": "Public Safety",
+            "confidence": 0.31
+          },
+          {
+            "name": "Health",
+            "confidence": 0.05
+          },
+          {
+            "name": "Religion & Belief",
+            "confidence": 0.01
+          },
+          {
+            "name": "Illicit Drugs",
+            "confidence": 0.02
+          },
+          {
+            "name": "War & Conflict",
+            "confidence": 0.03
+          },
+          {
+            "name": "Politics",
+            "confidence": 0.04
+          },
+          {
+            "name": "Finance",
+            "confidence": 0.05
+          },
+          {
+            "name": "Legal",
+            "confidence": 0.01
+          }
+        ]
+      }
+    }
+  },
+  "harassment": {
+    "openai": {
+      "source": "hand-written",
+      "reply": {
+        "id": "modr-hand-written-harassment",
+        "model": "omni-moderation-2024-09-26",
+        "results": [
+          {
+            "flagged": true,
+            "categories": {
+              "harassment": true,
+              "harassment/threatening": false,
+              "hate": false,
+              "hate/threatening": false,
+              "illicit": false,
+              "illicit/violent": false,
+              "self-harm": false,
+              "self-harm/instructions": false,
+              "self-harm/intent": false,
+              "sexual": false,
+              "sexual/minors": false,
+              "violence": false,
+              "violence/graphic": false
+            },
+            "category_scores": {
+              "harassment": 0.89,
+              "harassment/threatening": 0.0012,
+              "hate": 0.03,
+              "hate/threatening": 0.0005,
+              "illicit": 0.0006,
+              "illicit/violent": 0.0007,
+              "self-harm": 0.0008,
+              "self-harm/instructions": 0.0009,
+              "self-harm/intent": 0.001,
+              "sexual": 0.0011,
+              "sexual/minors": 0.0012,
+              "violence": 0.0004,
+              "violence/graphic": 0.0005
+            },
+            "category_applied_input_types": {
+              "harassment": ["text"],
+              "harassment/threatening": ["text"],
+              "hate": ["text"],
+              "hate/threatening": ["text"],
+              "illicit": ["text"],
+              "illicit/violent": ["text"],
+              "self-harm": ["text"],
+              "self-harm/instructions": ["text"],
+              "self-harm/intent": ["text"],
+              "sexual": ["text"],
+              "sexual/minors": ["text"],
+              "violence": ["text"],
+              "violence/graphic": ["text"]
+            }
+          }
+        ]
+      }
+    },
+    "google": {
+      "source": "hand-written",
+      "reply": {
+        "moderationCategories": [
+          {
+            "name": "Toxic",
+            "confidence": 0.89
+          },
+          {
+            "name": "Insult",
+            "confidence": 0.93
+          },
+          {
+            "name": "Profanity",
+            "confidence": 0.12
+          },
+          {
+            "name": "Derogatory",
+            "confidence": 0.05
+          },
+          {
+            "name": "Sexual",
+            "confidence": 0.01
+          },
+          {
+            "name": "Death, Harm & Tragedy",
+            "confidence": 0.02
+          },
+          {
+            "name": "Violent",
+            "confidence": 0.03
+          },
+          {
+            "name": "Firearms & Weapons",
+            "confidence": 0.04
+          },
+          {
+            "name": "Public Safety",
+            "confidence": 0.05
+          },
+          {
+            "name": "Health",
+            "confidence": 0.01
+          },
+          {
+            "name": "Religion & Belief",
+            "confidence": 0.02
+          },
+          {
+            "name": "Illicit Drugs",
+            "confidence": 0.03
+          },
+          {
+            "name": "War & Conflict",
+            "confidence": 0.04
+          },
+          {
+            "name": "Politics",
+            "confidence": 0.05
+          },
+          {
+            "name": "Finance",
+            "confidence": 0.01
+          },
+          {
+            "name": "Legal",
+            "confidence": 0.02
+          }
+        ]
+      }
+    }
+  },
+  "hate": {
+    "openai": {
+      "source": "hand-written",
+      "reply": {
+        "id": "modr-hand-written-hate",
+        "model": "omni-moderation-2024-09-26",
+        "results": [
+          {
+            "flagged": true,
+            "categories": {
+              "harassment": true,
+              "harassment/threatening": false,
+              "hate": true,
+              "hate/threatening": true,
+              "illicit": false,
+              "illicit/violent": false,
+              "self-harm": false,
+              "self-harm/instructions": false,
+              "self-harm/intent": false,
+              "sexual": false,
+              "sexual/minors": false,
+              "violence": true,
+              "violence/graphic": false
+            },
+            "category_scores": {
+              "harassment": 0.64,
+              "harassment/threatening": 0.001,
+              "hate": 0.86,
+              "hate/threatening": 0.71,
+              "illicit": 0.0004,
+              "illicit/violent": 0.0005,
+              "self-harm": 0.0006,
+              "self-harm/instructions": 0.0007,
+              "self-harm/intent": 0.0008,
+              "sexual": 0.0009,
+              "sexual/minors": 0.001,
+              "violence": 0.55,
+              "violence/graphic": 0.0012
+            },
+            "category_applied_input_types": {
+              "harassment": ["text"],
+              "harassment/threatening": ["text"],
+              "hate": ["text"],
+              "hate/threatening": ["text"],
+              "illicit": ["text"],
+              "illicit/violent": ["text"],
+              "self-harm": ["text"],
+              "self-harm/instructions": ["text"],
+              "self-harm/intent": ["text"],
+              "sexual": ["text"],
+              "sexual/minors": ["text"],
+              "violence": ["text"],
+              "violence/graphic": ["text"]
+            }
+          }
+        ]
+      }
+    },
+    "google": {
+      "source": "hand-written",
+      "reply": {
+        "moderationCategories": [
+          {
+            "name": "Toxic",
+            "confidence": 0.9
+          },
+          {
+            "name": "Insult",
+            "confidence": 0.62
+          },
+          {
+            "name": "Profanity",
+            "confidence": 0.05
+          },
+          {
+            "name": "Derogatory",
+            "confidence": 0.94
+          },
+          {
+            "name": "Sexual",
+            "confidence": 0.02
+          },
+          {
+            "name": "Death, Harm & Tragedy",
+            "confidence": 0.03
+          },
+          {
+            "name": "Violent",
+            "confidence": 0.48
+          },
+          {
+            "name": "Firearms & Weapons",
+            "confidence": 0.05
+          },
+          {
+            "name": "Public Safety",
+            "confidence": 0.01
+          },
+          {
+            "name": "Health",
+            "confidence": 0.02
+          },
+          {
+            "name": "Religion & Belief",
+            "confidence": 0.03
+          },
+          {
+            "name": "Illicit Drugs",
+            "confidence": 0.04
+          },
+          {
+            "name": "War & Conflict",
+            "confidence": 0.05
+          },
+          {
+            "name": "Politics",
+            "confidence": 0.01
+          },
+          {
+            "name": "Finance",
+            "confidence": 0.02
+          },
+          {
+            "name": "Legal",
+            "confidence": 0.03
+          }
+        ]
+      }
+    }
+  },
+  "self-harm": {
+    "openai": {
+      "source": "hand-written",
+      "reply": {
+        "id": "modr-hand-written-self-harm",
+        "model": "omni-moderation-2024-09-26",
+        "results": [
+          {
+            "flagged": true,
+            "categories": {
+              "harassment": false,
+              "harassment/threatening": false,
+              "hate": false,
+              "hate/threatening": false,
+              "illicit": false,
+              "illicit/violent": false,
+              "self-harm": true,
+              "self-harm/instructions": false,
+              "self-harm/intent": true,
+              "sexual": false,
+              "sexual/minors": false,
+              "violence": false,
+              "violence/graphic": false
+            },
+            "category_scores": {
+              "harassment": 0.0007,
+              "harassment/threatening": 0.0008,
+              "hate": 0.0009,
+              "hate/threatening": 0.001,
+              "illicit": 0.0011,
+              "illicit/violent": 0.0012,
+              "self-harm": 0.82,
+              "self-harm/instructions": 0.0005,
+              "self-harm/intent": 0.88,
+              "sexual": 0.0007,
+              "sexual/minors": 0.0008,
+              "violence": 0.04,
+              "violence/graphic": 0.001
+            },
+            "category_applied_input_types": {
+              "harassment": ["text"],
+              "harassment/threatening": ["text"],
+              "hate": ["text"],
+              "hate/threatening": ["text"],
+              "illicit": ["text"],
+              "illicit/violent": ["text"],
+              "self-harm": ["text"],
+              "self-harm/instructions": ["text"],
+              "self-harm/intent": ["text"],
+              "sexual": ["text"],
+              "sexual/minors": ["text"],
+              "violence": ["text"],
+              "violence/graphic": ["text"]
+            }
+          }
+        ]
+      }
+    },
+    "google": {
+      "source": "hand-written",
+      "reply": {
+        "moderationCategories": [
+          {
+            "name": "Toxic",
+            "confidence": 0.22
+          },
+          {
+            "name": "Insult",
+            "confidence": 0.05
+          },
+          {
+            "name": "Profanity",
+            "confidence": 0.01
+          },
+          {
+            "name": "Derogatory",
+            "confidence": 0.02
+          },
+          {
+            "name": "Sexual",
+            "confidence": 0.03
+          },
+          {
+            "name": "Death, Harm & Tragedy",
+            "confidence": 0.83
+          },
+          {
+            "name": "Violent",
+            "confidence": 0.05
+          },
+          {
+            "name": "Firearms & Weapons",
+            "confidence": 0.01
+          },
+          {
+            "name": "Public Safety",
+            "confidence": 0.02
+          },
+          {
+            "name": "Health",
+            "confidence": 0.47
+          },
+          {
+            "name": "Religion & Belief",
+            "confidence": 0.04
+          },
+          {
+            "name": "Illicit Drugs",
+            "confidence": 0.05
+          },
+          {
+            "name": "War & Conflict",
+            "confidence": 0.01
+          },
+          {
+            "name": "Politics",
+            "confidence": 0.02
+          },
+          {
+            "name": "Finance",
+            "confidence": 0.03
+          },
+          {
+            "name": "Legal",
+            "confidence": 0.04
+          }
+        ]
+      }
+    }
+  },
+  "borderline-insult": {
+    "openai": {
+      "source": "hand-written",
+      "reply": {
+        "id": "modr-hand-written-borderline-insult",
+        "model": "omni-moderation-2024-09-26",
+        "results": [
+          {
+            "flagged": false,
+            "categories": {
+              "harassment": false,
+              "harassment/threatening": false,
+              "hate": false,
+              "hate/threatening": false,
+              "illicit": false,
+              "illicit/violent": false,
+              "self-harm": false,
+              "self-harm/instructions": false,
+              "self-harm/intent": false,
+              "sexual": false,
+              "sexual/minors": false,
+              "violence": false,
+              "violence/graphic": false
+            },
+            "category_scores": {
+              "harassment": 0.31,
+              "harassment/threatening": 0.0006,
+              "hate": 0.0007,
+              "hate/threatening": 0.0008,
+              "illicit": 0.0009,
+              "illicit/violent": 0.001,
+              "self-harm": 0.0011,
+              "self-harm/instructions": 0.0012,
+              "self-harm/intent": 0.0004,
+              "sexual": 0.0005,
+              "sexual/minors": 0.0006,
+              "violence": 0.0007,
+              "violence/graphic": 0.0008
+            },
+            "category_applied_input_types": {
+              "harassment": ["text"],
+              "harassment/threatening": ["text"],
+              "hate": ["text"],
+              "hate/threatening": ["text"],
+              "illicit": ["text"],
+              "illicit/violent": ["text"],
+              "self-harm": ["text"],
+              "self-harm/instructions": ["text"],
+              "self-harm/intent": ["text"],
+              "sexual": ["text"],
+              "sexual/minors": ["text"],
+              "violence": ["text"],
+              "violence/graphic": ["text"]
+            }
+          }
+        ]
+      }
+    },
+    "google": {
+      "source": "hand-written",
+      "reply": {
+        "moderationCategories": [
+          {
+            "name": "Toxic",
+            "confidence": 0.72
+          },
+          {
+            "name": "Insult",
+            "confidence": 0.81
+          },
+          {
+            "name": "Profanity",
+            "confidence": 0.02
+          },
+          {
+            "name": "Derogatory",
+            "confidence": 0.03
+          },
+          {
+            "name": "Sexual",
+            "confidence": 0.04
+          },
+          {
+            "name": "Death, Harm & Tragedy",
+            "confidence": 0.05
+          },
+          {
+            "name": "Violent",
+            "confidence": 0.01
+          },
+          {
+            "name": "Firearms & Weapons",
+            "confidence": 0.02
+          },
+          {
+            "name": "Public Safety",
+            "confidence": 0.03
+          },
+          {
+            "name": "Health",
+            "confidence": 0.04
+          },
+          {
+            "name": "Religion & Belief",
+            "confidence": 0.05
+          },
+          {
+            "name": "Illicit Drugs",
+            "confidence": 0.01
+          },
+          {
+            "name": "War & Conflict",
+            "confidence": 0.02
+          },
+          {
+            "name": "Politics",
+            "confidence": 0.03
+          },
+          {
+            "name": "Finance",
+            "confidence": 0.04
+          },
+          {
+            "name": "Legal",
+            "confidence": 0.05
+          }
+        ]
+      }
+    }
+  },
+  "argument": {
+    "openai": {
+      "source": "hand-written",
+      "reply": {
+        "id": "modr-hand-written-argument",
+        "model": "omni-moderation-2024-09-26",
+        "results": [
+          {
+            "flagged": false,
+            "categories": {
+              "harassment": false,
+              "harassment/threatening": false,
+              "hate": false,
+              "hate/threatening": false,
+              "illicit": false,
+              "illicit/violent": false,
+              "self-harm": false,
+              "self-harm/instructions": false,
+              "self-harm/intent": false,
+              "sexual": false,
+              "sexual/minors": false,
+              "violence": false,
+              "violence/graphic": false
+            },
+            "category_scores": {
+              "harassment": 0.0012,
+              "harassment/threatening": 0.0004,
+              "hate": 0.0005,
+              "hate/threatening": 0.0006,
+              "illicit": 0.0007,
+              "illicit/violent": 0.0008,
+              "self-harm": 0.0009,
+              "self-harm/instructions": 0.001,
+              "self-harm/intent": 0.0011,
+              "sexual": 0.0012,
+              "sexual/minors": 0.0004,
+              "violence": 0.0005,
+              "violence/graphic": 0.0006
+            },
+            "category_applied_input_types": {
+              "harassment": ["text"],
+              "harassment/threatening": ["text"],
+              "hate": ["text"],
+              "hate/threatening": ["text"],
+              "illicit": ["text"],
+              "illicit/violent": ["text"],
+              "self-harm": ["text"],
+              "self-harm/instructions": ["text"],
+              "self-harm/intent": ["text"],
+              "sexual": ["text"],
+              "sexual/minors": ["text"],
+              "violence": ["text"],
+              "violence/graphic": ["text"]
+            }
+          }
+        ]
+      }
+    },
+    "google": {
+      "source": "hand-written",
+      "reply": {
+        "moderationCategories": [
+          {
+            "name": "Toxic",
+            "confidence": 0.05
+          },
+          {
+            "name": "Insult",
+            "confidence": 0.02
+          },
+          {
+            "name": "Profanity",
+            "confidence": 0.03
+          },
+          {
+            "name": "Derogatory",
+            "confidence": 0.04
+          },
+          {
+            "name": "Sexual",
+            "confidence": 0.05
+          },
+          {
+            "name": "Death, Harm & Tragedy",
+            "confidence": 0.01
+          },
+          {
+            "name": "Violent",
+            "confidence": 0.02
+          },
+          {
+            "name": "Firearms & Weapons",
+            "confidence": 0.03
+          },
+          {
+            "name": "Public Safety",
+            "confidence": 0.04
+          },
+          {
+            "name": "Health",
+            "confidence": 0.05
+          },
+          {
+            "name": "Religion & Belief",
+            "confidence": 0.01
+          },
+          {
+            "name": "Illicit Drugs",
+            "confidence": 0.02
+          },
+          {
+            "name": "War & Conflict",
+            "confidence": 0.03
+          },
+          {
+            "name": "Politics",
+            "confidence": 0.38
+          },
+          {
+            "name": "Finance",
+            "confidence": 0.52
+          },
+          {
+            "name": "Legal",
+            "confidence": 0.01
+          }
+        ]
+      }
+    }
+  },
+  "eyewitness": {
+    "openai": {
+      "source": "hand-written",
+      "reply": {
+        "id": "modr-hand-written-eyewitness",
+        "model": "omni-moderation-2024-09-26",
+        "results": [
+          {
+            "flagged": false,
+            "categories": {
+              "harassment": false,
+              "harassment/threatening": false,
+              "hate": false,
+              "hate/threatening": false,
+              "illicit": false,
+              "illicit/violent": false,
+              "self-harm": false,
+              "self-harm/instructions": false,
+              "self-harm/intent": false,
+              "sexual": false,
+              "sexual/minors": false,
+              "violence": false,
+              "violence/graphic": false
+            },
+            "category_scores": {
+              "harassment": 0.001,
+              "harassment/threatening": 0.0011,
+              "hate": 0.0012,
+              "hate/threatening": 0.0004,
+              "illicit": 0.0005,
+              "illicit/violent": 0.0006,
+              "self-harm": 0.0007,
+              "self-harm/instructions": 0.0008,
+              "self-harm/intent": 0.0009,
+              "sexual": 0.001,
+              "sexual/minors": 0.0011,
+              "violence": 0.0012,
+              "violence/graphic": 0.0004
+            },
+            "category_applied_input_types": {
+              "harassment": ["text"],
+              "harassment/threatening": ["text"],
+              "hate": ["text"],
+              "hate/threatening": ["text"],
+              "illicit": ["text"],
+              "illicit/violent": ["text"],
+              "self-harm": ["text"],
+              "self-harm/instructions": ["text"],
+              "self-harm/intent": ["text"],
+              "sexual": ["text"],
+              "sexual/minors": ["text"],
+              "violence": ["text"],
+              "violence/graphic": ["text"]
+            }
+          }
+        ]
+      }
+    },
+    "google": {
+      "source": "hand-written",
+      "reply": {
+        "moderationCategories": [
+          {
+            "name": "Toxic",
+            "confidence": 0.03
+          },
+          {
+            "name": "Insult",
+            "confidence": 0.03
+          },
+          {
+            "name": "Profanity",
+            "confidence": 0.04
+          },
+          {
+            "name": "Derogatory",
+            "confidence": 0.05
+          },
+          {
+            "name": "Sexual",
+            "confidence": 0.01
+          },
+          {
+            "name": "Death, Harm & Tragedy",
+            "confidence": 0.02
+          },
+          {
+            "name": "Violent",
+            "confidence": 0.03
+          },
+          {
+            "name": "Firearms & Weapons",
+            "confidence": 0.04
+          },
+          {
+            "name": "Public Safety",
+            "confidence": 0.22
+          },
+          {
+            "name": "Health",
+            "confidence": 0.01
+          },
+          {
+            "name": "Religion & Belief",
+            "confidence": 0.02
+          },
+          {
+            "name": "Illicit Drugs",
+            "confidence": 0.03
+          },
+          {
+            "name": "War & Conflict",
+            "confidence": 0.04
+          },
+          {
+            "name": "Politics",
+            "confidence": 0.05
+          },
+          {
+            "name": "Finance",
+            "confidence": 0.01
+          },
+          {
+            "name": "Legal",
+            "confidence": 0.02
+          }
+        ]
+      }
+    }
+  },
+  "hard-news": {
+    "openai": {
+      "source": "hand-written",
+      "reply": {
+        "id": "modr-hand-written-hard-news",
+        "model": "omni-moderation-2024-09-26",
+        "results": [
+          {
+            "flagged": false,
+            "categories": {
+              "harassment": false,
+              "harassment/threatening": false,
+              "hate": false,
+              "hate/threatening": false,
+              "illicit": false,
+              "illicit/violent": false,
+              "self-harm": false,
+              "self-harm/instructions": false,
+              "self-harm/intent": false,
+              "sexual": false,
+              "sexual/minors": false,
+              "violence": false,
+              "violence/graphic": false
+            },
+            "category_scores": {
+              "harassment": 0.0008,
+              "harassment/threatening": 0.0009,
+              "hate": 0.001,
+              "hate/threatening": 0.0011,
+              "illicit": 0.0012,
+              "illicit/violent": 0.0004,
+              "self-harm": 0.0005,
+              "self-harm/instructions": 0.0006,
+              "self-harm/intent": 0.0007,
+              "sexual": 0.0008,
+              "sexual/minors": 0.0009,
+              "violence": 0.18,
+              "violence/graphic": 0.06
+            },
+            "category_applied_input_types": {
+              "harassment": ["text"],
+              "harassment/threatening": ["text"],
+              "hate": ["text"],
+              "hate/threatening": ["text"],
+              "illicit": ["text"],
+              "illicit/violent": ["text"],
+              "self-harm": ["text"],
+              "self-harm/instructions": ["text"],
+              "self-harm/intent": ["text"],
+              "sexual": ["text"],
+              "sexual/minors": ["text"],
+              "violence": ["text"],
+              "violence/graphic": ["text"]
+            }
+          }
+        ]
+      }
+    },
+    "google": {
+      "source": "hand-written",
+      "reply": {
+        "moderationCategories": [
+          {
+            "name": "Toxic",
+            "confidence": 0.18
+          },
+          {
+            "name": "Insult",
+            "confidence": 0.04
+          },
+          {
+            "name": "Profanity",
+            "confidence": 0.05
+          },
+          {
+            "name": "Derogatory",
+            "confidence": 0.01
+          },
+          {
+            "name": "Sexual",
+            "confidence": 0.02
+          },
+          {
+            "name": "Death, Harm & Tragedy",
+            "confidence": 0.9
+          },
+          {
+            "name": "Violent",
+            "confidence": 0.8
+          },
+          {
+            "name": "Firearms & Weapons",
+            "confidence": 0.05
+          },
+          {
+            "name": "Public Safety",
+            "confidence": 0.01
+          },
+          {
+            "name": "Health",
+            "confidence": 0.02
+          },
+          {
+            "name": "Religion & Belief",
+            "confidence": 0.03
+          },
+          {
+            "name": "Illicit Drugs",
+            "confidence": 0.04
+          },
+          {
+            "name": "War & Conflict",
+            "confidence": 0.6
+          },
+          {
+            "name": "Politics",
+            "confidence": 0.44
+          },
+          {
+            "name": "Finance",
+            "confidence": 0.02
+          },
+          {
+            "name": "Legal",
+            "confidence": 0.03
+          }
+        ]
+      }
+    }
+  },
+  "strong-disagreement": {
+    "openai": {
+      "source": "hand-written",
+      "reply": {
+        "id": "modr-hand-written-strong-disagreement",
+        "model": "omni-moderation-2024-09-26",
+        "results": [
+          {
+            "flagged": false,
+            "categories": {
+              "harassment": false,
+              "harassment/threatening": false,
+              "hate": false,
+              "hate/threatening": false,
+              "illicit": false,
+              "illicit/violent": false,
+              "self-harm": false,
+              "self-harm/instructions": false,
+              "self-harm/intent": false,
+              "sexual": false,
+              "sexual/minors": false,
+              "violence": false,
+              "violence/graphic": false
+            },
+            "category_scores": {
+              "harassment": 0.02,
+              "harassment/threatening": 0.0007,
+              "hate": 0.0008,
+              "hate/threatening": 0.0009,
+              "illicit": 0.001,
+              "illicit/violent": 0.0011,
+              "self-harm": 0.0012,
+              "self-harm/instructions": 0.0004,
+              "self-harm/intent": 0.0005,
+              "sexual": 0.0006,
+              "sexual/minors": 0.0007,
+              "violence": 0.0008,
+              "violence/graphic": 0.0009
+            },
+            "category_applied_input_types": {
+              "harassment": ["text"],
+              "harassment/threatening": ["text"],
+              "hate": ["text"],
+              "hate/threatening": ["text"],
+              "illicit": ["text"],
+              "illicit/violent": ["text"],
+              "self-harm": ["text"],
+              "self-harm/instructions": ["text"],
+              "self-harm/intent": ["text"],
+              "sexual": ["text"],
+              "sexual/minors": ["text"],
+              "violence": ["text"],
+              "violence/graphic": ["text"]
+            }
+          }
+        ]
+      }
+    },
+    "google": {
+      "source": "hand-written",
+      "reply": {
+        "moderationCategories": [
+          {
+            "name": "Toxic",
+            "confidence": 0.21
+          },
+          {
+            "name": "Insult",
+            "confidence": 0.05
+          },
+          {
+            "name": "Profanity",
+            "confidence": 0.01
+          },
+          {
+            "name": "Derogatory",
+            "confidence": 0.02
+          },
+          {
+            "name": "Sexual",
+            "confidence": 0.03
+          },
+          {
+            "name": "Death, Harm & Tragedy",
+            "confidence": 0.04
+          },
+          {
+            "name": "Violent",
+            "confidence": 0.05
+          },
+          {
+            "name": "Firearms & Weapons",
+            "confidence": 0.01
+          },
+          {
+            "name": "Public Safety",
+            "confidence": 0.02
+          },
+          {
+            "name": "Health",
+            "confidence": 0.03
+          },
+          {
+            "name": "Religion & Belief",
+            "confidence": 0.04
+          },
+          {
+            "name": "Illicit Drugs",
+            "confidence": 0.05
+          },
+          {
+            "name": "War & Conflict",
+            "confidence": 0.01
+          },
+          {
+            "name": "Politics",
+            "confidence": 0.7
+          },
+          {
+            "name": "Finance",
+            "confidence": 0.03
+          },
+          {
+            "name": "Legal",
+            "confidence": 0.04
+          }
+        ]
+      }
+    }
+  }
+}

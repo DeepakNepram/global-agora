@@ -67,7 +67,7 @@ schema_paths = []
 enabled = true
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql"]
+sql_paths = ["./seed.sql", "./seeds/*.sql"]
 
 [db.network_restrictions]
 # Enable management of network restrictions.
@@ -390,8 +390,9 @@ authorization_url_path = "/oauth/consent"
 allow_dynamic_registration = false
 
 [edge_runtime]
-# Off until a prompt needs it; keeps `supabase start` small.
-enabled = false
+# On for Prompt 4.3's moderate-post function. Its local settings are in
+# supabase/functions/.env (gitignored; see .env.example there).
+enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
 # `per_worker` (default) — enables hot reload during local development.
 # `oneshot` — fallback mode if hot reload causes issues (e.g. in large repos or with symlinks).
@@ -403,6 +404,11 @@ deno_version = 2
 
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
+
+# Called only by the database (pg_net), which sends a hook secret the
+# function checks itself; no JWT is involved.
+[functions.moderate-post]
+verify_jwt = false
 
 [analytics]
 # Off until a prompt needs it; keeps `supabase start` small.

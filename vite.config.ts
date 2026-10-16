@@ -77,6 +77,7 @@ export default defineConfig(({ mode }) => ({
       'src/**/*.test.tsx',
       'tests/**/*.test.ts',
       'workers/**/*.test.ts',
+      'supabase/functions/**/*.test.ts',
     ],
     globals: false,
   },
