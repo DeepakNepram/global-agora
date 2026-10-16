@@ -13,7 +13,7 @@ import { createAccountRemote } from '../../src/core/db/account.ts';
 
 import { admin, createUser, signedIn, type Record, type TestUser } from './smoke-library.ts';
 
-async function service(
+export async function service(
   config: DbConfig,
   serviceKey: string,
   path: string,

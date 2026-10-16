@@ -7,9 +7,12 @@
  *   SUPABASE_URL=… SUPABASE_ANON_KEY=… npm run db:smoke    any project, anon key only
  *
  * On the local stack it also checks the signed-in library (smoke-library.ts)
- * an account's setup and deletion (smoke-account.ts) and a discussion's
- * sides, posts and votes (smoke-discussion.ts) with throwaway users; against
- * any other project that part is skipped.
+ * an account's setup and deletion (smoke-account.ts), a discussion's sides,
+ * posts and votes (smoke-discussion.ts), and moderation end to end with
+ * known-toxic posts (smoke-moderation.ts), with throwaway users; against any
+ * other project that part is skipped.
+ *
+ *   npm run db:smoke -- --record             also saves the live models' replies
  */
 import { execSync } from 'node:child_process';
 
@@ -20,6 +23,7 @@ import type { Database } from '../../src/core/db/types.ts';
 import { accountChecks } from './smoke-account.ts';
 import { discussionChecks } from './smoke-discussion.ts';
 import { libraryChecks } from './smoke-library.ts';
+import { moderationChecks } from './smoke-moderation.ts';
 
 type TableName = keyof Database['public']['Tables'];
 
@@ -192,11 +196,15 @@ record(
   story.error?.message ?? storyTitle ?? 'NOT FOUND',
 );
 
-// --- Signed in: library (3.4), account (4.1), discussion (4.2); local only. ---
+// --- Signed in: library (3.4), account (4.1), discussion (4.2), moderation
+// (4.3); local only. `-- --record` saves the live models' replies (4.3). ---
 if (serviceKey !== null) {
   await libraryChecks(config, serviceKey, record);
   await accountChecks(config, serviceKey, record);
   await discussionChecks(config, serviceKey, record);
+  await moderationChecks(config, serviceKey, record, {
+    recordFixtures: process.argv.includes('--record'),
+  });
 }
 
 // --- Report. ------------------------------------------------------------------

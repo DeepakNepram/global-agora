@@ -2,7 +2,8 @@
 
 import type { AdminRemote, QueueItem, QueuedFor } from '../moderationQueue';
 import type { DbClient } from './client';
-import { fail } from './moderation';
+// Explicit .ts: scripts/db/smoke.ts loads this under plain Node, which needs it.
+import { fail } from './moderation.ts';
 
 interface QueueRow {
   readonly post_id: string;
