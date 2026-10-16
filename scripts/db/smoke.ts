@@ -8,9 +8,10 @@
  *
  * On the local stack it also checks the signed-in library (smoke-library.ts)
  * an account's setup and deletion (smoke-account.ts), a discussion's sides,
- * posts and votes (smoke-discussion.ts), and moderation end to end with
- * known-toxic posts (smoke-moderation.ts), with throwaway users; against any
- * other project that part is skipped.
+ * posts and votes (smoke-discussion.ts), moderation end to end with
+ * known-toxic posts (smoke-moderation.ts), and the local badge through the
+ * API Worker (smoke-local-badge.ts), with throwaway users; against any other
+ * project that part is skipped.
  *
  *   npm run db:smoke -- --record             also saves the live models' replies
  */
@@ -22,6 +23,7 @@ import type { Database } from '../../src/core/db/types.ts';
 
 import { accountChecks } from './smoke-account.ts';
 import { discussionChecks } from './smoke-discussion.ts';
+import { localBadgeChecks } from './smoke-local-badge.ts';
 import { libraryChecks } from './smoke-library.ts';
 import { moderationChecks } from './smoke-moderation.ts';
 
@@ -197,7 +199,8 @@ record(
 );
 
 // --- Signed in: library (3.4), account (4.1), discussion (4.2), moderation
-// (4.3); local only. `-- --record` saves the live models' replies (4.3). ---
+// (4.3), the local badge through the Worker (4.4); local only. `-- --record`
+// saves the live models' replies (4.3). ---
 if (serviceKey !== null) {
   await libraryChecks(config, serviceKey, record);
   await accountChecks(config, serviceKey, record);
@@ -205,6 +208,7 @@ if (serviceKey !== null) {
   await moderationChecks(config, serviceKey, record, {
     recordFixtures: process.argv.includes('--record'),
   });
+  await localBadgeChecks(config, serviceKey, record);
 }
 
 // --- Report. ------------------------------------------------------------------

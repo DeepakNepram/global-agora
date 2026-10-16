@@ -48,15 +48,17 @@ export interface SubmittedPost {
 export type PostingErrorCode =
   'signed-out' | 'rate-limited' | 'not-allowed' | 'invalid' | 'unavailable' | 'network' | 'unknown';
 
+// Plain fields, not parameter properties: scripts/db/smoke.ts runs this under
+// Node's type stripping, which cannot compile those.
 export class PostingError extends Error {
-  override readonly name = 'PostingError';
-  constructor(
-    readonly code: PostingErrorCode,
-    message: string,
-    /** For rate-limited: how long until the next post may go. */
-    readonly retryAfterSeconds: number | null = null,
-  ) {
+  override readonly name: string = 'PostingError';
+  readonly code: PostingErrorCode;
+  /** For rate-limited: how long until the next post may go. */
+  readonly retryAfterSeconds: number | null;
+  constructor(code: PostingErrorCode, message: string, retryAfterSeconds: number | null = null) {
     super(message);
+    this.code = code;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
