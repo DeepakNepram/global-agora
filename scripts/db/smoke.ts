@@ -7,8 +7,9 @@
  *   SUPABASE_URL=… SUPABASE_ANON_KEY=… npm run db:smoke    any project, anon key only
  *
  * On the local stack it also checks the signed-in library (smoke-library.ts)
- * and an account's setup and deletion (smoke-account.ts) with throwaway
- * users; against any other project that part is skipped.
+ * an account's setup and deletion (smoke-account.ts) and a discussion's
+ * sides, posts and votes (smoke-discussion.ts) with throwaway users; against
+ * any other project that part is skipped.
  */
 import { execSync } from 'node:child_process';
 
@@ -17,6 +18,7 @@ import { createDbClient, type DbConfig } from '../../src/core/db/client.ts';
 import type { Database } from '../../src/core/db/types.ts';
 
 import { accountChecks } from './smoke-account.ts';
+import { discussionChecks } from './smoke-discussion.ts';
 import { libraryChecks } from './smoke-library.ts';
 
 type TableName = keyof Database['public']['Tables'];
@@ -190,10 +192,11 @@ record(
   story.error?.message ?? storyTitle ?? 'NOT FOUND',
 );
 
-// --- Signed in: the library (3.4) and the account (4.1), local stack only. -----
+// --- Signed in: library (3.4), account (4.1), discussion (4.2); local only. ---
 if (serviceKey !== null) {
   await libraryChecks(config, serviceKey, record);
   await accountChecks(config, serviceKey, record);
+  await discussionChecks(config, serviceKey, record);
 }
 
 // --- Report. ------------------------------------------------------------------
