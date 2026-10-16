@@ -878,6 +878,7 @@ export type Database = {
           side_label: string;
           stance: string;
           story_id: string;
+          strikes_to_suspend: number;
           toxicity: number;
           waiting_since: string;
         }[];

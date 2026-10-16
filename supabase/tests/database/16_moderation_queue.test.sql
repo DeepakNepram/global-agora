@@ -93,10 +93,10 @@ select results_eq(
   'hidden, reported and unchecked posts, longest waiting first');
 select results_eq(
   $$select report_count, report_reasons, side_label, author_handle, author_strikes,
-           author_suspended, prompt
+           author_suspended, strikes_to_suspend, prompt
       from public.moderation_queue() where post_id = '00000000-0000-4000-8000-0000000007c2'$$,
   $$values (2, '{"harassment": 1, "spam": 1}'::jsonb, 'Yes'::text, 'queue_2'::text, 0::smallint,
-            false, 'Queued?'::text)$$,
+            false, 3::smallint, 'Queued?'::text)$$,
   'a reported post shows its reasons, its side and its author');
 select results_eq(
   $$select toxicity, flagged from public.moderation_queue()
@@ -148,20 +148,25 @@ select is((select post_count from public.discussions
             where story_id = '00000000-0000-4000-8000-0000000007b1'),
   4, 'the approved count follows each decision (7c1, 7c3 joined; 7c8, 7c9 left)');
 select results_eq(
-  $$select right(post_id::text, 3), source, issued_by from public.strikes$$,
+  $$select right(post_id::text, 3), source, issued_by from public.strikes
+     where user_id = '00000000-0000-4000-8000-0000000007a2'$$,
   $$values ('7c8'::text, 'moderator'::text, '00000000-0000-4000-8000-0000000007a1'::uuid)$$,
   'strike gave the author one strike, issued by M; remove gave none');
 select results_eq(
-  $$select right(post_id::text, 3), state, resolved_by from public.reports order by post_id, reason$$,
+  $$select right(post_id::text, 3), state, resolved_by from public.reports
+     where post_id::text like '00000000-0000-4000-8000-0000000007c_' order by post_id, reason$$,
   $$values ('7c2'::text, 'dismissed'::text, '00000000-0000-4000-8000-0000000007a1'::uuid),
            ('7c2', 'dismissed', '00000000-0000-4000-8000-0000000007a1'),
            ('7c8', 'actioned', '00000000-0000-4000-8000-0000000007a1'),
            ('7c9', 'actioned', '00000000-0000-4000-8000-0000000007a1')$$,
   'reports are dismissed or actioned, by M');
-select is((select count(*) from public.reports where resolved_at is null), 0::bigint,
+select is((select count(*) from public.reports
+            where resolved_at is null and post_id::text like '00000000-0000-4000-8000-0000000007c_'),
+  0::bigint,
   'each with when it was dealt with');
 select results_eq(
-  $$select right(post_id::text, 3), action, actor_id from public.moderation_actions order by id$$,
+  $$select right(post_id::text, 3), action, actor_id from public.moderation_actions
+     where actor_id = '00000000-0000-4000-8000-0000000007a1' order by id$$,
   $$values ('7c1'::text, 'approve'::text, '00000000-0000-4000-8000-0000000007a1'::uuid),
            ('7c2', 'approve', '00000000-0000-4000-8000-0000000007a1'),
            ('7c9', 'remove', '00000000-0000-4000-8000-0000000007a1'),

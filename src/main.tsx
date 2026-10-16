@@ -20,8 +20,23 @@ const config = resolveConfig(env);
 const dbConfig = dbConfigFromEnv(env);
 const authProviders = authProvidersFromEnv(env);
 
-createRoot(container).render(
-  <StrictMode>
-    <App config={config} dbConfig={dbConfig} authProviders={authProviders} />
-  </StrictMode>,
-);
+const root = createRoot(container);
+const path = window.location.pathname;
+
+if (path === '/admin' || path.startsWith('/admin/')) {
+  // The admin pages (Prompt 4.3, 4.6) in their own chunk, instead of the globe:
+  // a reader's start never pays for them.
+  void import('./ui/admin/AdminApp').then(({ AdminApp }) =>
+    root.render(
+      <StrictMode>
+        <AdminApp dbConfig={dbConfig} />
+      </StrictMode>,
+    ),
+  );
+} else {
+  root.render(
+    <StrictMode>
+      <App config={config} dbConfig={dbConfig} authProviders={authProviders} />
+    </StrictMode>,
+  );
+}

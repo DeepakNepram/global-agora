@@ -3,16 +3,7 @@ import type { JSX } from 'react';
 import { describeNotice, type AppNotice } from '@/core';
 import { getUpdatesController, useUpdatesStore, wallClockNow } from '@/state';
 
-import { formatAgo } from '../story/format';
-
-const DAY_MS = 86_400_000;
-
-/** Notices can be weeks old; stories never are, so formatAgo stops at hours. */
-function noticeAge(timeMs: number, nowMs: number): string {
-  const days = Math.floor((nowMs - timeMs) / DAY_MS);
-  if (days < 2) return formatAgo(timeMs, nowMs);
-  return `${days} days ago`;
-}
+import { formatAgoLong } from '../story/format';
 
 function Notice({ notice, nowMs }: { notice: AppNotice; nowMs: number }): JSX.Element {
   const text = describeNotice(notice);
@@ -27,7 +18,9 @@ function Notice({ notice, nowMs }: { notice: AppNotice; nowMs: number }): JSX.El
           {text.title}
           {fresh && <span className="sr-only"> (new)</span>}
         </span>
-        <span className="shrink-0 text-xs text-muted">{noticeAge(notice.createdAtMs, nowMs)}</span>
+        <span className="shrink-0 text-xs text-muted">
+          {formatAgoLong(notice.createdAtMs, nowMs)}
+        </span>
       </p>
       <p className="text-sm text-muted">{text.body}</p>
       {text.help !== undefined && (

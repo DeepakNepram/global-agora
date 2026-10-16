@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { discussCopy, formatAgo, formatKm, sourcesText } from './format';
+import { discussCopy, formatAgo, formatAgoLong, formatKm, sourcesText } from './format';
 
 const NOW = Date.UTC(2026, 9, 1, 12);
 const MIN = 60_000;
@@ -12,6 +12,12 @@ describe('story copy', () => {
     expect(formatAgo(NOW - 12 * MIN, NOW)).toBe('12 min ago');
     expect(formatAgo(NOW - 59 * MIN, NOW)).toBe('59 min ago');
     expect(formatAgo(NOW - 200 * MIN, NOW)).toBe('3 h ago');
+  });
+
+  it('counts days for what outlives a story', () => {
+    expect(formatAgoLong(NOW - 47 * 60 * MIN, NOW)).toBe('47 h ago');
+    expect(formatAgoLong(NOW - 48 * 60 * MIN, NOW)).toBe('2 days ago');
+    expect(formatAgoLong(NOW - 30 * 24 * 60 * MIN, NOW)).toBe('30 days ago');
   });
 
   it('says how far and how many', () => {

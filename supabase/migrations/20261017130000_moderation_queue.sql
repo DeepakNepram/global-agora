@@ -76,6 +76,8 @@ returns table (
   author_handle     text,
   author_strikes    smallint,
   author_suspended  boolean,
+  -- How many strikes suspend, so a strike can say whether it will.
+  strikes_to_suspend smallint,
   mod_state         text,
   queued_for        text,
   waiting_since     timestamptz,
@@ -134,6 +136,7 @@ begin
                        else 'Neutral' end,
          q.body, q.kind, q.stance, q.evidence_url, q.created_at,
          q.author_id, a.handle, a.strikes, a.suspended_at is not null,
+         (select m.strikes_to_suspend from private.moderation_settings m),
          q.mod_state, q.queued_for, q.waiting_since,
          coalesce(q.n, 0), coalesce(q.reasons, '{}'::jsonb),
          (q.mod_scores -> 'signals' ->> 'toxicity')::real,

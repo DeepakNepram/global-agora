@@ -15,6 +15,14 @@ export function formatAgo(timeMs: number, nowMs: number): string {
   return `${Math.floor(minutes / 60)} h ago`;
 }
 
+const DAY_MS = 86_400_000;
+
+/** formatAgo, then "3 days ago": for notices and queued posts, which outlive a story. */
+export function formatAgoLong(timeMs: number, nowMs: number): string {
+  const days = Math.floor(Math.max(0, nowMs - timeMs) / DAY_MS);
+  return days < 2 ? formatAgo(timeMs, nowMs) : `${days} days ago`;
+}
+
 /** "Under 1 km", "340 km", "1,200 km". */
 export function formatKm(km: number): string {
   if (km < 1) return 'Under 1 km';
