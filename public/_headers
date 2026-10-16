@@ -1,0 +1,7 @@
+# Cloudflare Pages response headers (Vite copies public/ into dist/).
+#
+# No page of this app may ask for the device's location (CLAUDE.md #5): the
+# browser refuses any request for it, from our code or anyone else's, without
+# ever showing a prompt. The local badge uses the API Worker's Cloudflare data.
+/*
+  Permissions-Policy: geolocation=()

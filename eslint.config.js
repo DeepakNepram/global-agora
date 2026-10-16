@@ -124,6 +124,10 @@ const functionsFromApp = {
   message: 'src/ must not import Edge Function code. It holds service keys (CLAUDE.md #9).',
 };
 
+const locationMessage =
+  'No GPS and no location prompt, ever (CLAUDE.md #5). The local badge comes from the ' +
+  "API Worker's Cloudflare data alone (src/core/localBadge.ts).";
+
 const clockMessage =
   'Do not read the wall clock here. Render the time store value (src/state/timeStore.ts); ' +
   'only src/state/clock.ts may call wallClockNow().';
@@ -229,6 +233,8 @@ export default tseslint.config(
   // The rendered time is the store's time, never "now", or the scrubber cannot
   // replay the past. src/state/clock.ts is the one sanctioned wall-clock read;
   // tests/clock.test.ts backs this up in case a rule is disabled inline.
+  // No device location, ever (CLAUDE.md #5), in the same list: a second
+  // no-restricted-properties block would replace this one, not add to it.
   {
     files: ['src/**/*.{ts,tsx}'],
     ignores: ['src/state/clock.ts', 'src/**/*.test.{ts,tsx}'],
@@ -237,6 +243,7 @@ export default tseslint.config(
         'error',
         { object: 'Date', property: 'now', message: clockMessage },
         { object: 'performance', property: 'now', message: clockMessage },
+        { property: 'geolocation', message: locationMessage },
       ],
       'no-restricted-syntax': [
         'error',
