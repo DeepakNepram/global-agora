@@ -13,7 +13,14 @@ import {
   type PinLayer,
   type PresentResult,
 } from '@/globe';
-import { filterStore, monotonicNowMs, ringedStory, storyStore, timeStore } from '@/state';
+import {
+  discussionStageStore,
+  filterStore,
+  monotonicNowMs,
+  ringedStory,
+  storyStore,
+  timeStore,
+} from '@/state';
 
 import { createBadgeAtlas } from './badgeAtlas';
 import type { PinPicker } from './pinPicker';
@@ -220,8 +227,11 @@ export function PinScene(props: PinSceneProps): JSX.Element | null {
   }, [layer, invalidate]);
 
   useFrame((state, delta) => {
-    // The camera always looks at the globe's centre, so its distance is its altitude.
-    if (state.camera instanceof PerspectiveCamera) {
+    // The camera always looks at the globe's centre, so its distance is its
+    // altitude; except in the discussion shot (Prompt 4.5), where the level
+    // holds: re-clustering behind the blur would be work nobody sees.
+    const inDiscussion = discussionStageStore.getState().phase !== 'closed';
+    if (state.camera instanceof PerspectiveCamera && !inDiscussion) {
       const altitudeKm = altitudeKmAt(state.camera.position.length());
       const zoom = clusterZoomFor(altitudeKm, state.size.height, state.camera.fov);
       const level = nextClusterLevel(levelRef.current, zoom);

@@ -9,12 +9,20 @@ import {
   type Permalink,
   type QualityTier,
 } from '@/core';
-import { CAMERA_FOV_DEG, renderSettingsForTier, VIGNETTE, type OrbitGlobeControls } from '@/globe';
-import { onboardingStore, useAccountStore, usePanelStore, useStoryStore } from '@/state';
+import { CAMERA_FOV_DEG, renderSettingsForTier, type OrbitGlobeControls } from '@/globe';
+import {
+  onboardingStore,
+  useAccountStore,
+  useDiscussionStage,
+  usePanelStore,
+  useStoryStore,
+} from '@/state';
 
-import { AccountButton } from './account/AccountButton';
+import { stageRecedeNow } from './discussion/stage';
 import { createPresentLog } from './globe/bloomReport';
 import { ControlsHost, PipelineHost } from './globe/canvasHosts';
+import { DiscussionStageHost } from './globe/DiscussionStageHost';
+import { REST_FRAME_INTERVAL_MS } from './globe/frameGovernor';
 import { createFrameProbe } from './globe/frameProbe';
 import { GlobeDevTools } from './globe/GlobeDevTools';
 import { GlobeReticle } from './globe/GlobeReticle';
@@ -26,16 +34,11 @@ import { useGlobeSelection } from './globe/useGlobeSelection';
 import { useLiveClock } from './globe/useLiveClock';
 import { usePinNodes } from './globe/usePinNodes';
 import { usePrefersReducedMotion } from './globe/usePrefersReducedMotion';
-import { vignetteCssGradient } from './globe/vignette';
-import { SecondarySheets } from './SecondarySheets';
-import { LibraryButtons } from './library/LibraryButtons';
+import { GlobeLayers } from './GlobeLayers';
 import type { GlobeTarget } from './nav/globeNavigation';
-import { NavLayer } from './nav/NavLayer';
 import { useOnboardingTrigger } from './onboarding/useOnboardingTrigger';
 import { TimeDriver } from './scrubber/TimeDriver';
-import { TimeScrubber } from './scrubber/TimeScrubber';
 import { useOpenPermalink } from './story/permalinkLink';
-import { StoryLayer } from './story/StoryLayer';
 
 export interface GlobeCanvasProps {
   readonly tier: QualityTier;
@@ -59,6 +62,14 @@ function voidColor(): string {
 
 const CAMERA = { fov: CAMERA_FOV_DEG } as const;
 
+/** A 3x phone would fill 2.25x the pixels of 2x for no visible gain on a sphere. */
+const DPR_RANGE: [number, number] = [1, 2];
+
+/** Half of what DPR_RANGE gives this screen: the discussion's resting resolution (Prompt 4.5). */
+function restDpr(): number {
+  return Math.min(DPR_RANGE[1], Math.max(DPR_RANGE[0], window.devicePixelRatio || 1)) / 2;
+}
+
 const GLOBE_LABEL =
   'Globe of Earth with news stories as pins, grouped into numbered clusters that open as you zoom in. ' +
   'Drag to rotate, scroll or pinch to zoom, tap a pin to read its story. When focused, arrow keys ' +
@@ -78,8 +89,9 @@ const GLOBE_LABEL =
  * - The wrapper is the camera's input surface: focusable, labelled as an
  *   application (it handles its own keys), and touch-action none so the
  *   browser does not pan or zoom the page under a drag or pinch.
- * - dpr capped at 2: a 3x phone would otherwise fill 2.25x the pixels of 2x
- *   for no visible gain on a sphere.
+ * - dpr capped at 2 (DPR_RANGE), and halved behind a settled discussion
+ *   panel. Through this prop, not setDpr: r3f resets anything else to the
+ *   prop on its next render.
  */
 export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
   const { tier, historyWindowHours, apiBaseUrl, savedStoryLimit, link, authProviders } = props;
@@ -95,7 +107,11 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
   const panelOpen = usePanelStore((state) => state.panel !== null);
   const sheetOpen = storyOpen || panelOpen;
   const accountOpen = useAccountStore((state) => state.sheet !== null);
-  useOnboardingTrigger(sheetOpen || accountOpen);
+  const inDiscussion = useDiscussionStage((state) => state.phase !== 'closed');
+  const resting = useDiscussionStage(
+    (state) => state.phase !== 'closed' && state.quality === 'rest',
+  );
+  useOnboardingTrigger(sheetOpen || accountOpen || inDiscussion);
   const target = useMemo(
     (): GlobeTarget => ({ controls, viewport: picker.viewport }),
     [controls, picker],
@@ -133,7 +149,7 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
       <Canvas
         frameloop="demand"
         flat={settings.postprocessing}
-        dpr={[1, 2]}
+        dpr={resting ? restDpr() : DPR_RANGE}
         camera={CAMERA}
         gl={gl}
         // scene.background, not setClearColor: three converts a clear colour for
@@ -148,6 +164,8 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
         aria-roledescription="globe"
         aria-label={GLOBE_LABEL}
         tabIndex={0}
+        // Behind the discussion panel the globe takes no input (Prompt 4.5).
+        inert={inDiscussion}
         style={{ touchAction: 'none' }}
         className="peer focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         fallback={
@@ -180,48 +198,31 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
           initialPose={link.camera}
           restingCenter={onboardingStore.getState().homeCity}
         />
-        <PipelineHost settings={settings} bloomEnabled={dev.bloomEnabled} probe={probe} />
+        <DiscussionStageHost controls={controls} />
+        <PipelineHost
+          settings={settings}
+          bloomEnabled={dev.bloomEnabled}
+          probe={probe}
+          frameIntervalMs={resting ? REST_FRAME_INTERVAL_MS : 0}
+          recede={stageRecedeNow}
+        />
       </Canvas>
       {/* Straight after the canvas: it shows on the canvas's focus-visible (CSS peer). */}
       <GlobeReticle message={selection.message} />
 
-      {!settings.postprocessing && (
-        // LOW has no composer; a CSS vignette matching VignetteEffect costs no GPU pass.
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0"
-          style={{ backgroundImage: vignetteCssGradient(VIGNETTE) }}
-        />
-      )}
-
-      <NavLayer
+      <GlobeLayers
+        settings={settings}
         nodes={pinNodes}
         target={target}
-        apiBaseUrl={apiBaseUrl}
-        historyHours={historyWindowHours}
-        actions={
-          <>
-            <LibraryButtons />
-            {authProviders !== null && <AccountButton />}
-          </>
-        }
-      />
-      <TimeScrubber nodes={pinNodes} historyHours={historyWindowHours} hidden={sheetOpen} />
-      <SecondarySheets
-        nodes={pinNodes}
-        target={target}
-        historyHours={historyWindowHours}
-        savedStoryLimit={savedStoryLimit}
-        reducedMotion={motion === 'reduced'}
-        authProviders={authProviders}
-      />
-      <StoryLayer
-        nodes={pinNodes}
         controls={controls}
         apiBaseUrl={apiBaseUrl}
+        historyHours={historyWindowHours}
         savedStoryLimit={savedStoryLimit}
         detailsAvailable={dev.pinSource === 'live'}
         reducedMotion={motion === 'reduced'}
+        authProviders={authProviders}
+        sheetOpen={sheetOpen}
+        inDiscussion={inDiscussion}
       />
 
       {/* Inspection tooling only; compiled out of production builds. */}

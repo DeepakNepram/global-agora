@@ -17,6 +17,7 @@ import {
 } from '@/state';
 
 import { nextAnnouncement } from '../announce';
+import { useDiscussButton } from '../discussion/useDiscussButton';
 import { PeekCard, type ShareState } from './PeekCard';
 import { copyText, shareUrl } from './permalinkLink';
 import { StoryDetails, type ReportState } from './StoryDetails';
@@ -99,6 +100,15 @@ export function StoryLayer(props: StoryLayerProps): JSX.Element {
   const announce = (text: string): void =>
     setAnnouncement((previous) => nextAnnouncement(previous, text));
 
+  const { opening, onDiscuss } = useDiscussButton({
+    discussionOpen: open && summary?.discussion === 'open',
+    selectedId,
+    detail,
+    controls,
+    reducedMotion,
+    announce,
+  });
+
   const onSave = (): void => {
     if (!summary) return;
     const { id, headline, place, publishedAtMs } = summary;
@@ -134,9 +144,6 @@ export function StoryLayer(props: StoryLayerProps): JSX.Element {
       copiedTimer.current = window.setTimeout(() => setShared(null), COPIED_MS);
     });
   };
-
-  // The discussion view is Prompt 4.5's; no discussion can open before then.
-  const onDiscuss = (): void => announce('Discussions open here in a later update.');
 
   const onReport = (): void => {
     if (selectedId === null) return;
@@ -204,6 +211,7 @@ export function StoryLayer(props: StoryLayerProps): JSX.Element {
           onSave={onSave}
           onShare={onShare}
           onDiscuss={onDiscuss}
+          discussOpening={opening !== null}
         />
       </StorySheet>
       <p role="status" className="sr-only">

@@ -96,6 +96,7 @@ export {
 export {
   browserAccountEnvironment,
   getAccountController,
+  getAccountSession,
   getUpdatesController,
   startAccounts,
 } from './accounts';
@@ -145,4 +146,18 @@ export {
   type OnboardingStatus,
   type OnboardingStore,
 } from './onboardingStore';
+export {
+  CLOSED_STAGE,
+  createDiscussionStageStore,
+  discussionStageStore,
+  stageActive,
+  useDiscussionStage,
+  type CameraMove,
+  type DiscussionStageStore,
+  type SavedPose,
+  type StagePhase,
+  type StageSegment,
+  type StageState,
+  type StageTarget,
+} from './discussionStage';
 export type { KeyValueStorage } from './persist';

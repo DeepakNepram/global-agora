@@ -45,6 +45,7 @@ export function browserAccountEnvironment(): AccountEnvironment {
 
 let current: AccountController | null = null;
 let currentUpdates: UpdatesController | null = null;
+let currentConfig: DbConfig | null = null;
 
 /**
  * One SDK client per backend, however often the controller is remade
@@ -76,6 +77,15 @@ export function getUpdatesController(): UpdatesController | null {
   return currentUpdates;
 }
 
+/**
+ * The one SDK session, loading it if need be, or null without a backend.
+ * Discussions (Prompt 4.5) read as guests too: a guest entering one loads the
+ * SDK then, on the same client a later sign-in uses.
+ */
+export function getAccountSession(): Promise<AccountSession> | null {
+  return currentConfig === null ? null : sharedSession(currentConfig);
+}
+
 /** Makes and starts the controller; the returned function stops it. */
 export function startAccounts(config: DbConfig | null): () => void {
   if (config === null) return () => {};
@@ -88,11 +98,13 @@ export function startAccounts(config: DbConfig | null): () => void {
   const updates = createUpdatesController({ store: updatesStore, accounts: accountStore, load });
   current = controller;
   currentUpdates = updates;
+  currentConfig = config;
   void controller.start();
   return () => {
     controller.dispose();
     updates.dispose();
     if (current === controller) current = null;
     if (currentUpdates === updates) currentUpdates = null;
+    if (currentConfig === config) currentConfig = null;
   };
 }

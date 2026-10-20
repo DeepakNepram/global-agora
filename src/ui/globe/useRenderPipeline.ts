@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { createGpuTimer, createRenderPipeline, type RenderSettings } from '@/globe';
 import { monotonicNowMs } from '@/state';
 
+import { createFrameGovernor, frameDue } from './frameGovernor';
 import type { FrameProbe } from './frameProbe';
 
 /**
@@ -17,6 +18,13 @@ export interface RenderPipelineOptions {
   readonly bloomEnabled: boolean;
   /** Frame timing sink. null in production: no timer queries, no bookkeeping. */
   readonly probe: FrameProbe | null;
+  /**
+   * Least time between draws, ms: the 30 fps cap behind a settled discussion
+   * panel (Prompt 4.5). 0 draws every frame asked for.
+   */
+  readonly frameIntervalMs?: number;
+  /** How far the globe has receded behind the discussion panel this frame, 0 to 1. */
+  readonly recede?: () => number;
 }
 
 /**
@@ -24,7 +32,8 @@ export interface RenderPipelineOptions {
  * frame r3f schedules. Timing wraps exactly the draw call, so the overlay shows
  * the cost of rendering and nothing else.
  */
-export function useRenderPipeline({ settings, bloomEnabled, probe }: RenderPipelineOptions): void {
+export function useRenderPipeline(options: RenderPipelineOptions): void {
+  const { settings, bloomEnabled, probe } = options;
   const gl = useThree((state) => state.gl);
   const scene = useThree((state) => state.scene);
   const camera = useThree((state) => state.camera);
@@ -35,6 +44,14 @@ export function useRenderPipeline({ settings, bloomEnabled, probe }: RenderPipel
 
   const pipelineRef = useRef<ReturnType<typeof createRenderPipeline> | null>(null);
   const timerRef = useRef<ReturnType<typeof createGpuTimer> | null>(null);
+  const governor = useRef(createFrameGovernor());
+  const intervalRef = useRef(options.frameIntervalMs ?? 0);
+  const recedeRef = useRef(options.recede);
+
+  useEffect(() => {
+    intervalRef.current = options.frameIntervalMs ?? 0;
+    recedeRef.current = options.recede;
+  });
 
   useEffect(() => {
     const pipeline = createRenderPipeline(gl, scene, camera, settings);
@@ -73,6 +90,12 @@ export function useRenderPipeline({ settings, bloomEnabled, probe }: RenderPipel
   useFrame((_state, delta) => {
     const pipeline = pipelineRef.current;
     if (!pipeline) return;
+    // Not due yet under a cap: skip this vsync and ask again on the next.
+    if (!frameDue(governor.current, monotonicNowMs(), intervalRef.current)) {
+      invalidate();
+      return;
+    }
+    pipeline.setRecede(recedeRef.current?.() ?? 0);
     const timer = timerRef.current;
     if (!probe || !timer) {
       pipeline.render(delta);

@@ -22,6 +22,8 @@ export interface PeekCardProps {
   readonly onSave: () => void;
   readonly onShare: () => void;
   readonly onDiscuss: () => void;
+  /** Discuss was pressed and the discussion is on its way. */
+  readonly discussOpening?: boolean;
 }
 
 const ACTION =
@@ -135,9 +137,12 @@ export function PeekCard(props: PeekCardProps): JSX.Element {
               : `${ACTION} flex-1 cursor-not-allowed border-ink/10 text-muted`
           }
           aria-disabled={!discuss.enabled}
+          aria-busy={props.discussOpening === true}
           onClick={discuss.enabled ? props.onDiscuss : undefined}
         >
-          <span className="truncate">{discuss.label}</span>
+          <span className="truncate">
+            {discuss.enabled && props.discussOpening === true ? 'Opening…' : discuss.label}
+          </span>
         </button>
       </div>
 
