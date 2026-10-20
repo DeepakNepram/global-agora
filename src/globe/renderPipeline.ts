@@ -18,6 +18,7 @@ import {
 } from 'three';
 
 import { BLOOM_THRESHOLD } from './hdr';
+import { RecedeEffect, recedeLook } from './recede';
 import type { RenderSettings } from './renderSettings';
 
 /**
@@ -26,6 +27,8 @@ import type { RenderSettings } from './renderSettings';
  */
 export const VIGNETTE = { offset: 0.3, darkness: 0.3 } as const;
 
+const BLOOM_INTENSITY = 0.8;
+
 export interface RenderPipeline {
   /** Draws one frame. The host calls this instead of renderer.render. */
   render(deltaSeconds: number): void;
@@ -33,29 +36,42 @@ export interface RenderPipeline {
   setSize(width: number, height: number): void;
   /** No-op without a composer: LOW never blooms. */
   setBloomEnabled(enabled: boolean): void;
+  /**
+   * How far the globe has receded behind the discussion panel, 0 to 1
+   * (recede.ts). No-op without a composer: the host dims LOW with CSS.
+   */
+  setRecede(amount: number): void;
   dispose(): void;
 }
 
-function createEffects(settings: RenderSettings, bloom: boolean): Effect[] {
-  const effects: Effect[] = [];
-  if (bloom) {
-    effects.push(
-      new BloomEffect({
-        // smoothstep(threshold, threshold + smoothing, luminance): white stays out.
-        luminanceThreshold: BLOOM_THRESHOLD,
-        luminanceSmoothing: 0.25,
-        mipmapBlur: true,
-        intensity: 0.8,
-        radius: 0.6,
-        resolutionScale: settings.bloomResolutionScale,
-      }),
-    );
+interface EffectSet {
+  readonly effects: Effect[];
+  readonly recede: RecedeEffect;
+  readonly bloom: BloomEffect | null;
+}
+
+function createEffects(settings: RenderSettings, bloomEnabled: boolean): EffectSet {
+  // First, so what follows applies on top of the receded globe.
+  const recede = new RecedeEffect();
+  const effects: Effect[] = [recede];
+  let bloom: BloomEffect | null = null;
+  if (bloomEnabled) {
+    bloom = new BloomEffect({
+      // smoothstep(threshold, threshold + smoothing, luminance): white stays out.
+      luminanceThreshold: BLOOM_THRESHOLD,
+      luminanceSmoothing: 0.25,
+      mipmapBlur: true,
+      intensity: BLOOM_INTENSITY,
+      radius: 0.6,
+      resolutionScale: settings.bloomResolutionScale,
+    });
+    effects.push(bloom);
   }
   // Order matters: bloom adds HDR light, ACES maps it to display range, and
   // the vignette darkens the result.
   effects.push(new ToneMappingEffect({ mode: ToneMappingMode.ACES_FILMIC }));
   effects.push(new VignetteEffect(VIGNETTE));
-  return effects;
+  return { effects, recede, bloom };
 }
 
 /**
@@ -64,8 +80,8 @@ function createEffects(settings: RenderSettings, bloom: boolean): Effect[] {
  * Without postprocessing the renderer draws straight to the canvas with ACES
  * applied per material (three's tonemapping_fragment): no extra pass, no extra
  * render target. With it, the scene goes to a half-float MSAA buffer so city
- * lights can exceed 1.0, then one merged EffectPass does bloom, ACES and the
- * vignette in a single full-screen draw.
+ * lights can exceed 1.0, then one merged EffectPass does the recede (Prompt
+ * 4.5), bloom, ACES and the vignette in a single full-screen draw.
  */
 export function createRenderPipeline(
   renderer: WebGLRenderer,
@@ -79,6 +95,7 @@ export function createRenderPipeline(
       render: () => renderer.render(scene, camera),
       setSize() {},
       setBloomEnabled() {},
+      setRecede() {},
       dispose() {},
     };
   }
@@ -93,7 +110,16 @@ export function createRenderPipeline(
   composer.addPass(new RenderPass(scene, camera));
 
   let effectPass: EffectPass | null = null;
+  let current: EffectSet | null = null;
   let bloomEnabled: boolean | null = null;
+  let recedeAmount = 0;
+
+  const setRecede = (amount: number): void => {
+    recedeAmount = amount;
+    if (!current) return;
+    current.recede.setAmount(amount);
+    if (current.bloom) current.bloom.intensity = BLOOM_INTENSITY * recedeLook(amount).bloomScale;
+  };
 
   const setBloomEnabled = (enabled: boolean): void => {
     if (enabled === bloomEnabled) return;
@@ -103,8 +129,10 @@ export function createRenderPipeline(
       // Disposes its effects too, so the next pass is built from fresh ones.
       effectPass.dispose();
     }
-    effectPass = new EffectPass(camera, ...createEffects(settings, enabled));
+    current = createEffects(settings, enabled);
+    effectPass = new EffectPass(camera, ...current.effects);
     composer.addPass(effectPass);
+    setRecede(recedeAmount);
   };
   setBloomEnabled(settings.bloom);
 
@@ -112,6 +140,7 @@ export function createRenderPipeline(
     render: (deltaSeconds) => composer.render(deltaSeconds),
     setSize: (width, height) => composer.setSize(width, height, false),
     setBloomEnabled,
+    setRecede,
     dispose: () => composer.dispose(),
   };
 }

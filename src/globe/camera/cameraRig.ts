@@ -126,6 +126,9 @@ export function createCameraRig(camera: PerspectiveCamera, body: Quaternion): Ca
       const lat = Math.min(scale.MAX_LATITUDE_DEG, Math.max(-scale.MAX_LATITUDE_DEG, pose.lat));
       orient.orientationFor({ lat, lon: pose.lon }, q);
       rig.altitudeKm = rig.clampAltitude(pose.altitudeKm);
+      // Someone else may have set the clip planes since (the discussion shot):
+      // the next apply() rewrites them rather than trusting the cache.
+      appliedAltitudeKm = -1;
     },
 
     lookDown(centre) {

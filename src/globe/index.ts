@@ -29,7 +29,20 @@ export {
   fitAltitudeKm,
   type CameraPose,
 } from './camera/cameraMath';
-export { flightDurationMs, type FlightResult } from './camera/flight';
+export { easeInOutCubic, flightDurationMs, type FlightResult } from './camera/flight';
+export {
+  applyShot,
+  orbitShot,
+  planShotMove,
+  poseShot,
+  shotDistanceKm,
+  shotTransform,
+  SHOT_TILT_RAD,
+  type LensShift,
+  type ShotMove,
+  type ShotPose,
+  type ShotTransform,
+} from './camera/discussionShot';
 export type { PointerInput } from './camera/pointerGestures';
 export type {
   AltitudeLimits,
@@ -66,3 +79,4 @@ export { BLOOM_THRESHOLD, NIGHT_LIGHTS_GAIN, ATMOSPHERE_MAX_LUMINANCE } from './
 export { createGpuTimer, type GpuTimer } from './gpuTimer';
 export { renderSettingsForTier, type AtmosphereMode, type RenderSettings } from './renderSettings';
 export { createRenderPipeline, VIGNETTE, type RenderPipeline } from './renderPipeline';
+export { recedeLook, type RecedeLook } from './recede';
