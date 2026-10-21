@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createDiscussionStageStore, type StageTarget } from '@/state';
 
-import { createStageController, type StageClock } from './stageController';
+import { createStageController, LEAVE_WARMUP_MS, type StageClock } from './stageController';
 import { segmentAt, SPRING_MS, STAGE_MS } from './stageMotion';
 
 const TARGET: StageTarget = {
@@ -91,21 +91,19 @@ describe('entering', () => {
 });
 
 describe('leaving', () => {
-  it('from rest, asks for full quality first and moves only two frames later', () => {
+  it('from rest, asks for full quality first and moves once the GPU has warmed up', () => {
     const { store, clock, stage, p } = setup();
     stage.begin(0);
     clock.advance(STAGE_MS);
+    const asked = clock.time;
     stage.leave();
     expect(store.getState()).toMatchObject({ phase: 'open', quality: 'full' });
     stage.leave();
-    clock.frame();
-    expect(store.getState().phase).toBe('open');
-    clock.frame();
-    const started = clock.time;
-    expect(store.getState()).toMatchObject({
-      phase: 'leaving',
-      camera: { direction: 'out', startMs: started },
-    });
+    while (store.getState().phase === 'open') clock.frame();
+    const started = store.getState().camera?.startMs ?? 0;
+    expect(started - asked).toBeGreaterThanOrEqual(LEAVE_WARMUP_MS);
+    expect(started - asked).toBeLessThan(LEAVE_WARMUP_MS + 32);
+    expect(store.getState()).toMatchObject({ phase: 'leaving', camera: { direction: 'out' } });
     expect(p()).toBe(1);
     clock.advance(STAGE_MS);
     expect(store.getState()).toMatchObject({ phase: 'closed', target: TARGET });

@@ -8,10 +8,15 @@ import { releaseLeaves, segmentAt, SPRING_MS, STAGE_MS } from './stageMotion';
  * not frames are being drawn.
  *
  * Quality: half resolution and 30 fps only while the panel is settled. Any
- * motion runs at full quality, and a leave from rest waits two frames after
- * asking for it back, so the resize (every buffer reallocated) is drawn
- * before anything moves.
+ * motion runs at full quality, and a leave from rest asks for it back first:
+ * the resize (every buffer reallocated) is drawn before anything moves, and
+ * the GPU, clocked down by seconds of light 30 fps work, has LEAVE_WARMUP_MS
+ * of full-rate frames to clock back up. Without that, leaving dropped one or
+ * two frames below 60 fps at its start (Prompt 4.5's benchmark).
  */
+
+/** Full-quality frames before a leave from rest moves. */
+export const LEAVE_WARMUP_MS = 100;
 
 export interface StageClock {
   now(): number;
@@ -134,8 +139,14 @@ export function createStageController(
         leaveQueued = true;
         cancel();
         store.setState({ quality: 'full' });
-        // The resized frame draws on the first; the motion starts on the second.
-        clock.nextFrame(() => clock.nextFrame((timeMs) => startLeave(timeMs)));
+        // The resized frame draws first; the motion starts on the first frame
+        // after the warm-up, and never before the second.
+        const asked = clock.now();
+        const whenWarm = (timeMs: number): void => {
+          if (timeMs - asked >= LEAVE_WARMUP_MS) startLeave(timeMs);
+          else clock.nextFrame(whenWarm);
+        };
+        clock.nextFrame(() => clock.nextFrame(whenWarm));
         return;
       }
       startLeave(clock.now());
