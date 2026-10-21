@@ -31,6 +31,8 @@ export interface FakeRoom {
   feeds: DiscussionFeed[];
   blocked: string[];
   sentDrafts: PostDraft[];
+  /** When the discussion closes; the fixture's fixed date unless a caller sets one. */
+  closesAtMs: number;
 }
 
 export function createFakeRoom(count = 60): FakeRoom {
@@ -44,6 +46,7 @@ export function createFakeRoom(count = 60): FakeRoom {
     feeds: [],
     blocked: [],
     sentDrafts: [],
+    closesAtMs: FIXTURE_DISCUSSION.closesAtMs,
     remotes: undefined as unknown as RoomRemotes,
   };
   const visible = (): DiscussionPost[] =>
@@ -52,7 +55,9 @@ export function createFakeRoom(count = 60): FakeRoom {
   const discussion: DiscussionRemote = {
     readerId: async () => fake.readerId,
     discussion: async (storyId) =>
-      storyId === FIXTURE_DISCUSSION.storyId ? FIXTURE_DISCUSSION : null,
+      storyId === FIXTURE_DISCUSSION.storyId
+        ? { ...FIXTURE_DISCUSSION, closesAtMs: fake.closesAtMs }
+        : null,
     posts: async (_storyId, offset, limit) => visible().slice(offset, offset + limit),
     post: async (id) => fake.posts.find((post) => post.id === id) ?? null,
     myUnapproved: async () =>

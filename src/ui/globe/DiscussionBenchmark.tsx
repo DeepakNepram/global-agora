@@ -2,7 +2,7 @@ import { useState, type JSX } from 'react';
 
 import type { QualityTier } from '@/core';
 import type { OrbitGlobeControls } from '@/globe';
-import { discussionStageStore, monotonicNowMs, type StagePhase } from '@/state';
+import { discussionStageStore, monotonicNowMs, wallClockNow, type StagePhase } from '@/state';
 // Static, not import(): this whole panel is compiled out of production
 // builds, and a dynamic import here made the bundler split the app's start
 // into four files, even though nothing in production ever loads it.
@@ -107,6 +107,8 @@ export function DiscussionBenchmark(props: DiscussionBenchmarkProps): JSX.Elemen
     try {
       const fake = createFakeRoom(60);
       fake.readerId = 'bench-reader';
+      // Open whenever the benchmark runs: the composer is part of what it measures.
+      fake.closesAtMs = wallClockNow() + 47 * 3_600_000;
       standInDiscussion(async () => fake.remotes);
       onFullMotionChange(true);
       onPinSourceChange(STORIES);
