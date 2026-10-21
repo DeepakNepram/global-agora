@@ -132,6 +132,7 @@ export function createRenderPipeline(
     current = createEffects(settings, enabled);
     effectPass = new EffectPass(camera, ...current.effects);
     composer.addPass(effectPass);
+    current.recede.warm(renderer);
     setRecede(recedeAmount);
   };
   setBloomEnabled(settings.bloom);

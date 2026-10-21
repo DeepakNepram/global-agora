@@ -108,9 +108,11 @@ export class RecedeEffect extends Effect {
       uniforms: new Map<string, Uniform>(Object.entries(values)),
     });
     this.values = values;
-    // Half the buffer's resolution: the blur is soft by definition, and its
-    // cost scales with the pixels it touches.
-    this.blurPass = new KawaseBlurPass({ kernelSize: KernelSize.HUGE, resolutionScale: 0.5 });
+    // A quarter of the buffer's resolution: the blur is soft by definition,
+    // its radius is set in full-buffer texels (KawaseBlurMaterial), and its
+    // cost scales with the pixels it touches: 10% off every transition frame
+    // against half (Prompt 4.5's benchmark).
+    this.blurPass = new KawaseBlurPass({ kernelSize: KernelSize.HUGE, resolutionScale: 0.25 });
     this.blurTarget = new WebGLRenderTarget(1, 1, { depthBuffer: false });
     this.blurTarget.texture.name = 'Recede.Blur';
     values.blurBuffer.value = this.blurTarget.texture;
@@ -135,6 +137,20 @@ export class RecedeEffect extends Effect {
   override setSize(width: number, height: number): void {
     this.blurPass.setSize(width, height);
     this.blurTarget.setSize(this.blurPass.resolution.width, this.blurPass.resolution.height);
+  }
+
+  /**
+   * Compiles the blur's two shaders now, at startup with every other one,
+   * rather than lazily in the first frame of the first discussion's
+   * transition (a 10 ms hitch on a laptop, more on a phone).
+   */
+  warm(renderer: WebGLRenderer): void {
+    const previous = renderer.getRenderTarget();
+    const source = new WebGLRenderTarget(4, 4, { depthBuffer: false });
+    source.texture.type = this.blurTarget.texture.type;
+    this.blurPass.render(renderer, source, this.blurTarget);
+    renderer.setRenderTarget(previous);
+    source.dispose();
   }
 
   override initialize(renderer: WebGLRenderer, alpha: boolean, frameBufferType: number): void {
