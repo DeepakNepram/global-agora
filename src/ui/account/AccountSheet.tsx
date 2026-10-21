@@ -13,6 +13,7 @@ import {
 import { ModalSheet } from '../sheets/ModalSheet';
 import { accountButtonElement } from './accountFocus';
 import { BODY, DANGER, HEADING, PRIMARY, QUIET, SECONDARY } from './accountStyles';
+import { BlockedList } from './BlockedList';
 import { UpdatesList } from './UpdatesList';
 
 export interface AccountSheetProps {
@@ -130,6 +131,7 @@ export function AccountSheet({ reducedMotion }: AccountSheetProps): JSX.Element 
           </p>
           {profile !== null && <Standing profile={profile} />}
           {status === 'signed-in' && <UpdatesList />}
+          {status === 'signed-in' && <BlockedList />}
           <div className="flex flex-wrap gap-2">
             {profile?.isAdmin === true && (
               <a href="/admin" className={`${SECONDARY} inline-flex items-center`}>
