@@ -80,12 +80,16 @@ Docker Desktop must be running.
 ```bash
 npm run db:start   # first run downloads about 1 GB of images
 npm run db:reset   # migrations + 200 fictional seed stories from the last 24 h
-npm run db:test    # 558 pgTAP assertions: RLS, constraints, ingest, API, accounts, discussions,
-                   # moderation, the local badge
+npm run db:test    # 585 pgTAP assertions: RLS, constraints, ingest, API, accounts, discussions,
+                   # moderation, the local badge, the live feed
 npm run db:smoke   # the stories come back, other tables refuse, an account's life, a discussion,
                    # known-toxic posts through the moderation pipeline, the local badge
-                   # through the API Worker
+                   # through the API Worker, a live post over Realtime
 ```
+
+Discussions update live through Realtime, which the local stack runs
+(`supabase/config.toml`). A stack started before Prompt 4.5 needs a restart:
+`npm run db:stop && npm run db:start`.
 
 Sign-in emails never leave the machine: the local stack catches them in
 Mailpit at http://127.0.0.1:54324, link and code included.
@@ -113,6 +117,10 @@ npx supabase db push
 ```
 
 `db push` leaves the fictional seed out unless you pass `--include-seed`.
+
+The live feed uses public Realtime channels. Keep Realtime's "Allow public
+access" on (Project Settings → Realtime; it is on by default), or
+discussions stop updating live.
 
 ## Ingest
 
@@ -306,6 +314,25 @@ location.reload();
 Clear it with `localStorage.removeItem('agora.quality-tier')`. The override is
 still clamped by `MAX_TEXTURE_SIZE`, since that is a hard GPU limit. The current
 tier and the reason for it are shown in the app footer.
+
+### Benchmarks
+
+The dev panel's benchmarks (globe frames, scrubbing, the discussion) post
+their results to `.bench/results.jsonl`. Development React is slow enough to
+skew them, so measure on a production build that keeps the dev panel:
+
+```bash
+npx vite build --mode bench
+```
+
+```bash
+npm run preview
+```
+
+Then open http://localhost:4173. "Discussion benchmark (60 posts)" runs on a
+fixture and needs no database: it enters, rests 5 seconds while the panel
+scrolls and live posts arrive, then leaves, and reports each step's frames
+slower than 60 fps. A plain `npm run build` leaves the dev panel out.
 
 ## Environment variables
 

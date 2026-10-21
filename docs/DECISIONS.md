@@ -6,6 +6,173 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-10-22 — Discussion UI: one clock for the stage, a cheap recede, ids over Realtime
+
+Prompt 4.5 builds the discussion. The camera dollies down to the story's
+city and orbits it, the globe blurs and drains behind a panel, and the
+panel holds the debate.
+
+**Your two calls.**
+
+- **Dragging the panel part way springs back.** Past halfway, or a flick
+  down, leaves.
+- **Clicking the blurred globe leaves**, and the unsent draft is kept for
+  the session. On a phone the backdrop is the top third, so a tap there
+  leaves too.
+
+**One clock.** The stage store (`src/state/discussionStage.ts`) holds plain
+data: segments that are held, eased (600 ms, ease-in-out cubic) or sprung.
+Every moving part samples the same pure functions
+(`src/ui/discussion/stageMotion.ts`) from the same start time. The panel is
+a Web Animations API animation, its keyframes sampled from that curve, so
+the compositor moves it even while the GPU is busy. The camera, blur and
+lens shift follow in r3f frames. A controller ends each segment on a timer,
+so it finishes on time even when no frame is drawn, and an interrupted
+transition reverses from where it is.
+
+**The shot** (`src/globe/camera/discussionShot.ts`) is a pose of centre,
+distance, tilt and heading. Tilt 0 and heading 0 give the rig's north-up
+camera exactly, which a test asserts.
+
+- **The dolly** reuses `planFlight`'s great circle and log distance.
+- **Tilt** eases to 40°.
+- **Distance** is 0.6 × the saved altitude, between 150 and 1,200 km.
+- **The orbit** turns 4°/s, eased in.
+- **`setViewOffset`** shifts the lens so the city sits in the part of the
+  screen the panel leaves visible.
+- **Leaving** unwinds the heading the short way and ends with
+  `setState(saved)`. The restore error was 4e-15 in every run.
+
+**The recede is a rack focus, not a depth of field.** With the focus
+pulled in front of the globe, every pixel of the globe is far behind it,
+so the circle of confusion comes out nearly uniform. A depth-buffer depth
+of field would need a depth texture under MSAA and a circle-of-confusion
+pass, for no visible difference.
+
+`RecedeEffect` (`src/globe/recede.ts`) is first in the merged EffectPass:
+
+- **Blur:** Kawase HUGE at a quarter of the buffer's resolution, its radius
+  constant in CSS pixels. A quarter takes 10% off every transition frame
+  compared with half.
+- **Colour:** 80% desaturation, 30% dimming, and bloom halved.
+- **Its amount is p²,** so there is little blur while the panel is still
+  low.
+- **At 0 it costs nothing.** No blur pass runs and the shader takes a
+  uniform branch. Paired runs against the pre-4.5 build at 3,000 pins gave
+  the same GPU time: MEDIUM 5.2 ms, HIGH 6.5 ms.
+- **Its two shaders compile at startup** (`warm()`). Compiled lazily, the
+  first discussion's first frame took 10 ms longer.
+- **LOW,** which has no composer, gets a CSS scrim instead (55% at p = 1).
+
+**Half resolution and 30 fps only at rest.** A resolution change
+reallocates the canvas and every composer buffer, so it never happens
+mid-motion.
+
+- **Entering:** quality drops once the stage settles. The blur is full by
+  then, so the change doesn't show.
+- **A drag:** restores full quality as the finger lands.
+- **The dpr goes through the Canvas prop,** because r3f resets an
+  imperative `setDpr` on its next render.
+- **A frame governor** (`src/ui/globe/frameGovernor.ts`) uses an
+  accumulator, so it averages exactly 30 draws a second at 60 or 144 Hz:
+  33.3 ms mean in every run.
+
+**Leaving from rest waits 100 ms.** After seconds of light 30 fps work the
+GPU clocks down. The first frames of a leave, at full resolution and full
+blur, then dropped one or two frames below 60 fps. A leave now asks for
+full quality, draws full-rate frames for `LEAVE_WARMUP_MS` (100 ms), and
+only then moves.
+
+The cost: Escape, ✕, Back or a backdrop tap starts moving 100 ms later. A
+drag (already at full quality) and a leave mid-entrance start at once.
+
+**Nothing commits mid-transition.**
+
+- Discuss waits ("Opening…") until the panel's chunk and the SDK are
+  loaded.
+- The stage begins two frames after the panel mounts.
+- The panel shows a placeholder until the stage settles, and its sections
+  mount one frame later.
+- Posts are memoised rows with stable callbacks, so a vote or a live post
+  re-renders one row, not sixty.
+
+**Live posts: a broadcast of the id, then a read under RLS.** A trigger
+(`private.posts_broadcast`) sends `{id}` on the public topic
+`discussion:<story uuid>`: `post` when a post becomes visible, `gone` when
+it stops being visible. Each client then reads the post through PostgREST,
+so blocks in both directions and moderation still apply. The id reveals
+nothing a guest can't already read.
+
+`postgres_changes` was rejected for two reasons:
+
+- every vote updates its post's counts, so every vote would go to every
+  viewer, against the free tier's 2M Realtime messages a month;
+- it checks RLS per subscriber on every change.
+
+A reconnect, or a tab becoming visible again, refetches the first page.
+
+**Scroll position.** A post arriving above the reader keeps the first
+visible post at the same offset, by hand (`overflow-anchor: none`), since
+browsers' own scroll anchoring differs and Safari has none. Measured drift
+was 0.25 px.
+
+`scrollIntoView` was replaced by scrolling the panel alone. It also scrolls
+`overflow: hidden` ancestors, and it shifted the whole app.
+
+**Benchmarks on production React.**
+
+- **The dev panel** sits behind a dynamic import, loaded only in
+  development and in `vite build --mode bench`, which keeps the panel and
+  the frame probe in an otherwise production build.
+- **Chunk hoisting:** the dev tools had imported the panel's modules, which
+  made rolldown hoist shared modules into extra startup chunks (four files,
+  394.8 KB). The startup bundle is now one file again.
+- **The Discussion benchmark** (dev panel) runs on a 60-post fixture and a
+  fake room, so it needs no stack:
+  - it enters, rests 5 s while the panel scrolls and three live posts
+    arrive above the reader, then leaves;
+  - it reports each window's frames slower than 60 fps, missed vsyncs, GPU
+    time, anchor drift and restore error to `.bench/results.jsonl`.
+
+**Measured.** Iris Xe, plugged in, headless Chrome at 144 Hz, 3,000 mock
+pins. Four runs per column (16 in all):
+
+| Frames slower than 60 fps (longest) | 1440 MEDIUM   | 1440 HIGH     | 390 MEDIUM    | 390 HIGH      |
+| ----------------------------------- | ------------- | ------------- | ------------- | ------------- |
+| Entering                            | 0/364 (14.8)  | 0/337 (16.2)  | 0/363 (10.6)  | 0/354 (15.1)  |
+| Panel at rest                       | 0/2754 (16.2) | 0/2748 (17.9) | 5/2739 (35.0) | 2/2748 (19.9) |
+| Back to full quality                | 0/55 (12.0)   | 0/50 (14.9)   | 0/59 (10.7)   | 0/49 (12.7)   |
+| Leaving                             | 0/334 (13.7)  | 0/298 (15.6)  | 1/343 (19.0)  | 1/330 (22.0)  |
+| Globe at rest, mean draw gap        | 33.3 ms       | 33.3 ms       | 33.4 ms       | 33.4 ms       |
+| GPU p95, entering / leaving         | 6.8 / 10.4 ms | 8.0 / 13.6 ms | 6.2 / 9.7 ms  | 8.9 / 11.9 ms |
+
+Some measured frames fall short of the target. The 390 columns are 390×844
+at a pixel ratio of 3.
+
+- **Leaving:** 2 of the 16 runs had one frame each slower than 60 fps
+  (19.0 and 22.0 ms).
+- **The panel at rest:** 3 of the 16 runs had such frames, 7 in all. Five
+  of them, the worst 35 ms, came in a single run, while the panel scrolled
+  and took live posts. The cause is not yet confirmed.
+- **Missed 144 Hz vsyncs:** at 144 Hz a frame misses vsync at 6.9 ms, and
+  HIGH's leave on a GPU p95 of 13.6 ms misses many of them. Those frames
+  still hold 60 fps.
+- **Anchor drift:** 0.25 px.
+- **Restore error:** 4e-15.
+- **Not yet run on the phone.**
+
+**Size.**
+
+- **Main chunk:** +5.9 KB gzip (382.3 to 388.2 KB).
+- **The panel's chunk:** 10.9 KB gzip.
+- **The SDK chunk:** 58.7 KB gzip.
+- **No new dependency.**
+
+**Tests:** pgTAP 585 (+27), db:smoke 74 (+6, a live round trip over the
+local Realtime), unit tests 1138 (+92).
+
+---
+
 ## 2026-10-16 — Local badge: a label only the API Worker can write, from request.cf alone
 
 Prompt 4.4 lets a reader show a coarse place on one post, such as

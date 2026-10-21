@@ -77,7 +77,7 @@ browser <──Brotli, ETag, SWR── API Worker <─────────�
    runs a required setup (17+, a handle, the community rules) through the
    profile functions, and only then moves the library up. Deleting the
    account deletes the auth user, and the cascades take everything else.
-9. Discussions (Prompt 4.2, database only so far). A reader takes one side
+9. Discussions (Prompt 4.2; the app's side is step 12). A reader takes one side
    per discussion (`discussion_stances`); votes go straight to Supabase under
    RLS, posts through the API Worker (step 11), and both take that side from
    the record. Vote triggers keep
@@ -98,6 +98,17 @@ browser <──Brotli, ETag, SWR── API Worker <─────────�
     alone (`src/core/localBadge.ts`) and a secret the database checks against
     Vault before writing `region_label`. `GET /api/local-badge` tells the
     toggle what it would show. No GPS, no prompt, no coordinates.
+12. The discussion (Prompt 4.5, `src/ui/discussion/`). Discuss saves the
+    camera's pose and opens the stage (`src/state/discussionStage.ts`): one
+    clock that the panel's Web Animation, the camera shot
+    (`src/globe/camera/discussionShot.ts`) and the recede effect
+    (`src/globe/recede.ts`) all sample. At rest the globe drops to half
+    resolution and 30 fps; leaving restores the saved pose exactly. The room
+    (`src/state/discussionRoomController.ts`) reads through
+    `src/core/db/discussion.ts` under RLS, and posts through the API Worker
+    (step 11). A database trigger broadcasts each newly visible post's id on
+    a public Realtime topic, and every client reads the post itself, so
+    blocks and moderation still apply.
 
 The wire format is defined once, in `src/core/data/payload.ts`, and both the
 Worker and the client validate against it.

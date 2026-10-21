@@ -26,6 +26,7 @@ truth; the original design is the build plan's §3
 | `20261017120000_posting_limits.sql`         | posting limits per tier (HTTP 429)                        |
 | `20261017130000_moderation_queue.sql`       | `admins`, the queue and its actions, `my_profile` fields  |
 | `20261018100000_local_badge.sql`            | `region_label` written only by the API Worker, its shape  |
+| `20261020100000_discussion_live.sql`        | the live feed's broadcast, `discussion_balance`           |
 
 Each table ships with its RLS policies and grants in the same file: a table and
 its access rules are one change. Migrations are timestamped and forward-only.
@@ -40,9 +41,11 @@ its access rules are one change. Migrations are timestamped and forward-only.
   grants is closed rather than open. Functions are closed too, because
   PostgREST exposes them as RPC endpoints: the ingest migration revokes
   PUBLIC's EXECUTE by default and on each function by name. Client roles may
-  call exactly fifteen, and a pgTAP test fails if that list changes:
+  call exactly sixteen, and a pgTAP test fails if that list changes:
   - the API's read-only `api_nodes` and `api_story`;
   - `discussion_participants`, the count `api_story` calls as the caller;
+  - `discussion_balance`, a discussion's approved posts per side, under the
+    caller's RLS (Prompt 4.5);
   - `api_report_location`, which can only add one to a counter;
   - outlet search's read-only `api_outlets` and `api_outlet_stories`, and
     `api_window`, the payload's stories, which they and `api_nodes` call as
@@ -181,6 +184,12 @@ evidence or expert, and `evidence` requires `evidence_url`.
   can approve or remove a hidden, reported or unchecked post.
 - **Posting limits:** 5 an hour, 30 seconds apart, 2 an hour for accounts
   under a day old, per tier; refused with HTTP 429 (`PT429`).
+- **Live feed (Prompt 4.5):** triggers broadcast `{id}` alone on the public
+  Realtime topic `discussion:<story id>`: `post` when a post becomes `ok`,
+  `gone` when an `ok` post stops being visible or is deleted. Votes send
+  nothing. Clients then read the post under RLS, so blocks and moderation
+  apply. `private.realtime_send` does nothing where Realtime is not
+  installed (CI's plain Postgres), so posting never depends on it.
 - **`rank_score`** is generated, never written:
   `ln(1 + helpful) * (0.5 + cross_side / greatest(helpful, 1)) + 1.5 * ln(1 +
 changed_mind)` from `private.post_rank`, which takes no `kind`, so Expert
@@ -346,6 +355,10 @@ reads run as the caller, under RLS, and the two `SECURITY DEFINER` functions
 - **`discussion_participants(p_story)`:** people with a visible post
   (`mod_state = 'ok'`), each counted once. `SECURITY DEFINER`, because posts
   are closed to signed-out readers; it returns the count and nothing else.
+- **`discussion_balance(p_story)`** (Prompt 4.5): `(stance, posts)`, the
+  approved posts per side, for "where the room stands". It runs as the
+  caller, not as definer, so a reader's blocks hide those authors' posts
+  from the count too.
 - **`api_report_location(p_seq | p_id)`:** one "wrong location" report;
   false for an unknown story. `SECURITY DEFINER`, writing only that counter.
 - **`api_window(p_hours, p_limit)`** (Prompt 3.4): the payload's stories,
