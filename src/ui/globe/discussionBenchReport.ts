@@ -14,8 +14,14 @@ export interface WindowStats {
   readonly intervalP50Ms: number | null;
   readonly intervalP95Ms: number | null;
   readonly intervalMaxMs: number | null;
-  /** Frames later than one vsync plus jitter: a dropped frame. */
+  /** Frames later than one vsync plus jitter: a frame the display had to wait for. */
   readonly missed: number;
+  /**
+   * Frames later than a 60 fps frame (16.7 ms) plus vsync jitter: Prompt
+   * 4.5's bar. On a 144 Hz display a frame can miss a vsync and still be
+   * well inside it.
+   */
+  readonly slowerThan60fps: number;
   /** Frames the globe drew. */
   readonly draws: number;
   /** Mean time between the globe's draws: 33.3 at a steady 30 fps. */
@@ -27,6 +33,10 @@ export interface WindowStats {
 
 /** Half a vsync's slack: a frame later than 1.5 vsyncs missed one. */
 export const MISS_FACTOR = 1.5;
+
+/** 60 fps, and the vsync jitter bloomReport.ts allows it (16.6–17.3 ms at 60 Hz). */
+const SIXTY_FPS_MS = 1000 / 60;
+const JITTER_MS = 2;
 
 function round(value: number | null): number | null {
   return value === null ? null : Math.round(value * 100) / 100;
@@ -79,6 +89,7 @@ export function windowStats(
     intervalP95Ms: p(intervals, 95),
     intervalMaxMs: intervals.length ? round(Math.max(...intervals)) : null,
     missed: intervals.filter((gap) => gap > vsync * MISS_FACTOR).length,
+    slowerThan60fps: intervals.filter((gap) => gap > SIXTY_FPS_MS + JITTER_MS).length,
     draws: draws.length,
     drawMeanMs: drawGaps.length
       ? round(drawGaps.reduce((sum, gap) => sum + gap, 0) / drawGaps.length)
@@ -92,7 +103,8 @@ export function windowStats(
 export function formatWindow(label: string, stats: WindowStats): string {
   return (
     `${label}: ${stats.frames} frames, p50 ${stats.intervalP50Ms ?? '—'} / p95 ` +
-    `${stats.intervalP95Ms ?? '—'} / max ${stats.intervalMaxMs ?? '—'} ms, ${stats.missed} missed · ` +
+    `${stats.intervalP95Ms ?? '—'} / max ${stats.intervalMaxMs ?? '—'} ms, ` +
+    `${stats.slowerThan60fps} slower than 60 fps (${stats.missed} vsyncs missed) · ` +
     `globe ${stats.draws} draws, every ${stats.drawMeanMs ?? '—'} ms · GPU p95 ${stats.gpuP95Ms ?? '—'} ms`
   );
 }

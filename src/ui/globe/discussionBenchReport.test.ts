@@ -36,6 +36,18 @@ describe('windowStats', () => {
     expect(stats.intervalMaxMs).toBeCloseTo(40 + VSYNC, 1);
   });
 
+  it('tells a missed 144 Hz vsync from a frame slower than 60 fps', () => {
+    const fast = 1000 / 144;
+    // A 14 ms frame misses a 144 Hz vsync but is inside 60 fps; a 20 ms one is not.
+    const start = ticks(0, 10, fast);
+    const late = (start.at(-1) ?? 0) + 14;
+    const later = late + 20;
+    const all = [...start, late, later, ...ticks(later + fast, 10, fast)];
+    const stats = windowStats(all, { frames: [], gpu: [] }, 0, 1000, fast);
+    expect(stats.missed).toBe(2);
+    expect(stats.slowerThan60fps).toBe(1);
+  });
+
   it('reads a 30 fps globe behind a 60 fps page', () => {
     const all = ticks(0, 120);
     const draws = all.filter((_, i) => i % 2 === 0).map((atMs) => ({ atMs, cpuMs: 1 }));
