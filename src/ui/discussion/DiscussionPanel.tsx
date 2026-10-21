@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'rea
 import type { DiscussionPost, VoteKind } from '@/core/discussion';
 import type { ReportReason } from '@/core/moderation';
 import type { PostingErrorCode, PostKind, PostStance } from '@/core/posting';
-import { accountStore, useAccountStore, useDiscussionStage, wallClockNow } from '@/state';
+import { accountStore, useAccountStore, useDiscussionStage } from '@/state';
 import { useDiscussionRoom } from '@/state/discussionRoom';
 
 import { nextAnnouncement } from '../announce';
@@ -13,7 +13,9 @@ import { PostItem } from './PostItem';
 import { PostList } from './PostList';
 import { getDiscussionRoom } from './room';
 import { RoomStrip } from './RoomStrip';
+import { scrollPostIntoPanel } from './scrollPanel';
 import { StancePicker } from './StancePicker';
+import { useMinuteClock } from './useMinuteClock';
 
 export interface DiscussionPanelProps {
   /** The story's uuid, which keys its discussion. */
@@ -26,18 +28,6 @@ export interface DiscussionPanelProps {
 
 const SUSPENDED = 'Posting, voting and taking sides are suspended on this account.';
 const NO_VOTES: readonly VoteKind[] = [];
-/** "3 min ago" moves on this often: the live tick's pace. */
-const CLOCK_MS = 30_000;
-
-/** The wall clock, read every CLOCK_MS, so the posts' times stay current without re-rendering each frame. */
-function useMinuteClock(): number {
-  const [nowMs, setNowMs] = useState(() => wallClockNow());
-  useEffect(() => {
-    const timer = window.setInterval(() => setNowMs(wallClockNow()), CLOCK_MS);
-    return () => window.clearInterval(timer);
-  }, []);
-  return nowMs;
-}
 
 /**
  * The discussion itself (Prompt 4.5), its own chunk: the debate and its
@@ -133,8 +123,7 @@ export function DiscussionPanel({
   );
 
   const showPost = useCallback((id: string): void => {
-    const item = scroller.current?.querySelector(`[data-post-id="${CSS.escape(id)}"]`);
-    item?.scrollIntoView({ block: 'center' });
+    const item = scrollPostIntoPanel(scroller.current, id);
     item?.querySelector<HTMLElement>('button, a')?.focus({ preventScroll: true });
   }, []);
 

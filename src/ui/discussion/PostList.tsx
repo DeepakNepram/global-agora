@@ -10,6 +10,8 @@ import {
 
 import type { DiscussionPost } from '@/core/discussion';
 
+import { scrollPostIntoPanel } from './scrollPanel';
+
 export interface PostListProps {
   /** The panel's scrolling area. */
   readonly scroller: RefObject<HTMLElement | null>;
@@ -126,8 +128,7 @@ export function PostList(props: PostListProps): JSX.Element {
 
   const showFresh = (): void => {
     const id = offscreen[0];
-    const item = id ? scroller.current?.querySelector(`[data-post-id="${CSS.escape(id)}"]`) : null;
-    item?.scrollIntoView({ block: 'center' });
+    const item = id ? scrollPostIntoPanel(scroller.current, id) : null;
     item?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
   };
 
