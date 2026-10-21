@@ -211,7 +211,7 @@ export function StoryLayer(props: StoryLayerProps): JSX.Element {
           onSave={onSave}
           onShare={onShare}
           onDiscuss={onDiscuss}
-          discussOpening={opening !== null}
+          discussOpening={opening}
         />
       </StorySheet>
       <p role="status" className="sr-only">
