@@ -5,3 +5,6 @@ package-lock.json
 public
 .wrangler
 supabase/.temp
+
+# Claude Code writes its local permissions here; it is never committed (global gitignore).
+.claude/settings.local.json
