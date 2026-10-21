@@ -1,9 +1,12 @@
-import { useId, type JSX, type ReactNode } from 'react';
+import { memo, useId, type JSX } from 'react';
 
 import type { DiscussionInfo, DiscussionPost, VoteKind } from '@/core/discussion';
+import type { ReportReason } from '@/core/moderation';
+import type { ModerationResult } from '@/state/discussionRoomActions';
 
 import { formatAgo } from '../story/format';
 import { kindChip, linkHost, sideName, voteLabel } from './discussionView';
+import { PostMenu } from './PostMenu';
 
 export interface PostItemProps {
   readonly post: DiscussionPost;
@@ -14,9 +17,11 @@ export interface PostItemProps {
   readonly voted: readonly VoteKind[];
   /** Just arrived live: highlighted until seen. */
   readonly fresh: boolean;
-  readonly onVote: (kind: VoteKind) => void;
-  /** Report and Block, for others' posts. */
-  readonly menu: ReactNode;
+  /** Stable across renders, like the rest, so an unchanged row never re-renders. */
+  readonly onVote: (post: DiscussionPost, kind: VoteKind) => void;
+  readonly onReport: (postId: string, reason: ReportReason) => Promise<ModerationResult>;
+  readonly onBlock: (authorId: string) => Promise<ModerationResult>;
+  readonly announce: (text: string) => void;
 }
 
 const STANCE_BAR: Readonly<Record<DiscussionPost['stance'], string>> = {
@@ -69,8 +74,8 @@ const MODERATION_NOTE: Partial<Record<DiscussionPost['modState'], string>> = {
  * purpose: Changed my mind is the one that counts most, so it is the filled
  * one. Expert posts always say they are self-declared and unverified.
  */
-export function PostItem(props: PostItemProps): JSX.Element {
-  const { post, info, nowMs, own, voted, fresh, onVote, menu } = props;
+export const PostItem = memo(function PostItem(props: PostItemProps): JSX.Element {
+  const { post, info, nowMs, own, voted, fresh, onVote, onReport, onBlock, announce } = props;
   const bodyId = useId();
   const helpful = voted.includes('helpful');
   const changed = voted.includes('changed_mind');
@@ -130,7 +135,7 @@ export function PostItem(props: PostItemProps): JSX.Element {
               type="button"
               aria-pressed={changed}
               aria-label={voteLabel('changed_mind', post.changedMindCount)}
-              onClick={() => onVote('changed_mind')}
+              onClick={() => onVote(post, 'changed_mind')}
               className="flex h-11 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-void hover:bg-accent/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-pressed:bg-ink aria-pressed:text-void"
             >
               <MindIcon />
@@ -141,14 +146,21 @@ export function PostItem(props: PostItemProps): JSX.Element {
               type="button"
               aria-pressed={helpful}
               aria-label={voteLabel('helpful', post.helpfulCount)}
-              onClick={() => onVote('helpful')}
+              onClick={() => onVote(post, 'helpful')}
               className="flex h-11 items-center gap-2 rounded-full border border-ink/20 px-3 text-sm text-ink/90 hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-pressed:border-accent aria-pressed:text-accent"
             >
               <HelpfulIcon />
               Helpful
               <span className="tabular-nums">{post.helpfulCount}</span>
             </button>
-            <span className="ml-auto">{menu}</span>
+            <span className="ml-auto">
+              <PostMenu
+                handle={post.authorHandle}
+                onReport={(reason) => onReport(post.id, reason)}
+                onBlock={() => onBlock(post.authorId)}
+                announce={announce}
+              />
+            </span>
           </div>
         )}
         {own && !removed && (
@@ -159,4 +171,4 @@ export function PostItem(props: PostItemProps): JSX.Element {
       </div>
     </article>
   );
-}
+});

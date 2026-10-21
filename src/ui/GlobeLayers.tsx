@@ -1,4 +1,4 @@
-import type { JSX } from 'react';
+import { memo, type JSX } from 'react';
 
 import type { AuthProvider, NodeBuffer } from '@/core';
 import { VIGNETTE, type OrbitGlobeControls, type RenderSettings } from '@/globe';
@@ -34,9 +34,10 @@ export interface GlobeLayersProps {
  * Everything over the globe, in stacking order. In a discussion the search
  * and filters step away and go inert, the scrubber slides off, and the panel
  * covers the rest; the account's sheets stay live above it, so signing in to
- * take part works from inside.
+ * take part works from inside. Memoised: the canvas re-renders when the
+ * discussion's resolution changes, and nothing here needs to with it.
  */
-export function GlobeLayers(props: GlobeLayersProps): JSX.Element {
+export const GlobeLayers = memo(function GlobeLayers(props: GlobeLayersProps): JSX.Element {
   const { settings, nodes, target, controls, historyHours, reducedMotion, inDiscussion } = props;
   return (
     <>
@@ -90,4 +91,4 @@ export function GlobeLayers(props: GlobeLayersProps): JSX.Element {
       <DiscussionLayer scrim={!settings.postprocessing} apiBaseUrl={props.apiBaseUrl} />
     </>
   );
-}
+});

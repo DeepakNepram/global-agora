@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type JSX } from 'react';
+import { memo, useEffect, useId, useMemo, useRef, useState, type JSX } from 'react';
 import { useStore } from 'zustand';
 
 import { evidenceUrlProblem, POST_MAX_CHARS } from '@/core/discussion';
@@ -53,7 +53,7 @@ const FIELD =
  * post. Locked until the reader takes a side; the posting limits' wait
  * counts down on Send.
  */
-export function Composer(props: ComposerProps): JSX.Element {
+export const Composer = memo(function Composer(props: ComposerProps): JSX.Element {
   const { storyId, apiBaseUrl, unlocked, sending, retryAtMs, onSend } = props;
   const [draft, setDraft] = useState<Draft>(() => drafts.get(storyId) ?? EMPTY);
   const [badge, setBadge] = useState(false);
@@ -233,4 +233,4 @@ export function Composer(props: ComposerProps): JSX.Element {
       </p>
     </form>
   );
-}
+});

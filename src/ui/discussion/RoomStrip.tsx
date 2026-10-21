@@ -1,4 +1,4 @@
-import { useId, type JSX } from 'react';
+import { memo, useId, type JSX } from 'react';
 
 import {
   roomShares,
@@ -33,7 +33,12 @@ function excerpt(body: string): string {
  * "Where the room stands" (Prompt 4.5): each side's share of the posts, as a
  * bar and in words, and the three posts the other side found most helpful.
  */
-export function RoomStrip({ info, balance, top, onShow }: RoomStripProps): JSX.Element {
+export const RoomStrip = memo(function RoomStrip({
+  info,
+  balance,
+  top,
+  onShow,
+}: RoomStripProps): JSX.Element {
   const shares = roomShares(balance ?? { a: 0, b: 0, neutral: 0 });
   const headingId = useId();
   return (
@@ -87,4 +92,4 @@ export function RoomStrip({ info, balance, top, onShow }: RoomStripProps): JSX.E
       )}
     </section>
   );
-}
+});

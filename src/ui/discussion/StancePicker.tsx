@@ -1,4 +1,4 @@
-import { useId, type JSX, type RefObject } from 'react';
+import { memo, useId, type JSX, type RefObject } from 'react';
 
 import type { DiscussionInfo, StanceRecord } from '@/core/discussion';
 import type { PostStance } from '@/core/posting';
@@ -29,7 +29,7 @@ const ORDER: readonly PostStance[] = ['a', 'neutral', 'b'];
  * radios, so the arrow keys move between sides. A side can change until the
  * reader first posts or votes; then the database fixes it (Prompt 4.2).
  */
-export function StancePicker(props: StancePickerProps): JSX.Element {
+export const StancePicker = memo(function StancePicker(props: StancePickerProps): JSX.Element {
   const { info, stance, busy, blocked, onPick, firstOption } = props;
   const noteId = useId();
   const locked = stance?.locked === true;
@@ -75,4 +75,4 @@ export function StancePicker(props: StancePickerProps): JSX.Element {
       </p>
     </fieldset>
   );
-}
+});

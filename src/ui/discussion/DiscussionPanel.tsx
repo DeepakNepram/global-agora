@@ -1,14 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 
 import type { DiscussionPost, VoteKind } from '@/core/discussion';
-import type { PostStance } from '@/core/posting';
-import {
-  accountStore,
-  useAccountStore,
-  useDiscussionStage,
-  useTimeStore,
-  wallClockNow,
-} from '@/state';
+import type { ReportReason } from '@/core/moderation';
+import type { PostingErrorCode, PostKind, PostStance } from '@/core/posting';
+import { accountStore, useAccountStore, useDiscussionStage, wallClockNow } from '@/state';
 import { useDiscussionRoom } from '@/state/discussionRoom';
 
 import { nextAnnouncement } from '../announce';
@@ -16,7 +11,6 @@ import { Composer } from './Composer';
 import { closingText, sideName, voteResultText } from './discussionView';
 import { PostItem } from './PostItem';
 import { PostList } from './PostList';
-import { PostMenu } from './PostMenu';
 import { getDiscussionRoom } from './room';
 import { RoomStrip } from './RoomStrip';
 import { StancePicker } from './StancePicker';
@@ -31,12 +25,28 @@ export interface DiscussionPanelProps {
 }
 
 const SUSPENDED = 'Posting, voting and taking sides are suspended on this account.';
+const NO_VOTES: readonly VoteKind[] = [];
+/** "3 min ago" moves on this often: the live tick's pace. */
+const CLOCK_MS = 30_000;
+
+/** The wall clock, read every CLOCK_MS, so the posts' times stay current without re-rendering each frame. */
+function useMinuteClock(): number {
+  const [nowMs, setNowMs] = useState(() => wallClockNow());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(wallClockNow()), CLOCK_MS);
+    return () => window.clearInterval(timer);
+  }, []);
+  return nowMs;
+}
 
 /**
  * The discussion itself (Prompt 4.5), its own chunk: the debate and its
  * sides, where the room stands, the reader's side, the composer, and the
  * posts best first, with new ones arriving live. Reading needs no account;
  * taking part asks for one at the moment it is needed.
+ *
+ * Every handler is stable and every row is memoised, so a live post or a
+ * vote re-renders the row it touches, not the fifty around it.
  */
 export function DiscussionPanel({
   storyId,
@@ -48,8 +58,7 @@ export function DiscussionPanel({
   const settled = useDiscussionStage((stage) => stage.phase !== 'entering');
   const signedIn = useAccountStore((account) => account.status === 'signed-in');
   const suspended = useAccountStore((account) => account.profile?.suspendedAtMs != null);
-  // Re-renders on each live tick (30 s), which keeps "3 min ago" current.
-  useTimeStore((time) => time.timeMs);
+  const nowMs = useMinuteClock();
   const scroller = useRef<HTMLDivElement>(null);
   const firstSide = useRef<HTMLInputElement>(null);
   const [announcement, setAnnouncement] = useState('');
@@ -57,6 +66,11 @@ export function DiscussionPanel({
     (text: string) => setAnnouncement((previous) => nextAnnouncement(previous, text)),
     [],
   );
+  const { info } = state;
+  const infoRef = useRef(info);
+  useEffect(() => {
+    infoRef.current = info;
+  }, [info]);
 
   // A new room for this story, and again when the reader signs in or out:
   // their side, votes and blocks change what there is to show.
@@ -78,34 +92,59 @@ export function DiscussionPanel({
   }, [state.notice, announce]);
 
   const onSeen = useCallback((id: string) => room.seen(id), [room]);
-  const { info } = state;
-  const nowMs = wallClockNow();
-  const closed = info !== null && (info.state === 'closed' || info.closesAtMs <= nowMs);
-  const blocked = closed ? 'This discussion has closed.' : suspended ? SUSPENDED : null;
+  const onMore = useCallback(() => void room.showMore(), [room]);
+  const report = useCallback((id: string, reason: ReportReason) => room.report(id, reason), [room]);
+  const block = useCallback((authorId: string) => room.block(authorId), [room]);
 
-  const pickSide = async (stance: PostStance): Promise<void> => {
-    const result = await room.takeSide(stance);
-    if (result === 'signed-out') accountStore.getState().openSignIn('Sign in to take a side.');
-    else if (result === 'ok' && info) announce(`Your side: ${sideName(stance, info)}.`);
-    else if (result === 'failed') announce('Your side could not be saved. Try again.');
-  };
+  const pickSide = useCallback(
+    (stance: PostStance): void => {
+      void room.takeSide(stance).then((result) => {
+        const current = infoRef.current;
+        if (result === 'signed-out') accountStore.getState().openSignIn('Sign in to take a side.');
+        else if (result === 'ok' && current) announce(`Your side: ${sideName(stance, current)}.`);
+        else if (result === 'failed') announce('Your side could not be saved. Try again.');
+      });
+    },
+    [room, announce],
+  );
 
-  const vote = async (post: DiscussionPost, kind: VoteKind): Promise<void> => {
-    const result = await room.vote(post.id, kind);
-    if (result === 'signed-out') accountStore.getState().openSignIn('Sign in to vote.');
-    if (result === 'no-side') firstSide.current?.focus();
-    const text = voteResultText(result, kind);
-    if (text) announce(text);
-  };
+  const vote = useCallback(
+    (post: DiscussionPost, kind: VoteKind): void => {
+      void room.vote(post.id, kind).then((result) => {
+        if (result === 'signed-out') accountStore.getState().openSignIn('Sign in to vote.');
+        if (result === 'no-side') firstSide.current?.focus();
+        const text = voteResultText(result, kind);
+        if (text) announce(text);
+      });
+    },
+    [room, announce],
+  );
 
-  const showPost = (id: string): void => {
+  const send = useCallback(
+    (draft: { body: string; kind: PostKind; evidenceUrl: string | null; localBadge: boolean }) => {
+      const sending = room.send({ ...draft, storyId });
+      void sending.then((result) => {
+        const code: PostingErrorCode | 'no-side' | null = result.ok ? null : result.code;
+        if (code === 'signed-out') accountStore.getState().openSignIn('Sign in to post.');
+      });
+      return sending;
+    },
+    [room, storyId],
+  );
+
+  const showPost = useCallback((id: string): void => {
     const item = scroller.current?.querySelector(`[data-post-id="${CSS.escape(id)}"]`);
     item?.scrollIntoView({ block: 'center' });
     item?.querySelector<HTMLElement>('button, a')?.focus({ preventScroll: true });
-  };
+  }, []);
 
-  const mineIds = new Set(state.mine.map((post) => post.id));
-  const posts = [...state.mine, ...state.posts.filter((post) => !mineIds.has(post.id))];
+  const posts = useMemo(() => {
+    const mineIds = new Set(state.mine.map((post) => post.id));
+    return [...state.mine, ...state.posts.filter((post) => !mineIds.has(post.id))];
+  }, [state.mine, state.posts]);
+
+  const closed = info !== null && (info.state === 'closed' || info.closesAtMs <= nowMs);
+  const blocked = closed ? 'This discussion has closed.' : suspended ? SUSPENDED : null;
 
   return (
     <div
@@ -166,7 +205,7 @@ export function DiscussionPanel({
             stance={state.stance}
             busy={state.stanceBusy}
             blocked={blocked}
-            onPick={(stance) => void pickSide(stance)}
+            onPick={pickSide}
             firstOption={firstSide}
           />
           {!blocked && (
@@ -176,7 +215,7 @@ export function DiscussionPanel({
               unlocked={state.readerId !== null && state.stance !== null}
               sending={state.sending}
               retryAtMs={state.retryAtMs}
-              onSend={(draft) => room.send({ ...draft, storyId })}
+              onSend={send}
             />
           )}
           {settled ? (
@@ -186,7 +225,7 @@ export function DiscussionPanel({
               fresh={state.fresh}
               more={state.more}
               loadingMore={state.loadingMore}
-              onMore={() => void room.showMore()}
+              onMore={onMore}
               onSeen={onSeen}
               renderPost={(post) => (
                 <PostItem
@@ -194,17 +233,12 @@ export function DiscussionPanel({
                   info={info}
                   nowMs={nowMs}
                   own={post.authorId === state.readerId}
-                  voted={state.voted[post.id] ?? []}
+                  voted={state.voted[post.id] ?? NO_VOTES}
                   fresh={state.fresh.includes(post.id)}
-                  onVote={(kind) => void vote(post, kind)}
-                  menu={
-                    <PostMenu
-                      handle={post.authorHandle}
-                      onReport={(reason) => room.report(post.id, reason)}
-                      onBlock={() => room.block(post.authorId)}
-                      announce={announce}
-                    />
-                  }
+                  onVote={vote}
+                  onReport={report}
+                  onBlock={block}
+                  announce={announce}
                 />
               )}
             />
