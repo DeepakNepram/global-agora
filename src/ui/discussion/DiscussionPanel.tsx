@@ -15,7 +15,9 @@ import { getDiscussionRoom } from './room';
 import { RoomStrip } from './RoomStrip';
 import { scrollPostIntoPanel } from './scrollPanel';
 import { StancePicker } from './StancePicker';
+import { PanelPlaceholder } from './PanelPlaceholder';
 import { useMinuteClock } from './useMinuteClock';
+import { useShownAfterSettling } from './useShownAfterSettling';
 
 export interface DiscussionPanelProps {
   /** The story's uuid, which keys its discussion. */
@@ -46,6 +48,7 @@ export function DiscussionPanel({
   const room = useMemo(() => getDiscussionRoom(apiBaseUrl), [apiBaseUrl]);
   const state = useDiscussionRoom((current) => current);
   const settled = useDiscussionStage((stage) => stage.phase !== 'entering');
+  const shown = useShownAfterSettling(settled);
   const signedIn = useAccountStore((account) => account.status === 'signed-in');
   const suspended = useAccountStore((account) => account.profile?.suspendedAtMs != null);
   const nowMs = useMinuteClock();
@@ -164,11 +167,14 @@ export function DiscussionPanel({
         )}
       </header>
 
-      {state.status === 'loading' && <p className="text-sm text-muted">Loading the discussion…</p>}
-      {state.status === 'missing' && (
+      {!shown && <PanelPlaceholder />}
+      {shown && state.status === 'loading' && (
+        <p className="text-sm text-muted">Loading the discussion…</p>
+      )}
+      {shown && state.status === 'missing' && (
         <p className="text-sm text-ink">This discussion is not available.</p>
       )}
-      {state.status === 'failed' && (
+      {shown && state.status === 'failed' && (
         <div className="flex items-center gap-3">
           <p className="text-sm text-ink">The discussion could not be loaded.</p>
           <button
@@ -181,7 +187,7 @@ export function DiscussionPanel({
         </div>
       )}
 
-      {state.status === 'ready' && info && (
+      {shown && state.status === 'ready' && info && (
         <>
           <RoomStrip
             info={info}
@@ -207,33 +213,29 @@ export function DiscussionPanel({
               onSend={send}
             />
           )}
-          {settled ? (
-            <PostList
-              scroller={scroller}
-              posts={posts}
-              fresh={state.fresh}
-              more={state.more}
-              loadingMore={state.loadingMore}
-              onMore={onMore}
-              onSeen={onSeen}
-              renderPost={(post) => (
-                <PostItem
-                  post={post}
-                  info={info}
-                  nowMs={nowMs}
-                  own={post.authorId === state.readerId}
-                  voted={state.voted[post.id] ?? NO_VOTES}
-                  fresh={state.fresh.includes(post.id)}
-                  onVote={vote}
-                  onReport={report}
-                  onBlock={block}
-                  announce={announce}
-                />
-              )}
-            />
-          ) : (
-            <p className="text-sm text-muted">Loading posts…</p>
-          )}
+          <PostList
+            scroller={scroller}
+            posts={posts}
+            fresh={state.fresh}
+            more={state.more}
+            loadingMore={state.loadingMore}
+            onMore={onMore}
+            onSeen={onSeen}
+            renderPost={(post) => (
+              <PostItem
+                post={post}
+                info={info}
+                nowMs={nowMs}
+                own={post.authorId === state.readerId}
+                voted={state.voted[post.id] ?? NO_VOTES}
+                fresh={state.fresh.includes(post.id)}
+                onVote={vote}
+                onReport={report}
+                onBlock={block}
+                announce={announce}
+              />
+            )}
+          />
         </>
       )}
       <p role="status" className="sr-only">

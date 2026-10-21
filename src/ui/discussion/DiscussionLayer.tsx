@@ -64,10 +64,14 @@ export function DiscussionLayer({ scrim, apiBaseUrl }: DiscussionLayerProps): JS
   const drag = useStageDrag(panel, layout);
   useBackToLeave(active);
 
-  // The motion starts on the panel's first frame, after it has been laid out.
+  // The motion starts two frames after the panel mounts: the mount is
+  // painted and its effects (the room starting to load) have run, so none of
+  // that work lands in the first frame of the motion.
   useEffect(() => {
     if (phase !== 'entering') return;
-    const frame = window.requestAnimationFrame((timeMs) => discussionStage.begin(timeMs));
+    let frame = window.requestAnimationFrame(() => {
+      frame = window.requestAnimationFrame((timeMs) => discussionStage.begin(timeMs));
+    });
     return () => window.cancelAnimationFrame(frame);
   }, [phase]);
 
