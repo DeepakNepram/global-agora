@@ -160,7 +160,8 @@ select is(
 -- count api_story calls and the location report (Prompt 3.3), and outlet
 -- search with the window it shares with the payload (Prompt 3.4), and the
 -- first sign-in's flow and account deletion (Prompt 4.1), and reporting a
--- post and the admins' queue (4.3, which refuses non-admins itself).
+-- post and the admins' queue (4.3, which refuses non-admins itself), and a
+-- discussion's balance (4.5, which runs as the caller).
 -- Anything else a client could call is a mistake.
 select is(
   (select coalesce(array_agg(p.proname::text order by p.proname), '{}')
@@ -170,8 +171,9 @@ select is(
       and (has_function_privilege('anon', p.oid, 'execute')
            or has_function_privilege('authenticated', p.oid, 'execute'))),
   array['accept_rules', 'api_nodes', 'api_outlet_stories', 'api_outlets', 'api_report_location',
-        'api_story', 'api_window', 'claim_handle', 'delete_my_account', 'discussion_participants',
-        'handles_available', 'moderate_post', 'moderation_queue', 'my_profile', 'report_post'],
+        'api_story', 'api_window', 'claim_handle', 'delete_my_account', 'discussion_balance',
+        'discussion_participants', 'handles_available', 'moderate_post', 'moderation_queue',
+        'my_profile', 'report_post'],
   'client roles can call exactly the API functions'
 );
 

@@ -812,6 +812,13 @@ export type Database = {
         Returns: string;
       };
       delete_my_account: { Args: never; Returns: undefined };
+      discussion_balance: {
+        Args: { p_story: string };
+        Returns: {
+          posts: number;
+          stance: string;
+        }[];
+      };
       discussion_participants: { Args: { p_story: string }; Returns: number };
       handle_reserved: { Args: { p_handle: string }; Returns: boolean };
       handles_available: { Args: { p_handles: string[] }; Returns: string[] };
