@@ -13,6 +13,8 @@ import { useStageDrag } from './useStageDrag';
 export interface DiscussionLayerProps {
   /** The LOW tier has no composer to blur with; a scrim dims the globe instead. */
   readonly scrim: boolean;
+  /** AppConfig.apiBaseUrl: posts go through the API Worker. */
+  readonly apiBaseUrl: string;
 }
 
 const ICON_BUTTON =
@@ -28,7 +30,7 @@ const ICON_BUTTON =
  * - Always mounted, off screen and inert when closed, so its motion has an
  *   element from the very first frame. Opaque, no backdrop blur (1.5).
  */
-export function DiscussionLayer({ scrim }: DiscussionLayerProps): JSX.Element {
+export function DiscussionLayer({ scrim, apiBaseUrl }: DiscussionLayerProps): JSX.Element {
   const phase = useDiscussionStage((state) => state.phase);
   const target = useDiscussionStage((state) => state.target);
   const width = useDiscussionStage((state) => state.width);
@@ -142,7 +144,7 @@ export function DiscussionLayer({ scrim }: DiscussionLayerProps): JSX.Element {
           </button>
         </header>
         {Panel && target ? (
-          <Panel storyId={target.storyId} titleId={titleId} />
+          <Panel storyId={target.storyId} titleId={titleId} apiBaseUrl={apiBaseUrl} />
         ) : (
           <h2 id={titleId} tabIndex={-1} className="px-5 text-lg font-semibold outline-none">
             Discussion

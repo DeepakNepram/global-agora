@@ -1,10 +1,13 @@
 import {
   AUTH_STORAGE_KEY,
   type AccountRemote,
+  type FetchLike,
   type LibraryRemote,
   type ModerationRemote,
 } from '@/core';
 import type { DbConfig } from '@/core/db';
+import type { DiscussionRemote } from '@/core/discussion';
+import type { PostingRemote } from '@/core/posting';
 
 import { browserStorage, type KeyValueStorage } from './persist';
 
@@ -25,6 +28,10 @@ export interface AccountSession {
   readonly library: LibraryRemote;
   /** Reports, blocks and the reader's notices (Prompt 4.3). */
   readonly moderation: ModerationRemote;
+  /** Discussions, read as a guest or as the signed-in reader (Prompt 4.5). */
+  readonly discussion: DiscussionRemote;
+  /** Posting through the API Worker as the signed-in reader (Prompt 4.4). */
+  posting(options: { readonly apiBaseUrl: string; readonly fetch: FetchLike }): PostingRemote;
   /** Calls back with the signed-in user (or null) now, then on every change. */
   onUser(listener: (user: SessionUser | null) => void): () => void;
   /** Once the SDK has read storage and the URL (a sign-in return is exchanged by then): who is signed in. */
@@ -52,6 +59,8 @@ export async function loadAccountSession(config: DbConfig): Promise<AccountSessi
     account: db.createAccountRemote(client),
     library: db.createLibraryRemote(client),
     moderation: db.createModerationRemote(client),
+    discussion: db.createDiscussionRemote(client),
+    posting: (options) => db.createPostingRemote(client, options),
     onUser(listener) {
       const { data } = client.auth.onAuthStateChange((_event, session) => {
         const user = toUser(session);

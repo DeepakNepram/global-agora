@@ -8,6 +8,8 @@ import {
   type ModerationRemote,
   type Profile,
 } from '@/core';
+import type { DiscussionRemote } from '@/core/discussion';
+import type { PostingRemote } from '@/core/posting';
 
 import { createAccountController, type AccountEnvironment } from './accountController';
 import { DELETED_NOTICE, UNDER_AGE_NOTICE, UNREACHABLE_NOTICE } from './accountMessages';
@@ -77,6 +79,8 @@ function fakeServer(start: { user?: SessionUser | null; profile?: Profile | null
     account,
     library: {} as LibraryRemote,
     moderation: {} as ModerationRemote,
+    discussion: {} as DiscussionRemote,
+    posting: () => ({}) as PostingRemote,
     onUser(listener) {
       listeners.add(listener);
       const now = user;

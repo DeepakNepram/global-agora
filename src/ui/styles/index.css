@@ -9,6 +9,10 @@
   --color-accent: #4da3ff;
   /* Sheets over the globe: a step above the void, opaque (no blur: 1.5). */
   --color-panel: #0b1120;
+  /* A discussion's two sides (Prompt 4.5). Never meaning on their own: every
+     use is next to the side's name. Both clear WCAG AA as text on the panel. */
+  --color-side-a: #f2a541;
+  --color-side-b: #a78bfa;
 
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
@@ -79,6 +83,33 @@ body {
 .scrubber-range:focus-visible::-moz-range-thumb {
   outline: 2px solid var(--color-accent);
   outline-offset: 3px;
+}
+
+/* A post that arrived live (Prompt 4.5): a tint that fades, so it can be
+   found without anything moving. Under reduced motion it holds, unanimated,
+   until the list marks it seen. */
+.discussion-post[data-fresh]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgb(77 163 255 / 0.14);
+  pointer-events: none;
+  animation: post-arrived 2.5s ease-out forwards;
+}
+@keyframes post-arrived {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .discussion-post[data-fresh]::before {
+    animation-name: none;
+  }
 }
 
 /* Honour the OS setting from day one rather than bolting it on in Phase 5. */

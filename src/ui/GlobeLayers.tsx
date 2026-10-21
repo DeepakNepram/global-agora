@@ -87,7 +87,7 @@ export function GlobeLayers(props: GlobeLayersProps): JSX.Element {
         detailsAvailable={props.detailsAvailable}
         reducedMotion={reducedMotion}
       />
-      <DiscussionLayer scrim={!settings.postprocessing} />
+      <DiscussionLayer scrim={!settings.postprocessing} apiBaseUrl={props.apiBaseUrl} />
     </>
   );
 }
