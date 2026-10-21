@@ -1,5 +1,5 @@
 import { Canvas } from '@react-three/fiber';
-import { useMemo, useState, type JSX } from 'react';
+import { Suspense, useMemo, useState, type JSX } from 'react';
 import { Color } from 'three';
 
 import {
@@ -24,9 +24,9 @@ import { ControlsHost, PipelineHost } from './globe/canvasHosts';
 import { DiscussionStageHost } from './globe/DiscussionStageHost';
 import { REST_FRAME_INTERVAL_MS } from './globe/frameGovernor';
 import { createFrameProbe } from './globe/frameProbe';
-import { GlobeDevTools } from './globe/GlobeDevTools';
 import { GlobeReticle } from './globe/GlobeReticle';
 import { GlobeScene } from './globe/GlobeScene';
+import { LazyGlobeDevTools } from './globe/LazyGlobeDevTools';
 import { createPinPicker } from './globe/pinPicker';
 import { PinScene } from './globe/PinScene';
 import { useDevSettings } from './globe/useDevSettings';
@@ -119,9 +119,15 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
   useLiveClock();
   useOpenPermalink(link, historyWindowHours);
 
-  // Timing is dev tooling; production draws without queries or bookkeeping.
-  const probe = useMemo(() => (import.meta.env.DEV ? createFrameProbe() : null), []);
-  const presentLog = useMemo(() => (import.meta.env.DEV ? createPresentLog() : null), []);
+  // Dev tooling (and `--mode bench`); production draws without queries.
+  const probe = useMemo(
+    () => (import.meta.env.DEV || import.meta.env.MODE === 'bench' ? createFrameProbe() : null),
+    [],
+  );
+  const presentLog = useMemo(
+    () => (import.meta.env.DEV || import.meta.env.MODE === 'bench' ? createPresentLog() : null),
+    [],
+  );
 
   // BASE_URL is resolved here, not in src/core, which must not read Vite globals.
   const textures = useMemo(
@@ -225,18 +231,19 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
         inDiscussion={inDiscussion}
       />
 
-      {/* Inspection tooling only; compiled out of production builds. */}
-      {import.meta.env.DEV && (
-        <GlobeDevTools
-          dev={dev}
-          tier={tier}
-          settings={settings}
-          probe={probe}
-          presentLog={presentLog}
-          controls={controls}
-          reducedMotionPreferred={reducedMotionPreferred}
-          historyHours={historyWindowHours}
-        />
+      {LazyGlobeDevTools && (
+        <Suspense fallback={null}>
+          <LazyGlobeDevTools
+            dev={dev}
+            tier={tier}
+            settings={settings}
+            probe={probe}
+            presentLog={presentLog}
+            controls={controls}
+            reducedMotionPreferred={reducedMotionPreferred}
+            historyHours={historyWindowHours}
+          />
+        </Suspense>
       )}
     </div>
   );

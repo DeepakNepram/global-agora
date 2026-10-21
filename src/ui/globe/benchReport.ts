@@ -109,7 +109,7 @@ export function summarisePairs(rows: readonly BenchRow[]): PairedSummary {
  * nothing is ever sent anywhere but the server that served the page.
  */
 export async function postBenchReport(report: Record<string, unknown>): Promise<boolean> {
-  if (!import.meta.env.DEV) return false;
+  if (!import.meta.env.DEV && import.meta.env.MODE !== 'bench') return false;
   try {
     const response = await fetch('/__bench', {
       method: 'POST',
