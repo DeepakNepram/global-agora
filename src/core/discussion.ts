@@ -7,7 +7,6 @@
  */
 
 // Explicit .ts: scripts/db/smoke.ts loads this under plain Node, which needs it.
-import { safeHttpUrl } from './data/story.ts';
 import type { PostKind, PostModState, PostStance } from './posting.ts';
 
 /** CLAUDE.md #7, posts_body_length in the database (tests/posting-sql.test.ts). */
@@ -143,13 +142,23 @@ export function postLength(body: string): number {
 
 export type EvidenceUrlProblem = 'missing' | 'not-a-link' | 'too-long';
 
+/** A link a browser can open: an absolute http(s) URL. */
+function parsesAsHttp(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 /** What is wrong with an evidence link, or null when it will pass the CHECK. */
 export function evidenceUrlProblem(raw: string): EvidenceUrlProblem | null {
   const url = raw.trim();
   if (url === '') return 'missing';
   if (url.length > EVIDENCE_URL_MAX_CHARS) return 'too-long';
   // The CHECK wants ^https?://, so the link is sent as typed, never normalised.
-  return /^https?:\/\//i.test(url) && safeHttpUrl(url) !== null ? null : 'not-a-link';
+  return /^https?:\/\//i.test(url) && parsesAsHttp(url) ? null : 'not-a-link';
 }
 
 /** Best first: rank, then newest, then id so the order never wobbles. */

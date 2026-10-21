@@ -7,6 +7,7 @@ import { BloomBenchmark } from './BloomBenchmark';
 import type { PresentLog } from './bloomReport';
 import { CameraDebugControls } from './CameraDebugControls';
 import { CameraOverlay } from './CameraOverlay';
+import { DiscussionBenchmark } from './DiscussionBenchmark';
 import type { FrameProbe } from './frameProbe';
 import { FrameTimeOverlay } from './FrameTimeOverlay';
 import { GlobeDebugPanel } from './GlobeDebugPanel';
@@ -103,6 +104,18 @@ export function GlobeDevTools(props: GlobeDevToolsProps): JSX.Element {
             onPinSourceChange={dev.setPinSource}
             onClusteringChange={dev.setClustering}
             onFullMotionChange={dev.setFullMotion}
+            onRunningChange={dev.setBenchmarking}
+          />
+        )}
+        {probe && (
+          <DiscussionBenchmark
+            probe={probe}
+            tier={tier}
+            controls={controls}
+            fullMotion={dev.fullMotion}
+            onFullMotionChange={dev.setFullMotion}
+            pinSource={dev.pinSource}
+            onPinSourceChange={dev.setPinSource}
             onRunningChange={dev.setBenchmarking}
           />
         )}
