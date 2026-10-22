@@ -1,71 +1,97 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, type JSX } from 'react';
+import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
 
-import type { DbConfig } from '@/core/db/config';
+import type { DbConfig } from '@/core/db';
 import { wallClockNow } from '@/state';
-// Directly, not through the barrel: only this chunk carries the queue.
-import {
-  createQueueController,
-  loadAdminSession,
-  queueStore,
-  useQueueStore,
-} from '@/state/moderationQueue';
+// Directly, not through the barrel: only this chunk carries the console.
+import { useConsoleStore } from '@/state/adminConsoleStore';
+import { useLocationsStore } from '@/state/adminLocations';
+import { useQueueStore } from '@/state/moderationQueue';
 
 import { PRIMARY, QUIET, SECONDARY } from '../account/accountStyles';
-import { QueueItemCard } from './QueueItemCard';
+import { createAdminControllers } from './adminControllers';
+import { AdminTabs } from './AdminTabs';
+import { ADMIN_TABS, panelId, tabForPath, tabId, type AdminTab } from './adminView';
+import { CountersBar } from './CountersBar';
+import { LocationsTab } from './LocationsTab';
+import { ModerationTab } from './ModerationTab';
+import { StoryQueue } from './StoryQueue';
 
 export interface AdminAppProps {
   readonly dbConfig: DbConfig | null;
 }
 
 const LINK = 'text-accent underline underline-offset-2';
+/** The clock the page's "3 h ago" and "closes in" read; a minute is fine-grained enough. */
+const CLOCK_TICK_MS = 30_000;
 
 /**
- * /admin (Prompt 4.3; Prompt 4.6 adds its other sections): the moderation
- * queue as a plain, keyboard-first list. Loaded instead of the globe, in its
- * own chunk. The page uses the session made on the globe; the database says
- * whether that account may moderate.
+ * /admin (Prompts 4.3 and 4.6): the counters, then three tabs: the hot story
+ * queue with one-click opening, the moderation queue, and the location
+ * correction tool. Plain and keyboard-first: built to be fast at 8am. Loaded
+ * instead of the globe, in its own chunk; the database says who may use it.
  */
 export function AdminApp({ dbConfig }: AdminAppProps): JSX.Element {
-  const status = useQueueStore((state) => state.status);
-  const handle = useQueueStore((state) => state.handle);
-  const items = useQueueStore((state) => state.items);
-  const acting = useQueueStore((state) => state.acting);
-  const message = useQueueStore((state) => state.message);
-  const heading = useRef<HTMLHeadingElement>(null);
-  const actedAt = useRef<number | null>(null);
-  const controller = useMemo(
-    () =>
-      dbConfig === null
-        ? null
-        : createQueueController({ store: queueStore, load: () => loadAdminSession(dbConfig) }),
+  const access = useConsoleStore((state) => state.access);
+  const handle = useConsoleStore((state) => state.handle);
+  const counters = useConsoleStore((state) => state.counters);
+  const storyCount = useConsoleStore((state) => state.stories.length);
+  const storiesReady = useConsoleStore((state) => state.storiesStatus === 'ready');
+  const queueCount = useQueueStore((state) =>
+    state.status === 'ready' ? state.items.length : null,
+  );
+  const locationCount = useLocationsStore((state) =>
+    state.status === 'ready' ? state.items.length : null,
+  );
+  const [tab, setTab] = useState<AdminTab>(() => tabForPath(window.location.pathname));
+  const [nowMs, setNowMs] = useState(wallClockNow);
+  const controllers = useMemo(
+    () => (dbConfig === null ? null : createAdminControllers(dbConfig)),
     [dbConfig],
   );
 
   useEffect(() => {
-    document.title = 'Moderation queue · Global Agora';
-    void controller?.start();
-  }, [controller]);
+    void controllers?.console.start();
+  }, [controllers]);
 
-  // A decided post leaves the list: focus moves to the one that took its
-  // place, or to the page heading when the list is empty.
-  useLayoutEffect(() => {
-    if (actedAt.current === null || acting !== null) return;
-    const headings = document.querySelectorAll<HTMLElement>('[data-queue-heading]');
-    const next = headings[Math.min(actedAt.current, headings.length - 1)];
-    actedAt.current = null;
-    (next ?? heading.current)?.focus();
-  }, [items, acting]);
+  useEffect(() => {
+    const label = ADMIN_TABS.find((entry) => entry.id === tab)?.label ?? 'Admin';
+    document.title = `${label} · Admin · Global Agora`;
+  }, [tab]);
 
-  const nowMs = wallClockNow();
+  // Back and Forward move between tabs; each tab has its own path.
+  useEffect(() => {
+    const onPop = (): void => setTab(tabForPath(window.location.pathname));
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  // Coming back to the page (the next morning, say): fresh numbers and stories.
+  useEffect(() => {
+    const tick = window.setInterval(() => setNowMs(wallClockNow()), CLOCK_TICK_MS);
+    const onVisible = (): void => {
+      if (document.visibilityState !== 'visible') return;
+      setNowMs(wallClockNow());
+      void controllers?.console.refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(tick);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [controllers]);
+
+  const select = useCallback((next: AdminTab) => {
+    setTab(next);
+    const path = ADMIN_TABS.find((entry) => entry.id === next)?.path ?? '/admin';
+    if (window.location.pathname !== path) window.history.pushState(null, '', path);
+  }, []);
 
   let content: JSX.Element;
-  if (controller === null) {
-    content = (
-      <p className="text-sm text-muted">This build has no backend, so nothing to moderate.</p>
-    );
-  } else if (status === 'loading') {
-    content = <p className="text-sm text-muted">Loading the queue…</p>;
-  } else if (status === 'signed-out') {
+  if (controllers === null) {
+    content = <p className="text-sm text-muted">This build has no backend, so nothing to run.</p>;
+  } else if (access === 'loading') {
+    content = <p className="text-sm text-muted">Checking who is here…</p>;
+  } else if (access === 'signed-out') {
     content = (
       <p className="text-sm text-muted">
         Sign in on the{' '}
@@ -75,41 +101,36 @@ export function AdminApp({ dbConfig }: AdminAppProps): JSX.Element {
         first, then come back here.
       </p>
     );
-  } else if (status === 'not-admin') {
+  } else if (access === 'not-admin') {
     content = <p className="text-sm text-muted">This page is for moderators.</p>;
-  } else if (status === 'unreachable') {
+  } else if (access === 'unreachable') {
     content = (
       <div className="flex flex-col items-start gap-2">
-        <p className="text-sm text-muted">The queue could not be loaded.</p>
-        <button type="button" className={PRIMARY} onClick={() => void controller.start()}>
+        <p className="text-sm text-muted">The console could not be reached.</p>
+        <button type="button" className={PRIMARY} onClick={() => void controllers.console.start()}>
           Try again
         </button>
       </div>
     );
-  } else if (items.length === 0) {
-    content = (
-      <p className="text-sm text-muted">
-        Nothing waiting. Held, reported and unchecked posts appear here.
-      </p>
-    );
   } else {
     content = (
-      <ol aria-label="Posts waiting" className="flex flex-col gap-3">
-        {items.map((item, index) => (
-          <li key={item.postId}>
-            <QueueItemCard
-              item={item}
-              nowMs={nowMs}
-              busy={acting !== null}
-              acting={acting === item.postId}
-              onAct={(action) => {
-                actedAt.current = index;
-                void controller.act(item.postId, action);
-              }}
-            />
-          </li>
-        ))}
-      </ol>
+      <>
+        <CountersBar counters={counters} />
+        <AdminTabs
+          tab={tab}
+          counts={{
+            ...(storiesReady ? { stories: storyCount } : {}),
+            ...(queueCount === null ? {} : { moderation: queueCount }),
+            ...(locationCount === null ? {} : { locations: locationCount }),
+          }}
+          onSelect={select}
+        />
+        <div role="tabpanel" id={panelId(tab)} aria-labelledby={tabId(tab)}>
+          {tab === 'stories' && <StoryQueue controller={controllers.console} nowMs={nowMs} />}
+          {tab === 'moderation' && <ModerationTab controller={controllers.queue} nowMs={nowMs} />}
+          {tab === 'locations' && <LocationsTab controller={controllers.locations} nowMs={nowMs} />}
+        </div>
+      </>
     );
   }
 
@@ -118,22 +139,21 @@ export function AdminApp({ dbConfig }: AdminAppProps): JSX.Element {
       <main className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs text-muted">Global Agora · Admin</p>
-            <h1 ref={heading} tabIndex={-1} className="text-xl font-semibold outline-none">
-              Moderation queue
-              {status === 'ready' && (
-                <span className="ml-2 text-sm font-normal text-muted">{items.length} waiting</span>
-              )}
-            </h1>
+            <p className="text-xs text-muted">Global Agora</p>
+            <h1 className="text-xl font-semibold">Admin console</h1>
             {handle !== null && <p className="text-xs text-muted">Signed in as @{handle}</p>}
           </div>
           <div className="flex gap-2">
-            {status === 'ready' && (
+            {access === 'ready' && controllers !== null && (
               <button
                 type="button"
                 className={SECONDARY}
-                disabled={acting !== null}
-                onClick={() => void controller?.refresh()}
+                onClick={() => {
+                  setNowMs(wallClockNow());
+                  void controllers.console.refresh();
+                  if (tab === 'moderation') void controllers.queue.refresh();
+                  if (tab === 'locations') void controllers.locations.load();
+                }}
               >
                 Refresh
               </button>
@@ -143,9 +163,6 @@ export function AdminApp({ dbConfig }: AdminAppProps): JSX.Element {
             </a>
           </div>
         </header>
-        <p role="status" className="min-h-5 text-sm text-ink">
-          {message}
-        </p>
         {content}
       </main>
     </div>

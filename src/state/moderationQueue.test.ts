@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { ModerationError, type AccountRemote, type Profile } from '@/core';
+import type { AdminConsoleRemote } from '@/core/admin';
 import type { AdminRemote, QueueItem } from '@/core/moderationQueue';
 
 import { createQueueController, createQueueStore, type AdminSession } from './moderationQueue';
@@ -54,6 +55,8 @@ function setup(start: { signedIn?: boolean; admin?: boolean; queue?: QueueItem[]
   const session: AdminSession = {
     account: { myProfile: async () => profile } as unknown as AccountRemote,
     admin,
+    // The queue never touches the console's remote.
+    console: {} as AdminConsoleRemote,
     signedIn: async () => start.signedIn ?? true,
   };
   const store = createQueueStore();

@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   clampView,
-  imagePlacement,
   latLonToPoint,
   MAX_ZOOM,
   nudge,
   panBy,
   pointToLatLon,
+  sourceRect,
   viewAt,
   WORLD_VIEW,
   zoomAt,
@@ -33,13 +33,16 @@ describe('the projection', () => {
     }
   });
 
-  it('places the texture so its corners land where the projection says', () => {
+  it('draws the whole texture at zoom 1, and just the frame’s part when zoomed', () => {
+    const texture = { width: 4096, height: 2048 };
+    expect(sourceRect(WORLD_VIEW, texture)).toEqual({ x: 0, y: 0, width: 4096, height: 2048 });
     const view = viewAt({ lat: 40, lon: -74 }, 4);
-    const placed = imagePlacement(view, SIZE);
-    const farCorner = latLonToPoint(view, { lat: -90, lon: 180 }, SIZE);
-    expect(placed.scale).toBe(4);
-    expect(placed.x + SIZE.width * placed.scale).toBeCloseTo(farCorner.x, 9);
-    expect(placed.y + SIZE.height * placed.scale).toBeCloseTo(farCorner.y, 9);
+    const rect = sourceRect(view, texture);
+    // The frame's top-left corner, as a texel of the texture.
+    const corner = pointToLatLon(view, { x: 0, y: 0 }, SIZE);
+    expect(rect.x).toBeCloseTo(((corner.lon + 180) / 360) * 4096, 9);
+    expect(rect.y).toBeCloseTo(((90 - corner.lat) / 180) * 2048, 9);
+    expect(rect).toMatchObject({ width: 1024, height: 512 });
   });
 });
 

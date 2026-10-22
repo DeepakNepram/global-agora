@@ -135,7 +135,7 @@ export function AccountSheet({ reducedMotion }: AccountSheetProps): JSX.Element 
           <div className="flex flex-wrap gap-2">
             {profile?.isAdmin === true && (
               <a href="/admin" className={`${SECONDARY} inline-flex items-center`}>
-                Moderation queue
+                Admin console
               </a>
             )}
             <button

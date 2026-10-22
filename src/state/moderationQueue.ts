@@ -1,15 +1,13 @@
 import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
-import { ModerationError, type AccountRemote } from '@/core';
-import type { DbConfig } from '@/core/db';
+import { ModerationError } from '@/core';
 // Directly, not through the barrels: only the /admin chunk carries the queue.
-import {
-  QUEUE_PAGE,
-  type AdminRemote,
-  type ModerationAction,
-  type QueueItem,
-} from '@/core/moderationQueue';
+import { QUEUE_PAGE, type ModerationAction, type QueueItem } from '@/core/moderationQueue';
+
+import type { AdminSession } from './adminSession';
+
+export { loadAdminSession, type AdminSession } from './adminSession';
 
 /**
  * The /admin moderation queue (Prompt 4.3). The page signs in nowhere: it
@@ -45,26 +43,6 @@ export const queueStore: QueueStore = createQueueStore();
 
 export function useQueueStore<T>(selector: (state: QueueState) => T): T {
   return useStore(queueStore, selector);
-}
-
-export interface AdminSession {
-  readonly account: AccountRemote;
-  readonly admin: AdminRemote;
-  /** Whether a reader is signed in on this device. */
-  signedIn(): Promise<boolean>;
-}
-
-export async function loadAdminSession(config: DbConfig): Promise<AdminSession> {
-  const db = await import('@/core/db');
-  const client = db.createDbClient(config);
-  return {
-    account: db.createAccountRemote(client),
-    admin: db.createAdminRemote(client),
-    async signedIn() {
-      const { data } = await client.auth.getSession();
-      return data.session !== null;
-    },
-  };
 }
 
 export interface QueueController {

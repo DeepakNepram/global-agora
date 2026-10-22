@@ -85,16 +85,26 @@ export function viewAt(at: LatLon, zoom: number): MapView {
   return clampView({ lat: at.lat, lon: at.lon, zoom });
 }
 
+/** A rectangle of the texture, in its own texels. */
+export interface TextureRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 /**
- * The texture's placement for a CSS transform, `translate(x, y) scale(scale)`
- * from the top-left: the world image is `size` at zoom 1.
+ * The part of an equirectangular texture (`texture` texels, north up, the
+ * antimeridian at both edges) the view shows: what a canvas draws, scaled to
+ * fill the frame. Only the visible texels are ever drawn, at any zoom.
  */
-export function imagePlacement(
-  view: MapView,
-  size: MapSize,
-): MapPoint & { readonly scale: number } {
-  const topLeft = latLonToPoint(view, { lat: 90, lon: -180 }, size);
-  return { x: topLeft.x, y: topLeft.y, scale: view.zoom };
+export function sourceRect(view: MapView, texture: MapSize): TextureRect {
+  return {
+    x: ((view.lon - 180 / view.zoom + 180) / 360) * texture.width,
+    y: ((90 - (view.lat + 90 / view.zoom)) / 180) * texture.height,
+    width: texture.width / view.zoom,
+    height: texture.height / view.zoom,
+  };
 }
 
 /** An arrow key's nudge: a two-hundredth of the frame's width, in degrees. */
