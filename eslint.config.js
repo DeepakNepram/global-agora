@@ -114,10 +114,16 @@ const functionsForbidden = [
     message: 'Edge Functions deploy on their own: import only from supabase/functions.',
   },
   {
-    group: ['@supabase/*', 'react', 'react-dom', 'three', 'zustand'],
+    group: ['@supabase/*', '@anthropic-ai/*', 'openai', 'react', 'react-dom', 'three', 'zustand'],
     message: 'Edge Functions use fetch only; no packages (see docs/DECISIONS.md).',
   },
 ];
+
+/** A model key belongs on a server: no model SDK in the app's bundle (CLAUDE.md #9). */
+const modelSdkFromApp = {
+  group: ['@anthropic-ai/*', 'openai'],
+  message: 'Model SDKs hold API keys; the models are called from Edge Functions.',
+};
 
 const functionsFromApp = {
   group: ['**/supabase/functions', '**/supabase/functions/**'],
@@ -178,7 +184,15 @@ export default tseslint.config(
       'no-restricted-imports': 'off',
       '@typescript-eslint/no-restricted-imports': [
         'error',
-        { patterns: [...coreForbidden, supabaseSeam, workersFromApp, functionsFromApp] },
+        {
+          patterns: [
+            ...coreForbidden,
+            supabaseSeam,
+            workersFromApp,
+            functionsFromApp,
+            modelSdkFromApp,
+          ],
+        },
       ],
     },
   },
@@ -188,7 +202,7 @@ export default tseslint.config(
       'no-restricted-imports': 'off',
       '@typescript-eslint/no-restricted-imports': [
         'error',
-        { patterns: [...coreForbidden, workersFromApp, functionsFromApp] },
+        { patterns: [...coreForbidden, workersFromApp, functionsFromApp, modelSdkFromApp] },
       ],
     },
   },
@@ -199,7 +213,7 @@ export default tseslint.config(
       'no-restricted-imports': 'off',
       '@typescript-eslint/no-restricted-imports': [
         'error',
-        { patterns: [supabaseSeam, workersFromApp, functionsFromApp] },
+        { patterns: [supabaseSeam, workersFromApp, functionsFromApp, modelSdkFromApp] },
       ],
     },
   },
@@ -209,7 +223,7 @@ export default tseslint.config(
       'no-restricted-imports': 'off',
       '@typescript-eslint/no-restricted-imports': [
         'error',
-        { patterns: [...globeForbidden, workersFromApp, functionsFromApp] },
+        { patterns: [...globeForbidden, workersFromApp, functionsFromApp, modelSdkFromApp] },
       ],
     },
   },

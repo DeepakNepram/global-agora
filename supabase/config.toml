@@ -412,6 +412,11 @@ deno_version = 2
 [functions.moderate-post]
 verify_jwt = false
 
+# Called by the admin console with the admin's token (Prompt 4.6); the
+# database refuses anyone else.
+[functions.suggest-debate]
+verify_jwt = true
+
 [analytics]
 # Off until a prompt needs it; keeps `supabase start` small.
 enabled = false

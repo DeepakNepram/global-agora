@@ -10,6 +10,7 @@
  * testable before every key exists. Both it and the public local hook
  * secret are refused against a hosted project.
  */
+import { isLocalProject } from '../project.ts';
 
 export interface ModelAccess {
   readonly apiKey: string;
@@ -29,9 +30,6 @@ export interface ModerationEnv {
 /** The local stack's hook secret (supabase/seeds/local-moderation.sql). Public. */
 export const LOCAL_HOOK_SECRET = 'local-only-moderation-hook';
 
-/** How the local stack names itself to the function. */
-const LOCAL_HOSTS = new Set(['kong', 'localhost', '127.0.0.1', 'host.docker.internal']);
-
 function value(get: (name: string) => string | undefined, name: string): string | null {
   const raw = get(name)?.trim();
   return raw === undefined || raw === '' ? null : raw;
@@ -44,12 +42,8 @@ export function moderationEnv(get: (name: string) => string | undefined): Modera
   const serviceRoleKey = value(get, 'SUPABASE_SERVICE_ROLE_KEY');
   const standIn = value(get, 'MODERATION_STAND_IN_URL');
 
-  let local: boolean;
-  try {
-    local = supabaseUrl !== null && LOCAL_HOSTS.has(new URL(supabaseUrl).hostname);
-  } catch {
-    return 'not configured: SUPABASE_URL is not a URL';
-  }
+  const local = supabaseUrl === null ? false : isLocalProject(supabaseUrl);
+  if (local === null) return 'not configured: SUPABASE_URL is not a URL';
   if (!local && hookSecret === LOCAL_HOOK_SECRET) {
     return 'the local hook secret cannot serve a hosted project';
   }
