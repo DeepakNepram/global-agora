@@ -109,6 +109,14 @@ browser <──Brotli, ETag, SWR── API Worker <─────────�
     (step 11). A database trigger broadcasts each newly visible post's id on
     a public Realtime topic, and every client reads the post itself, so
     blocks and moderation still apply.
+13. The admin console (Prompt 4.6, `/admin`, `src/ui/admin/`, its own
+    chunk). Counters, then three tabs: the hot story queue, the moderation
+    queue (step 10) and a location correction map. Each admin path is a
+    database function that checks `private.is_admin()` first;
+    `open_discussion()` enforces the cap on open discussions. The
+    `suggest-debate` Edge Function reads the story as the caller and asks
+    Claude, over fetch, for a debate prompt and two side labels, which the
+    admin edits before opening.
 
 The wire format is defined once, in `src/core/data/payload.ts`, and both the
 Worker and the client validate against it.

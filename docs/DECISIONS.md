@@ -6,6 +6,119 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-10-22 — Admin console: definer functions, the cap in the database, Claude over fetch
+
+Prompt 4.6 builds `/admin`: four counters, then three tabs. The hot story
+queue opens discussions in one step, the moderation queue is 4.3's, and a
+location tool corrects a story's pin.
+
+**Your calls.**
+
+- **Claude writes the debate suggestions:** Opus 5.5 by default.
+  `DEBATE_MODEL` and `DEBATE_EFFORT` tune it.
+- **The counters.** "Posts today" counts from the admin's local midnight,
+  in any moderation state. The median time to act covers reports resolved
+  (actioned or dismissed) in the last 7 days.
+- **Plain fetch, not Anthropic's SDK** (below).
+
+**The role check** is 4.3's `private.is_admin()`. Every admin path is a
+`SECURITY DEFINER` function that checks it first. The tables stay closed to
+clients: no grants, and a restrictive deny on `admin_actions`. So no direct
+write can skip the cap or the log, and pgTAP checks that every function
+refuses guests and readers.
+
+**The cap lives in the database.** `open_discussion()`:
+
+1. takes a transaction advisory lock, so two admins at 24 open cannot both
+   take the 25th;
+2. counts the discussions that are open and not past their close time;
+3. at `private.admin_settings.max_open_discussions` (25), refuses with
+   SQLSTATE `PT409` (HTTP 409), whose detail is when the next discussion
+   closes.
+
+The page also holds Open back at the cap, but the database is what
+enforces it. The 48 hours is `discussion_length` in the same settings row.
+
+**A debate's words** have one set of limits: the prompt at most 200
+characters, each side at most 40, one line each, and the two sides
+different. The table's CHECKs, the function, the form and the suggestion
+function all hold the same limits, and `tests/admin-sql.test.ts` keeps them
+in step.
+
+**Suggestions.** The `suggest-debate` Edge Function:
+
+- **Reads `admin_story_brief()` as the caller,** so a non-admin is refused
+  before any model is called.
+- **Sends Claude the story as data:** the headline, the snippet, the place
+  and up to eight outlets' headlines (one per outlet), escaped and tagged,
+  with an instruction to treat them as information only.
+- **Asks for structured output** (a JSON schema) at medium effort.
+- **Opts into the server-side refusal fallback,** `fallbacks: "default"`
+  (beta `server-side-fallback-2026-07-01`).
+- **Retries a 429 or 5xx once,** and gives up after 45 s.
+
+Any failure or decline returns `{suggestion: null, reason}`, and the admin
+types the words.
+
+The form shows its fields at once, and a suggestion fills only fields not
+typed in. At Opus 5.5's $4 and $20 per million tokens, a suggestion is
+estimated at 2–3 cents. That isn't measured yet: there has been no live run.
+
+**Why fetch, not the SDK.**
+
+- **The SDK couldn't load locally.** Avast's HTTPS scanning on the
+  development machine re-signs TLS with a root that Windows trusts but
+  Docker containers don't. The local edge runtime couldn't download the
+  SDK from npm, so the function didn't start.
+- **Fetch fits the repo's existing rule** for Edge Functions, no packages
+  (4.3). It starts anywhere, and Vitest runs the same code.
+- **The rule is enforced twice:** lint and `tests/edge-functions.test.ts`
+  keep model SDKs out of the functions and the app.
+- **Live local calls are blocked too.** The same interception stops any
+  live HTTPS from local functions (OpenAI, Google, Anthropic), so a live
+  local run needs an Avast exception for those hosts. Hosted functions are
+  unaffected.
+
+**Locations.**
+
+- **The map** is a flat map of the globe's 4K day texture (NASA), drawn on a
+  canvas that draws only the texels in view. Scaling an image 32× with CSS
+  would make enormous layers.
+- **Placing the pin:** click to place it, drag to pan, and zoom with the
+  wheel or the buttons. Arrow keys nudge it by 1/200 of the frame's width
+  (Shift: ten times as far), and there's a place search over the gazetteer
+  and numeric fields.
+- **The place's name follows the pin:** the nearest gazetteer city within
+  50 km, until the admin types one.
+- **`fix_story_location()`** sets `place_source = 'manual'`, answers the
+  reports (it deletes the counter row) and logs the move, from and to.
+- **`ingest_apply` now keeps a manual location.** Before, a story not yet
+  queued would have gone back to the ingest's place on its next batch.
+
+**The log.** `admin_actions` records openings, with their words, and moved
+pins, from and to, each with who did it. Moderation decisions keep their own
+log (4.3).
+
+**Measured.**
+
+- **Tests:** pgTAP 632 (+47); db:smoke 82 (+8), through the real function
+  and a local Claude stand-in; unit tests 1210 (+72).
+- **Size:** main chunk +0.07 KB gzip (388.28 KB); the admin chunk is
+  11.4 KB gzip (was 3.2). The map texture (640 KB) and the gazetteer load
+  only on the Locations tab.
+- **In the browser, on the local stack:**
+  - the suggestion fills the form, and the unreachable case says so;
+  - Ctrl+Enter opens;
+  - lowering the cap to 1 refuses with the next close time;
+  - the map places, nudges and saves;
+  - a pasted share link finds its story;
+  - tabs work from the keyboard;
+  - nothing scrolls sideways at 375 px.
+- **Not yet run against real Claude.** That needs a key and the Avast
+  exception locally, or a deploy.
+
+---
+
 ## 2026-10-22 — Discussion UI: one clock for the stage, a cheap recede, ids over Realtime
 
 Prompt 4.5 builds the discussion. The camera dollies down to the story's

@@ -80,11 +80,12 @@ Docker Desktop must be running.
 ```bash
 npm run db:start   # first run downloads about 1 GB of images
 npm run db:reset   # migrations + 200 fictional seed stories from the last 24 h
-npm run db:test    # 585 pgTAP assertions: RLS, constraints, ingest, API, accounts, discussions,
-                   # moderation, the local badge, the live feed
+npm run db:test    # 632 pgTAP assertions: RLS, constraints, ingest, API, accounts, discussions,
+                   # moderation, the local badge, the live feed, the admin console
 npm run db:smoke   # the stories come back, other tables refuse, an account's life, a discussion,
                    # known-toxic posts through the moderation pipeline, the local badge
-                   # through the API Worker, a live post over Realtime
+                   # through the API Worker, a live post over Realtime, the admin console
+                   # with its debate suggestions
 ```
 
 Discussions update live through Realtime, which the local stack runs
@@ -99,9 +100,26 @@ Moderation runs in a Supabase Edge Function, served by the local stack. Copy
 stack (`npm run db:stop && npm run db:start`). With no model keys there,
 db:smoke stands in for the models with recorded replies; put an OpenAI key
 (and a Google Cloud key) there to run the known-toxic posts live, and
-`npm run db:smoke -- --record` to save the live replies. Admins are added by
-SQL (`insert into public.admins (user_id) select id from public.profiles where
-handle = '…'`) and work the queue at `/admin`.
+`npm run db:smoke -- --record` to save the live replies.
+
+Admins are added by SQL (`insert into public.admins (user_id) select id from
+public.profiles where handle = '…'`). They sign in on the globe, then work
+the admin console at `/admin`: the counters, the hot story queue
+(`/admin`), the moderation queue (`/admin/moderation`) and the location map
+(`/admin/locations`).
+
+Opening a discussion asks Claude for a suggested prompt and two sides,
+through the `suggest-debate` Edge Function. Locally that needs
+`ANTHROPIC_API_KEY` in `supabase/functions/.env` (you add it; never paste
+it anywhere else) and a stack restart. Without a key the function asks
+db:smoke's stand-in (`DEBATE_STAND_IN_URL`), which answers only while
+db:smoke runs. Otherwise the form says Claude did not answer, and you type
+the words.
+
+**HTTPS-scanning antivirus** (Avast's Web Shield, for one) re-signs TLS
+with a root that Windows trusts but Docker containers don't. Local Edge
+Functions then cannot reach OpenAI, Google or Anthropic: add exceptions
+for those hosts to run them live. Hosted functions are not affected.
 
 The schema and the access matrix are in
 [`docs/DATA_SCHEMA.md`](docs/DATA_SCHEMA.md). After changing a migration, run
@@ -121,6 +139,20 @@ npx supabase db push
 The live feed uses public Realtime channels. Keep Realtime's "Allow public
 access" on (Project Settings → Realtime; it is on by default), or
 discussions stop updating live.
+
+The two Edge Functions deploy on their own. Set their secrets in the
+dashboard (Project Settings → Edge Functions → Secrets), never the local
+values in `supabase/functions/.env`: `OPENAI_API_KEY`, `GOOGLE_API_KEY`,
+`MODERATION_HOOK_SECRET` (a new random value) and `ANTHROPIC_API_KEY`.
+Then:
+
+```bash
+npx supabase functions deploy moderate-post
+```
+
+```bash
+npx supabase functions deploy suggest-debate
+```
 
 ## Ingest
 

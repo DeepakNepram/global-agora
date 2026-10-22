@@ -27,6 +27,7 @@ truth; the original design is the build plan's §3
 | `20261017130000_moderation_queue.sql`       | `admins`, the queue and its actions, `my_profile` fields  |
 | `20261018100000_local_badge.sql`            | `region_label` written only by the API Worker, its shape  |
 | `20261020100000_discussion_live.sql`        | the live feed's broadcast, `discussion_balance`           |
+| `20261022100000_admin_console.sql`          | the console's functions, the cap, `admin_actions`         |
 
 Each table ships with its RLS policies and grants in the same file: a table and
 its access rules are one change. Migrations are timestamped and forward-only.
@@ -41,7 +42,7 @@ its access rules are one change. Migrations are timestamped and forward-only.
   grants is closed rather than open. Functions are closed too, because
   PostgREST exposes them as RPC endpoints: the ingest migration revokes
   PUBLIC's EXECUTE by default and on each function by name. Client roles may
-  call exactly sixteen, and a pgTAP test fails if that list changes:
+  call exactly twenty-two, and a pgTAP test fails if that list changes:
   - the API's read-only `api_nodes` and `api_story`;
   - `discussion_participants`, the count `api_story` calls as the caller;
   - `discussion_balance`, a discussion's approved posts per side, under the
@@ -53,7 +54,11 @@ its access rules are one change. Migrations are timestamped and forward-only.
   - the first sign-in's `handles_available`, `claim_handle`, `accept_rules`
     and `my_profile`, and `delete_my_account` (Prompt 4.1), signed in only;
   - `report_post`, and the admins' `moderation_queue` and `moderate_post`,
-    which refuse anyone who is not an admin (Prompt 4.3).
+    which refuse anyone who is not an admin (Prompt 4.3);
+  - the admin console's `admin_story_queue`, `admin_story_brief`,
+    `open_discussion`, `admin_counters`, `admin_location_queue` and
+    `fix_story_location`, which refuse anyone who is not an admin too
+    (Prompt 4.6).
 
   `record_moderation` is the service role's alone: the moderate-post Edge
   Function answers through it.
@@ -89,27 +94,28 @@ its access rules are one change. Migrations are timestamped and forward-only.
 
 Grants and policies agree; `npm run db:test` checks both.
 
-| Table                    | Signed out | Signed in                             | Writes                           |
-| ------------------------ | ---------- | ------------------------------------- | -------------------------------- |
-| `stories`                | read       | read                                  | service role (ingest Worker)     |
-| `articles`               | read       | read                                  | service role (ingest Worker)     |
-| `discussions`            | read       | read                                  | service role (admin, Prompt 4.6) |
-| `feature_flags`          | none       | read                                  | service role                     |
-| `posts`                  | approved   | approved, no block either way; yours  | yours, by column (Prompt 4.2)    |
-| `profiles`               | public     | public; your own private via function | your own, through functions      |
-| `votes`                  | none       | your own votes                        | yours, by column (Prompt 4.2)    |
-| `discussion_stances`     | none       | your own                              | yours, until you post or vote    |
-| `blocks`                 | none       | blocks you made                       | add by column, remove your own   |
-| `reports`                | none       | none (explicit restrictive deny)      | `report_post` only               |
-| `strikes`                | none       | none (explicit restrictive deny)      | moderation's functions           |
-| `notifications`          | none       | your own                              | `read_at` on your own            |
-| `admins`                 | none       | none (explicit restrictive deny)      | service role (SQL)               |
-| `moderation_actions`     | none       | none (explicit restrictive deny)      | `moderate_post` only             |
-| `story_signals`          | none       | none (explicit restrictive deny)      | service role (ingest Worker)     |
-| `ingest_runs`            | none       | none (explicit restrictive deny)      | service role (ingest Worker)     |
-| `story_location_reports` | none       | none (explicit restrictive deny)      | `api_report_location` only       |
-| `follows`                | none       | your own                              | add and remove your own          |
-| `saved_stories`          | none       | your own                              | add and remove your own          |
+| Table                    | Signed out | Signed in                             | Writes                          |
+| ------------------------ | ---------- | ------------------------------------- | ------------------------------- |
+| `stories`                | read       | read                                  | service role (ingest Worker)    |
+| `articles`               | read       | read                                  | service role (ingest Worker)    |
+| `discussions`            | read       | read                                  | `open_discussion` (admins only) |
+| `feature_flags`          | none       | read                                  | service role                    |
+| `posts`                  | approved   | approved, no block either way; yours  | yours, by column (Prompt 4.2)   |
+| `profiles`               | public     | public; your own private via function | your own, through functions     |
+| `votes`                  | none       | your own votes                        | yours, by column (Prompt 4.2)   |
+| `discussion_stances`     | none       | your own                              | yours, until you post or vote   |
+| `blocks`                 | none       | blocks you made                       | add by column, remove your own  |
+| `reports`                | none       | none (explicit restrictive deny)      | `report_post` only              |
+| `strikes`                | none       | none (explicit restrictive deny)      | moderation's functions          |
+| `notifications`          | none       | your own                              | `read_at` on your own           |
+| `admins`                 | none       | none (explicit restrictive deny)      | service role (SQL)              |
+| `admin_actions`          | none       | none (explicit restrictive deny)      | the console's functions         |
+| `moderation_actions`     | none       | none (explicit restrictive deny)      | `moderate_post` only            |
+| `story_signals`          | none       | none (explicit restrictive deny)      | service role (ingest Worker)    |
+| `ingest_runs`            | none       | none (explicit restrictive deny)      | service role (ingest Worker)    |
+| `story_location_reports` | none       | none (explicit restrictive deny)      | `api_report_location` only      |
+| `follows`                | none       | your own                              | add and remove your own         |
+| `saved_stories`          | none       | your own                              | add and remove your own         |
 
 Open questions left for the prompts that own them:
 
@@ -130,7 +136,9 @@ Open questions left for the prompts that own them:
 - `category` is an index into `NEWS_CATEGORIES` (`src/core/nodeBuffer.ts`),
   0 to 7. A unit test keeps the CHECK range and the array in step.
 - `lat` and `lon` are the event's location. `geog` is generated from them
-  (never written) and carries the GIST index for radius queries.
+  (never written) and carries the GIST index for radius queries. An admin
+  can move them (`fix_story_location()`, Prompt 4.6): `place_source`
+  becomes `manual`, and the ingest never moves a manual place back.
 - `heat` is 0 to 255 and `sentiment` −100 to 100. `place_conf` is 0 to 100 and
   backs "why this location".
 - `discussion_state` is `none`, `queued`, `open` or `closed`.
@@ -142,13 +150,22 @@ Open questions left for the prompts that own them:
 - `url` is unique and must be http(s), so a `javascript:` link cannot be
   stored. `story_id` is required and cascades with its story.
 
-**`discussions`**: opened by hand from the admin queue.
+**`discussions`**: opened by an admin from the console's hot story queue,
+through `open_discussion()` (Prompt 4.6).
+
+- **The cap:** at most `private.admin_settings.max_open_discussions` (25)
+  open at once, counting those not past `closes_at`. Opening takes an
+  advisory lock, and the 26th is refused with `PT409` (HTTP 409), its
+  detail the next close time. Only a `queued` story opens, and opening
+  sets it to `open`; `admin_actions` logs who and with what words.
+- **The words:** the prompt one line of at most 200 characters, each side
+  one line of at most 40 (CHECKs, so a write from anywhere is held to them).
 
 - `story_id` uses **restrict**, not cascade. The ingest cleanup deletes stories
   older than 48 hours, and a cascade would silently delete a live debate with
   everyone's posts. Prompt 2.2's cleanup must skip stories with a discussion.
 
-- `closes_at` defaults to 48 hours after opening; the `close-discussions`
+- `closes_at` is `discussion_length` (48 hours) after opening; the `close-discussions`
   job (every 5 minutes) closes the discussion and its story after it.
   Posting and voting stop at `closes_at` by policy, whenever the job runs.
 - `post_count` is the approved posts, kept by trigger.
@@ -226,7 +243,13 @@ strikes_to_suspend, suspended). Their owner reads them and sets `read_at`.
 
 **`admins`** (Prompt 4.3): who may moderate, added by SQL;
 `private.is_admin()` checks it. **`moderation_actions`**: each approve,
-remove and strike, by whom and when.
+remove and strike, by whom and when. **`admin_actions`** (Prompt 4.6):
+each discussion opened (with its words) and each pin moved (from and to),
+by whom and when; `actor_id` and `story_id` are set null when either goes.
+
+**`private.admin_settings`** (Prompt 4.6), one row: `max_open_discussions`
+(25), `discussion_length` (48 hours) and `report_median_window` (7 days,
+for the console's median time to act). No API role can read it.
 
 **`profiles`**: cascades from `auth.users`, so deleting an account deletes the
 profile and, through it, that user's posts, votes and blocks (Prompt 4.1:
@@ -260,8 +283,9 @@ wrong place (Prompt 3.3).
 - One row per reported story: `reports`, `first_reported_at`,
   `last_reported_at`. A counter, not a log: no reporter, no text, no IP.
 - Written only through `api_report_location`, which adds one and saturates
-  rather than overflowing. Read by the service role (the admin correction
-  tool, Prompt 4.6), most-reported first.
+  rather than overflowing. The console reads it through
+  `admin_location_queue()`, most-reported first, and `fix_story_location()`
+  deletes a story's row when an admin moves its pin (Prompt 4.6).
 - `story_id` cascades: a report is about a pin and goes when the story is
   pruned.
 
@@ -313,7 +337,8 @@ so public reads never carry it.
 
 What ingest writes on `stories`:
 
-- `place_source` is `gdelt`;
+- `place_source` is `gdelt` (a new story's; an existing story keeps its
+  place once queued, or once an admin set it by hand);
 - `title_hash` is the lead write-up's 64-bit simhash;
 - `heat` is the peak score;
 - `sentiment` is GDELT's tone × 10;
