@@ -28,12 +28,12 @@ select is(
 -- A new table fails here until someone decides its row in the matrix below.
 select tables_are(
   'public',
-  array['admins', 'articles', 'blocks', 'discussion_stances', 'discussions', 'feature_flags',
-        'follows', 'ingest_runs', 'moderation_actions', 'notifications', 'posts', 'profiles',
-        'reports', 'saved_stories', 'stories', 'story_location_reports', 'story_signals', 'strikes',
-        'votes'],
+  array['admin_actions', 'admins', 'articles', 'blocks', 'discussion_stances', 'discussions',
+        'feature_flags', 'follows', 'ingest_runs', 'moderation_actions', 'notifications', 'posts',
+        'profiles', 'reports', 'saved_stories', 'stories', 'story_location_reports',
+        'story_signals', 'strikes', 'votes'],
   'public holds exactly the v1 tables, the ingest ledger, the location reports, the library, '
-  'stances, and moderation''s strikes, notifications, admins and log'
+  'stances, moderation''s strikes, notifications, admins and log, and the admin console''s log'
 );
 
 -- The private schema's tables (settings) are for definer functions only.
@@ -161,7 +161,8 @@ select is(
 -- search with the window it shares with the payload (Prompt 3.4), and the
 -- first sign-in's flow and account deletion (Prompt 4.1), and reporting a
 -- post and the admins' queue (4.3, which refuses non-admins itself), and a
--- discussion's balance (4.5, which runs as the caller).
+-- discussion's balance (4.5, which runs as the caller), and the admin
+-- console's functions (4.6, which refuse non-admins themselves).
 -- Anything else a client could call is a mistake.
 select is(
   (select coalesce(array_agg(p.proname::text order by p.proname), '{}')
@@ -170,10 +171,12 @@ select is(
     where n.nspname = 'public'
       and (has_function_privilege('anon', p.oid, 'execute')
            or has_function_privilege('authenticated', p.oid, 'execute'))),
-  array['accept_rules', 'api_nodes', 'api_outlet_stories', 'api_outlets', 'api_report_location',
-        'api_story', 'api_window', 'claim_handle', 'delete_my_account', 'discussion_balance',
-        'discussion_participants', 'handles_available', 'moderate_post', 'moderation_queue',
-        'my_profile', 'report_post'],
+  array['accept_rules', 'admin_counters', 'admin_location_queue', 'admin_story_brief',
+        'admin_story_queue', 'api_nodes', 'api_outlet_stories', 'api_outlets',
+        'api_report_location', 'api_story', 'api_window', 'claim_handle', 'delete_my_account',
+        'discussion_balance', 'discussion_participants', 'fix_story_location',
+        'handles_available', 'moderate_post', 'moderation_queue', 'my_profile',
+        'open_discussion', 'report_post'],
   'client roles can call exactly the API functions'
 );
 

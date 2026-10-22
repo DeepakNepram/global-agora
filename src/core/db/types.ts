@@ -3,6 +3,48 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      admin_actions: {
+        Row: {
+          action: string;
+          actor_id: string | null;
+          created_at: string;
+          detail: Json;
+          id: number;
+          story_id: string | null;
+        };
+        Insert: {
+          action: string;
+          actor_id?: string | null;
+          created_at?: string;
+          detail?: Json;
+          id?: never;
+          story_id?: string | null;
+        };
+        Update: {
+          action?: string;
+          actor_id?: string | null;
+          created_at?: string;
+          detail?: Json;
+          id?: never;
+          story_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'admin_actions_actor_id_fkey';
+            columns: ['actor_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'admin_actions_story_id_fkey';
+            columns: ['story_id'];
+            isOneToOne: false;
+            referencedRelation: 'stories';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       admins: {
         Row: {
           granted_at: string;
@@ -778,6 +820,51 @@ export type Database = {
     };
     Functions: {
       accept_rules: { Args: never; Returns: string };
+      admin_counters: {
+        Args: { p_day_start: string };
+        Returns: {
+          max_open: number;
+          median_action_seconds: number;
+          median_window_days: number;
+          next_close_at: string;
+          open_discussions: number;
+          posts_today: number;
+          reports_open: number;
+          reports_resolved: number;
+        }[];
+      };
+      admin_location_queue: {
+        Args: { p_limit?: number; p_seq?: number };
+        Returns: {
+          country_code: string;
+          last_reported_at: string;
+          lat: number;
+          lon: number;
+          place_name: string;
+          place_source: string;
+          published_at: string;
+          reports: number;
+          seq: number;
+          story_id: string;
+          title: string;
+        }[];
+      };
+      admin_story_brief: { Args: { p_story: string }; Returns: Json };
+      admin_story_queue: {
+        Args: { p_limit?: number };
+        Returns: {
+          country_code: string;
+          heat: number;
+          location_reports: number;
+          place_name: string;
+          published_at: string;
+          seq: number;
+          source_count: number;
+          story_id: string;
+          summary: string;
+          title: string;
+        }[];
+      };
       api_nodes: {
         Args: { p_hours: number; p_known?: string; p_limit: number };
         Returns: Json;
@@ -820,6 +907,16 @@ export type Database = {
         }[];
       };
       discussion_participants: { Args: { p_story: string }; Returns: number };
+      fix_story_location: {
+        Args: {
+          p_country_code: string;
+          p_lat: number;
+          p_lon: number;
+          p_place_name: string;
+          p_story: string;
+        };
+        Returns: number;
+      };
       handle_reserved: { Args: { p_handle: string }; Returns: boolean };
       handles_available: { Args: { p_handles: string[] }; Returns: string[] };
       ingest_apply: { Args: { p_batch: Json }; Returns: Json };
@@ -902,6 +999,20 @@ export type Database = {
           strikes: number;
           suspended_at: string;
           tier: string;
+        }[];
+      };
+      open_discussion: {
+        Args: {
+          p_prompt: string;
+          p_side_a: string;
+          p_side_b: string;
+          p_story: string;
+        };
+        Returns: {
+          closes_at: string;
+          max_open: number;
+          open_count: number;
+          story_id: string;
         }[];
       };
       record_moderation: {
