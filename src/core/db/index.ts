@@ -21,4 +21,12 @@ export {
 } from './discussion';
 export { createPostingRemote, type PostingRemoteOptions } from './posting';
 export { createAdminRemote, toQueueItem } from './moderationQueue';
+export {
+  adminErrorCode,
+  createAdminConsoleRemote,
+  toCounters,
+  toHotStory,
+  toLocationItem,
+  toSuggestion,
+} from './admin';
 export type { Database, Json, Tables, TablesInsert, TablesUpdate } from './types';
