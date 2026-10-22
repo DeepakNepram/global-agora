@@ -6,6 +6,35 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-10-22 — npm audit: patch bumps only, rolldown held at 1.2.11
+
+`npm audit` reported 9 advisories (2 moderate, 7 high), all in dev
+tooling. Each package moved to the lowest patched version, and none needed a
+major bump:
+
+- **vite** 8.3.0 to 8.3.3 (launch-editor and the dev server);
+- **vitest** 5.0.0 to 5.0.3, with `@vitest/mocker`;
+- **wrangler** 4.137.0 to 4.149.0, which brings miniflare
+  5.20261006.1-alpha, undici 7.29.1, sharp 0.35.5 and workerd 1.20261006.1;
+- **sharp** declared as `^0.35.5` (the textures script imports it);
+- **brace-expansion** 5.0.12 and **source-map-js** 1.2.2, lockfile only.
+
+**rolldown is held at 1.2.11** in the lockfile, the lowest version vite 8.3.3
+accepts (`~1.2.11`). npm would pick 1.2.15. From 1.2.14 on, rolldown moves
+modules that the entry shares with the lazy chunks (the discussion panel,
+the admin app) into chunks of their own: `format` (the stores and
+`src/ui/story/format.ts`, 12.1 KB gzip), `library` (2.1 KB) and a runtime
+(0.4 KB). The start then fetches four files, 390.4 KB in all, instead of
+one at 388.3 KB. It is the 3.3 and 3.4 lesson from the bundler's side.
+
+- **Size:** main chunk 388.27 KB gzip (+0.06), still one startup file.
+- **What it costs:** `npm update` or the next vite update will bring
+  rolldown 1.2.14 or later and the split. Before taking it, either find the
+  shared import that triggers it or group the startup chunks with
+  `build.rolldownOptions.output.codeSplitting`, then measure the cold start.
+
+---
+
 ## 2026-10-22 — Admin console: definer functions, the cap in the database, Claude over fetch
 
 Prompt 4.6 builds `/admin`: four counters, then three tabs. The hot story
