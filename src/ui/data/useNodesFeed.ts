@@ -15,7 +15,7 @@ export interface NodesFeedConfig {
 /**
  * Runs the payload feed for the app's lifetime and writes what it gets into
  * nodesStore. Checks pause while the tab is hidden and resume, with an
- * immediate check, when it is shown again.
+ * immediate check, when it is shown again or the device comes back online.
  */
 export function useNodesFeed({ baseUrl, hours, refreshSeconds }: NodesFeedConfig): void {
   useEffect(() => {
@@ -28,8 +28,8 @@ export function useNodesFeed({ baseUrl, hours, refreshSeconds }: NodesFeedConfig
         set: (callback, ms) => window.setTimeout(callback, ms),
         clear: (handle) => window.clearTimeout(handle as number),
       },
-      onUpdate: (nodes, etag) => nodesStore.getState().loaded(nodes, etag),
-      onUnchanged: (etag) => nodesStore.getState().unchanged(etag),
+      onUpdate: (nodes, etag, savedAtMs) => nodesStore.getState().loaded(nodes, etag, savedAtMs),
+      onUnchanged: (etag, savedAtMs) => nodesStore.getState().unchanged(etag, savedAtMs),
       onError: (error, failures) => {
         nodesStore.getState().failed(failures);
         console.warn('News payload check failed; retrying.', error);
@@ -40,10 +40,16 @@ export function useNodesFeed({ baseUrl, hours, refreshSeconds }: NodesFeedConfig
       if (document.visibilityState === 'visible') feed.resume();
       else feed.pause();
     };
+    // Back online: check at once rather than wait out the backoff.
+    const onOnline = (): void => {
+      if (document.visibilityState === 'visible') feed.resume();
+    };
     if (document.visibilityState !== 'visible') feed.pause();
     document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('online', onOnline);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('online', onOnline);
       feed.stop();
     };
   }, [baseUrl, hours, refreshSeconds]);

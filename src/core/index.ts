@@ -47,6 +47,7 @@ export type { MockNodeOptions, MockStack } from './mockNodes';
 export { decodeNodes, fetchNodes, nodesUrl, NodesFetchError } from './data/nodes';
 export type { FetchLike, FetchNodesOptions, FetchNodesResult } from './data/nodes';
 export { retryDelayMs, startNodesFeed } from './data/nodesFeed';
+export { newestStoryMs, newsAgeText, SAVED_AT_HEADER, savedAtFrom } from './data/saved';
 export {
   fetchStory,
   locationReportUrl,

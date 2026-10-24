@@ -6,6 +6,7 @@ import { NEWS_CATEGORIES } from '../nodeBuffer';
 import { decodeNodes, fetchNodes, nodesUrl, NodesFetchError, type FetchLike } from './nodes';
 import { dequantizeLat, dequantizeLon, PayloadError } from './payload';
 import { samplePayload } from './payload.fixture';
+import { SAVED_AT_HEADER } from './saved';
 
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -103,7 +104,24 @@ describe('fetchNodes', () => {
     const result = await fetchNodes({ baseUrl: '/api', hours: 24, fetch, etag: 'W/"1-abc"' });
     const headers = fetch.calls[0]?.[1]?.headers as Record<string, string>;
     expect(headers['if-none-match']).toBe('W/"1-abc"');
-    expect(result).toEqual({ status: 'unchanged', etag: 'W/"1-abc"' });
+    expect(result).toEqual({ status: 'unchanged', etag: 'W/"1-abc"', savedAtMs: null });
+  });
+
+  it('passes on the service worker’s mark when the news is its saved copy', async () => {
+    const date = 'Sat, 24 Oct 2026 21:00:00 GMT';
+    const saved = fakeFetch(() => {
+      const response = jsonResponse(samplePayload());
+      response.headers.set(SAVED_AT_HEADER, date);
+      return response;
+    });
+    const result = await fetchNodes({ baseUrl: '/api', hours: 24, fetch: saved });
+    expect(result.savedAtMs).toBe(Date.parse(date));
+    const fresh = await fetchNodes({
+      baseUrl: '/api',
+      hours: 24,
+      fetch: fakeFetch(() => jsonResponse(samplePayload())),
+    });
+    expect(fresh.savedAtMs).toBeNull();
   });
 
   it('skips the decode when a cache answers 200 with the same ETag', async () => {

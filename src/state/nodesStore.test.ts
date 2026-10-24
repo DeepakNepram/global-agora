@@ -32,4 +32,20 @@ describe('nodesStore', () => {
     store.getState().unchanged(null);
     expect(store.getState().failures).toBe(0);
   });
+
+  it('marks the offline copy, which does not count as checked', () => {
+    let now = 1000;
+    const store = createNodesStore(() => now);
+    const nodes = createNodeBuffer(2);
+    store.getState().loaded(nodes, 'W/"a"');
+    expect(store.getState().savedAtMs).toBeNull();
+
+    now = 9000;
+    store.getState().unchanged('W/"a"', 4000);
+    expect(store.getState()).toMatchObject({ savedAtMs: 4000, checkedAtMs: 1000 });
+
+    // The network answers again: the mark goes.
+    store.getState().unchanged('W/"a"');
+    expect(store.getState()).toMatchObject({ savedAtMs: null, checkedAtMs: 9000 });
+  });
 });

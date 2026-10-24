@@ -4,10 +4,12 @@ import { decodePermalink, type AppConfig, type AuthProvider } from '@/core';
 import type { DbConfig } from '@/core/db/config';
 
 import { useAccountSession } from './data/useAccountSession';
+import { useConnectivity } from './data/useConnectivity';
 import { useNodesFeed } from './data/useNodesFeed';
 import { useAnyModalOpen } from './focus/useModal';
 import { NewsStatus } from './NewsStatus';
 import { NewsView } from './NewsView';
+import { OfflineBanner } from './OfflineBanner';
 import { resolveQuality } from './platform/capabilities';
 import { UpdateNotice } from './UpdateNotice';
 
@@ -30,6 +32,7 @@ export function App({ config, dbConfig = null, authProviders = [] }: AppProps): 
   // Read once: the globe applies it and then clears it from the address bar.
   const [link] = useState(() => decodePermalink(window.location.search));
   useAccountSession(dbConfig);
+  useConnectivity();
   // Behind a modal (a discussion, an account sheet) the page around the news is inert.
   const modal = useAnyModalOpen();
   useNodesFeed({
@@ -48,11 +51,14 @@ export function App({ config, dbConfig = null, authProviders = [] }: AppProps): 
         Skip to the news
       </a>
 
-      <header inert={modal} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-6 py-4">
-        <h1 className="text-lg font-semibold tracking-tight">Global Agora</h1>
-        <p className="text-sm text-muted">Preview. Pins are news stories from GDELT.</p>
-        <NewsStatus />
-        <UpdateNotice />
+      <header inert={modal}>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-6 py-4">
+          <h1 className="text-lg font-semibold tracking-tight">Global Agora</h1>
+          <p className="text-sm text-muted">Preview. Pins are news stories from GDELT.</p>
+          <NewsStatus />
+          <UpdateNotice />
+        </div>
+        <OfflineBanner />
       </header>
 
       <main id="globe" tabIndex={-1} aria-label="News" className="relative min-h-0 flex-1">

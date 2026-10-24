@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'rea
 import type { DiscussionPost, VoteKind } from '@/core/discussion';
 import type { ReportReason } from '@/core/moderation';
 import type { PostingErrorCode, PostKind, PostStance } from '@/core/posting';
-import { accountStore, useAccountStore, useDiscussionStage } from '@/state';
+import { accountStore, useAccountStore, useConnectivityStore, useDiscussionStage } from '@/state';
 import { useDiscussionRoom } from '@/state/discussionRoom';
 
 import { nextAnnouncement } from '../announce';
@@ -29,6 +29,7 @@ export interface DiscussionPanelProps {
 }
 
 const SUSPENDED = 'Posting, voting and taking sides are suspended on this account.';
+const OFFLINE = 'You’re offline. Posting, voting and taking sides resume when you’re back online.';
 const NO_VOTES: readonly VoteKind[] = [];
 
 /**
@@ -51,6 +52,7 @@ export function DiscussionPanel({
   const shown = useShownAfterSettling(settled);
   const signedIn = useAccountStore((account) => account.status === 'signed-in');
   const suspended = useAccountStore((account) => account.profile?.suspendedAtMs != null);
+  const online = useConnectivityStore((connectivity) => connectivity.online);
   const nowMs = useMinuteClock();
   const scroller = useRef<HTMLDivElement>(null);
   const firstSide = useRef<HTMLInputElement>(null);
@@ -136,7 +138,13 @@ export function DiscussionPanel({
   }, [state.mine, state.posts]);
 
   const closed = info !== null && (info.state === 'closed' || info.closesAtMs <= nowMs);
-  const blocked = closed ? 'This discussion has closed.' : suspended ? SUSPENDED : null;
+  const blocked = closed
+    ? 'This discussion has closed.'
+    : !online
+      ? OFFLINE
+      : suspended
+        ? SUSPENDED
+        : null;
 
   return (
     <div

@@ -1,7 +1,13 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type JSX } from 'react';
 
 import type { AuthProvider, OAuthProvider } from '@/core';
-import { accountStore, getAccountController, useAccountStore, wallClockNow } from '@/state';
+import {
+  accountStore,
+  getAccountController,
+  useAccountStore,
+  useConnectivityStore,
+  wallClockNow,
+} from '@/state';
 
 import { ModalSheet } from '../sheets/ModalSheet';
 import { accountButtonElement } from './accountFocus';
@@ -58,6 +64,7 @@ export function SignInSheet({ providers, reducedMotion }: SignInSheetProps): JSX
   const notice = useAccountStore((state) => state.notice);
   const busy = useAccountStore((state) => state.busy);
   const reason = useAccountStore((state) => state.reason);
+  const online = useConnectivityStore((state) => state.online);
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const heading = useRef<HTMLHeadingElement>(null);
@@ -107,6 +114,9 @@ export function SignInSheet({ providers, reducedMotion }: SignInSheetProps): JSX
         {sentTo === null ? 'Sign in to Global Agora' : 'Check your email'}
       </h2>
 
+      {!online && (
+        <p className="text-sm text-ink">You’re offline. Signing in needs a connection.</p>
+      )}
       {sentTo === null ? (
         <>
           <p className={BODY}>{reason ?? WHY}</p>

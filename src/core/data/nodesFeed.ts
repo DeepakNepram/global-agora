@@ -14,8 +14,9 @@ import { fetchNodes, type FetchLike } from './nodes';
  */
 
 export interface NodesFeedCallbacks {
-  onUpdate(nodes: NodeBuffer, etag: string | null): void;
-  onUnchanged(etag: string | null): void;
+  /** `savedAtMs`: set when the news is the offline copy (src/core/data/saved.ts), else null. */
+  onUpdate(nodes: NodeBuffer, etag: string | null, savedAtMs: number | null): void;
+  onUnchanged(etag: string | null, savedAtMs: number | null): void;
   /** `failures` counts consecutive failed checks, from 1. */
   onError(error: unknown, failures: number): void;
 }
@@ -83,8 +84,9 @@ export function startNodesFeed(options: NodesFeedOptions): NodesFeed {
       if (stopped) return;
       failures = 0;
       etag = result.etag;
-      if (result.status === 'updated') options.onUpdate(result.nodes, result.etag);
-      else options.onUnchanged(result.etag);
+      if (result.status === 'updated')
+        options.onUpdate(result.nodes, result.etag, result.savedAtMs);
+      else options.onUnchanged(result.etag, result.savedAtMs);
       schedule(options.refreshMs);
     } catch (error) {
       if (stopped) return;

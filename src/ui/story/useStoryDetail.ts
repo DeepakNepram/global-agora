@@ -78,6 +78,15 @@ export function useStoryDetail(baseUrl: string, id: number | null, enabled: bool
     };
   }, [baseUrl, id, enabled, attempt]);
 
+  // Coming back online retries a story that failed to load, without a click.
+  const failed = loaded?.id === id && loaded.attempt === attempt && loaded.failure === 'error';
+  useEffect(() => {
+    if (!failed) return;
+    const retry = (): void => setAttempt((n) => n + 1);
+    window.addEventListener('online', retry);
+    return () => window.removeEventListener('online', retry);
+  }, [failed]);
+
   if (id === null || !enabled) return { status: 'idle' };
   if (loaded?.id === id && loaded.attempt === attempt) {
     if (loaded.detail) return { status: 'ready', detail: loaded.detail };

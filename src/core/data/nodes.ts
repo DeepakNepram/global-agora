@@ -1,6 +1,7 @@
 import { NEWS_CATEGORIES, createNodeBuffer, type NodeBuffer } from '../nodeBuffer';
 
 import { COORD_SCALE, parseNodesPayload, type NodesPayload } from './payload';
+import { savedAtFrom } from './saved';
 
 /**
  * Loads the globe's stories from GET /api/nodes and decodes them straight into
@@ -24,9 +25,19 @@ export interface FetchNodesOptions {
   readonly etag?: string | null;
 }
 
+/** `savedAtMs` is set when the reply is the service worker's saved copy, the network having failed. */
 export type FetchNodesResult =
-  | { readonly status: 'unchanged'; readonly etag: string | null }
-  | { readonly status: 'updated'; readonly etag: string | null; readonly nodes: NodeBuffer };
+  | {
+      readonly status: 'unchanged';
+      readonly etag: string | null;
+      readonly savedAtMs: number | null;
+    }
+  | {
+      readonly status: 'updated';
+      readonly etag: string | null;
+      readonly savedAtMs: number | null;
+      readonly nodes: NodeBuffer;
+    };
 
 export class NodesFetchError extends Error {
   override readonly name = 'NodesFetchError';
@@ -114,11 +125,14 @@ export async function fetchNodes(options: FetchNodesOptions): Promise<FetchNodes
   }
 
   const etag = response.headers.get('etag');
-  if (response.status === 304) return { status: 'unchanged', etag: etag ?? options.etag ?? null };
+  const savedAtMs = savedAtFrom(response.headers);
+  if (response.status === 304) {
+    return { status: 'unchanged', etag: etag ?? options.etag ?? null, savedAtMs };
+  }
   if (!response.ok) throw new NodesFetchError(`HTTP ${response.status}`, response.status);
   // A cache in between may answer 200 with the same bytes; skip the decode.
-  if (etag !== null && etag === options.etag) return { status: 'unchanged', etag };
+  if (etag !== null && etag === options.etag) return { status: 'unchanged', etag, savedAtMs };
 
   const payload = parseNodesPayload(await response.json());
-  return { status: 'updated', etag, nodes: decodeNodes(payload) };
+  return { status: 'updated', etag, savedAtMs, nodes: decodeNodes(payload) };
 }

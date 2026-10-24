@@ -41,9 +41,16 @@ export interface DiscussCopy {
 
 /**
  * The Discuss button is never hidden: open, it says how many are taking part
- * once that is known; otherwise it stays, greyed, saying why.
+ * once that is known; otherwise it stays, greyed, saying why. A discussion is
+ * live, so offline it waits for the connection (Prompt 5.2).
  */
-export function discussCopy(state: DiscussionState, participants: number | null): DiscussCopy {
+export function discussCopy(
+  state: DiscussionState,
+  participants: number | null,
+  online = true,
+): DiscussCopy {
+  if (state === 'open' && !online)
+    return { enabled: false, label: 'Discussion needs a connection' };
   if (state === 'open') {
     return {
       enabled: true,

@@ -23,6 +23,13 @@ export {
   type NodesStore,
 } from './nodesStore';
 export {
+  connectivityStore,
+  createConnectivityStore,
+  useConnectivityStore,
+  type ConnectivityState,
+  type ConnectivityStore,
+} from './connectivityStore';
+export {
   createStoryStore,
   ringedStory,
   storyStore,

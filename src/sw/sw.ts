@@ -2,19 +2,31 @@
  * The service worker (Prompt 5.2): an offline shell, and the files it needs.
  * Which request gets which treatment is decided in routes.ts; this file only
  * carries it out. Bundled on its own into dist/sw.js after the app build
- * (scripts/vite/serviceWorker.ts), which fills in the two constants below.
+ * (scripts/vite/serviceWorker.ts), which fills in the constants below.
  *
  * Updates: a new build installs beside the old one and waits. The page offers
  * "Reload" (src/ui/platform/serviceWorker.ts), which posts `skip-waiting`; so
  * a reader is never switched to new code in the middle of a session.
  */
 
-import { precacheUrl, routeFor, shellCacheName, SHELL_CACHE_PREFIX, STATIC_CACHE } from './routes';
+import { SAVED_AT_HEADER } from '../core/data/saved';
+
+import {
+  precacheUrl,
+  resolveApiBase,
+  routeFor,
+  shellCacheName,
+  SHELL_CACHE_PREFIX,
+  STATIC_CACHE,
+  type RouteContext,
+} from './routes';
 
 /** This build's shell files, relative to the site root (scripts/vite/serviceWorker.ts). */
 declare const __AGORA_PRECACHE__: readonly string[];
 /** A hash of those files' names: changes with any of them. */
 declare const __AGORA_VERSION__: string;
+/** The build's AppConfig.apiBaseUrl (VITE_API_BASE_URL, else "/api"). */
+declare const __AGORA_API_BASE__: string;
 
 /**
  * The slice of ServiceWorkerGlobalScope used here, declared locally: the
@@ -41,7 +53,11 @@ interface SwScope {
 
 const scope = self as unknown as SwScope;
 const SHELL = shellCacheName(__AGORA_VERSION__);
-const PRECACHED = new Set(__AGORA_PRECACHE__.map(precacheUrl));
+const CONTEXT: RouteContext = {
+  origin: scope.location.origin,
+  apiBase: resolveApiBase(__AGORA_API_BASE__, scope.location.origin),
+  precached: new Set(__AGORA_PRECACHE__.map(precacheUrl)),
+};
 
 scope.addEventListener('install', (event) => {
   // `reload` skips the HTTP cache, so an install never keeps a stale copy.
@@ -49,7 +65,7 @@ scope.addEventListener('install', (event) => {
     caches
       .open(SHELL)
       .then((cache) =>
-        cache.addAll([...PRECACHED].map((url) => new Request(url, { cache: 'reload' }))),
+        cache.addAll([...CONTEXT.precached].map((url) => new Request(url, { cache: 'reload' }))),
       ),
   );
 });
@@ -114,9 +130,66 @@ async function staleWhileRevalidate(request: Request, event: SwFetchEvent): Prom
   return fresh;
 }
 
+/**
+ * The copy kept for offline: the same body, marked as saved. Its value is the
+ * reply's own Date header, so the worker never reads a clock; the body is
+ * already decoded, so the encoding headers go.
+ */
+async function savedCopy(response: Response): Promise<Response> {
+  const headers = new Headers(response.headers);
+  headers.delete('content-encoding');
+  headers.delete('content-length');
+  headers.set(SAVED_AT_HEADER, response.headers.get('date') ?? 'unknown');
+  return new Response(await response.arrayBuffer(), { status: 200, headers });
+}
+
+async function save(
+  cacheName: string,
+  key: string,
+  response: Response,
+  limit: number | null,
+): Promise<void> {
+  const cache = await caches.open(cacheName);
+  await cache.put(key, await savedCopy(response));
+  if (limit === null) return;
+  // Oldest first: a put moves its key to the end.
+  const keys = await cache.keys();
+  await Promise.all(keys.slice(0, Math.max(0, keys.length - limit)).map((k) => cache.delete(k)));
+}
+
+async function networkThenSaved(
+  request: Request,
+  event: SwFetchEvent,
+  cacheName: string,
+  limit: number | null,
+): Promise<Response> {
+  // By URL alone: the feed's If-None-Match must not make a saved copy miss.
+  const key = request.url;
+  let response: Response;
+  try {
+    response = await fetch(request);
+  } catch (error) {
+    const saved = await caches.match(key, { cacheName, ignoreVary: true });
+    if (saved) return saved;
+    throw error;
+  }
+  if (response.status === 200) {
+    event.waitUntil(save(cacheName, key, response.clone(), limit).catch(() => undefined));
+  } else if (response.status === 404) {
+    // A story that has gone is gone offline too.
+    event.waitUntil(
+      caches
+        .open(cacheName)
+        .then((cache) => cache.delete(key))
+        .catch(() => undefined),
+    );
+  }
+  return response;
+}
+
 scope.addEventListener('fetch', (event) => {
   const { request } = event;
-  const route = routeFor(request, scope.location.origin, PRECACHED);
+  const route = routeFor(request, CONTEXT);
   switch (route.kind) {
     case 'precached':
     case 'immutable':
@@ -127,6 +200,9 @@ scope.addEventListener('fetch', (event) => {
       break;
     case 'static':
       event.respondWith(staleWhileRevalidate(request, event));
+      break;
+    case 'saved':
+      event.respondWith(networkThenSaved(request, event, route.cache, route.limit));
       break;
     case 'pass':
       break;

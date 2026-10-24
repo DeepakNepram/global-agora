@@ -37,5 +37,9 @@ describe('story copy', () => {
     });
     expect(discussCopy('none', null).label).toBe('Discussion not open yet');
     expect(discussCopy('closed', 40)).toEqual({ enabled: false, label: 'Discussion closed' });
+    expect(discussCopy('open', 12, false)).toEqual({
+      enabled: false,
+      label: 'Discussion needs a connection',
+    });
   });
 });

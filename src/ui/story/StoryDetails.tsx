@@ -7,6 +7,7 @@ import {
   type NodeBuffer,
   type StoryDetail,
 } from '@/core';
+import { useConnectivityStore } from '@/state';
 
 import { FollowRow } from './FollowRow';
 import { formatAgo, formatKm } from './format';
@@ -173,20 +174,27 @@ function Nearby(props: Omit<StoryDetailsProps, 'detail' | 'report' | 'onReport'>
  */
 export function StoryDetails(props: StoryDetailsProps): JSX.Element {
   const { detail, nodes, row } = props;
+  const online = useConnectivityStore((state) => state.online);
   return (
     <div className="mt-5 flex flex-col gap-5">
       {nodes && row >= 0 && (
         <FollowRow nodes={nodes} row={row} expanded={props.expanded} announce={props.announce} />
       )}
       {detail.status === 'loading' && <p className="text-sm text-muted">Loading the coverage…</p>}
-      {detail.status === 'error' && (
-        <p className="text-sm text-muted">
-          The coverage could not load.{' '}
-          <button type="button" className={LINK_BUTTON} onClick={detail.retry}>
-            Retry
-          </button>
-        </p>
-      )}
+      {detail.status === 'error' &&
+        (online ? (
+          <p className="text-sm text-muted">
+            The coverage could not load.{' '}
+            <button type="button" className={LINK_BUTTON} onClick={detail.retry}>
+              Retry
+            </button>
+          </p>
+        ) : (
+          <p className="text-sm text-muted">
+            You’re offline, and this story’s coverage wasn’t saved for offline reading. It will load
+            when you’re back online.
+          </p>
+        ))}
       {detail.status === 'ready' && (
         <>
           {detail.detail.summary && (

@@ -24,6 +24,7 @@ const NOT_PRECACHED = new Set(['AdminApp', 'admin', 'db', 'GlobeDevTools', 'sent
 export function serviceWorker(): Plugin {
   let root = '.';
   let outDir = 'dist';
+  let apiBase = '/api';
   let precache: string[] = [];
 
   return {
@@ -32,6 +33,8 @@ export function serviceWorker(): Plugin {
     configResolved(config) {
       root = config.root;
       outDir = resolve(config.root, config.build.outDir);
+      // The same fallback as src/core/config.ts's FREE_TIER_DEFAULTS.apiBaseUrl.
+      apiBase = config.env['VITE_API_BASE_URL']?.trim() || '/api';
     },
     // writeBundle, not generateBundle: index.html is only in the bundle by then.
     writeBundle(_options, bundle) {
@@ -52,6 +55,7 @@ export function serviceWorker(): Plugin {
         define: {
           __AGORA_PRECACHE__: JSON.stringify(precache),
           __AGORA_VERSION__: JSON.stringify(version),
+          __AGORA_API_BASE__: JSON.stringify(apiBase),
         },
         build: {
           outDir,

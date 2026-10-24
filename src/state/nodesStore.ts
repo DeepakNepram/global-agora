@@ -23,8 +23,14 @@ export interface NodesState {
   readonly failures: number;
   /** When the payload was last confirmed current (epoch ms), or null before the first. */
   readonly checkedAtMs: number | null;
-  loaded(nodes: NodeBuffer, etag: string | null): void;
-  unchanged(etag: string | null): void;
+  /**
+   * Set while the stories are the offline copy the service worker saved
+   * (src/core/data/saved.ts): when it was saved, epoch ms. Null when they
+   * came from the network.
+   */
+  readonly savedAtMs: number | null;
+  loaded(nodes: NodeBuffer, etag: string | null, savedAtMs?: number | null): void;
+  unchanged(etag: string | null, savedAtMs?: number | null): void;
   failed(failures: number): void;
 }
 
@@ -38,13 +44,28 @@ export function createNodesStore(now: () => number = wallClockNow): NodesStore {
     etag: null,
     failures: 0,
     checkedAtMs: null,
+    savedAtMs: null,
 
-    loaded(nodes, etag) {
-      set({ nodes, etag, status: 'ready', failures: 0, checkedAtMs: now() });
+    // A saved copy is not a confirmation that the news is current.
+    loaded(nodes, etag, savedAtMs = null) {
+      set({
+        nodes,
+        etag,
+        savedAtMs,
+        status: 'ready',
+        failures: 0,
+        ...(savedAtMs === null ? { checkedAtMs: now() } : {}),
+      });
     },
 
-    unchanged(etag) {
-      set({ etag, status: 'ready', failures: 0, checkedAtMs: now() });
+    unchanged(etag, savedAtMs = null) {
+      set({
+        etag,
+        savedAtMs,
+        status: 'ready',
+        failures: 0,
+        ...(savedAtMs === null ? { checkedAtMs: now() } : {}),
+      });
     },
 
     failed(failures) {

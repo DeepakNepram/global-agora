@@ -1,5 +1,7 @@
 import type { JSX } from 'react';
 
+import { useConnectivityStore } from '@/state';
+
 import { CategoryLabel } from '../category/CategoryMark';
 import { discussCopy, formatAgo, sourcesText } from './format';
 import type { StorySummary } from './storySummary';
@@ -83,6 +85,7 @@ function BookmarkIcon({ filled }: { filled: boolean }): JSX.Element {
  */
 export function PeekCard(props: PeekCardProps): JSX.Element {
   const { summary, gone, loading, nowMs, headlineId, saved, share } = props;
+  const online = useConnectivityStore((state) => state.online);
 
   // One heading element whatever the state, so the focus the sheet gives it
   // on opening survives the story loading in.
@@ -97,7 +100,7 @@ export function PeekCard(props: PeekCardProps): JSX.Element {
   );
   if (!summary) return <div className="flex flex-col gap-1.5">{heading}</div>;
 
-  const discuss = discussCopy(summary.discussion, summary.participants);
+  const discuss = discussCopy(summary.discussion, summary.participants, online);
   const meta = [summary.outlet, formatAgo(summary.publishedAtMs, nowMs), summary.place].filter(
     (part): part is string => part !== null && part !== '',
   );
