@@ -1,14 +1,8 @@
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 
+import type { AuthProvider, Permalink, QualityTier } from '@/core';
+import { renderSettingsForTier, type OrbitGlobeControls } from '@/globe';
 import {
-  CONTEXT_RESTORE_WAIT_MS,
-  type AuthProvider,
-  type Permalink,
-  type QualityTier,
-} from '@/core';
-import { renderSettingsForTier, type CameraPose, type OrbitGlobeControls } from '@/globe';
-import {
-  globeHealthStore,
   useAccountStore,
   useDiscussionStage,
   useGlobeHealth,
@@ -16,7 +10,6 @@ import {
   useStoryStore,
   useViewStore,
   viewStore,
-  wallClockNow,
 } from '@/state';
 
 import { FlatMap } from './flatmap/FlatMap';
@@ -25,6 +18,7 @@ import { useModalSheetOpen } from './focus/useModal';
 import { createPresentLog } from './globe/bloomReport';
 import { createFrameProbe } from './globe/frameProbe';
 import { GlobeErrorBoundary } from './globe/GlobeErrorBoundary';
+import { useGlobeRecovery } from './globe/useGlobeRecovery';
 import { LazyGlobeDevTools } from './globe/LazyGlobeDevTools';
 import { createPinPicker } from './globe/pinPicker';
 import { useDevSettings } from './globe/useDevSettings';
@@ -36,9 +30,10 @@ import { GlobeCanvas } from './GlobeCanvas';
 import { GlobeLayers } from './GlobeLayers';
 import { StoryList } from './list/StoryList';
 import type { ViewCamera, ViewTarget } from './nav/viewNavigation';
+import { useNewsProblem } from './data/useNewsProblem';
+import { NewsProblem } from './NewsProblem';
 import { useOnboardingTrigger } from './onboarding/useOnboardingTrigger';
 import { useTimeDriving } from './scrubber/timeDriving';
-import { reportWarning } from './platform/errorReporting';
 import { useOpenPermalink } from './story/permalinkLink';
 
 export interface NewsViewProps {
@@ -79,8 +74,6 @@ export function NewsView(props: NewsViewProps): JSX.Element {
   const motion = reducedMotionPreferred && !dev.fullMotion ? 'reduced' : 'full';
   const layout = useViewStore((state) => state.layout);
   const globeFallback = useGlobeHealth((state) => state.fallback);
-  const generation = useGlobeHealth((state) => state.generation);
-  const restoring = useGlobeHealth((state) => state.restoring);
   // Under reduced motion the globe is a flat map: no flights, no inertia, no
   // pulse. So it is without WebGL, or once the globe has failed (Prompt 5.2).
   const visual: 'globe' | 'map' =
@@ -104,6 +97,7 @@ export function NewsView(props: NewsViewProps): JSX.Element {
   const accountOpen = useAccountStore((state) => state.sheet !== null);
   const inDiscussion = useDiscussionStage((state) => state.phase !== 'closed');
   const covered = useModalSheetOpen();
+  const problem = useNewsProblem();
   useOnboardingTrigger(sheetOpen || accountOpen || inDiscussion);
   const target = useMemo(
     (): ViewTarget => ({
@@ -125,27 +119,7 @@ export function NewsView(props: NewsViewProps): JSX.Element {
     fly(camera);
   }, [camera]);
 
-  // A lost WebGL context: a new canvas takes over where the camera was,
-  // when the browser says it is back or after a short wait (Prompt 5.2).
-  const resumePose = useRef<CameraPose | null>(null);
-  const onContextLost = useCallback(() => {
-    resumePose.current = controls?.getState() ?? null;
-    globeHealthStore.getState().contextLost(wallClockNow());
-    const { lossesMs, fallback } = globeHealthStore.getState();
-    const losses = String(lossesMs.length);
-    reportWarning(
-      `WebGL context lost (${losses} in 10 min)`,
-      { tier, losses },
-      'webgl-context-lost',
-    );
-    if (fallback === 'lost') reportWarning('The globe gave way to the flat map', { tier });
-  }, [controls, tier]);
-  const onContextRestored = useCallback(() => globeHealthStore.getState().remount(), []);
-  useEffect(() => {
-    if (!restoring) return;
-    const timer = window.setTimeout(onContextRestored, CONTEXT_RESTORE_WAIT_MS);
-    return () => window.clearTimeout(timer);
-  }, [restoring, onContextRestored]);
+  const recovery = useGlobeRecovery(controls, tier);
 
   useLiveClock();
   useOpenPermalink(link, historyWindowHours);
@@ -167,7 +141,7 @@ export function NewsView(props: NewsViewProps): JSX.Element {
       {used.globe && visual === 'globe' && (
         <GlobeErrorBoundary>
           <GlobeCanvas
-            key={generation}
+            key={recovery.generation}
             tier={tier}
             settings={settings}
             dev={dev}
@@ -177,10 +151,10 @@ export function NewsView(props: NewsViewProps): JSX.Element {
             input={selection.input}
             message={selection.message}
             focused={selection.focused}
-            initialPose={resumePose.current ?? link.camera}
-            onContextLost={onContextLost}
-            onContextRestored={onContextRestored}
-            restoring={restoring}
+            initialPose={recovery.resumePose.current ?? link.camera}
+            onContextLost={recovery.onContextLost}
+            onContextRestored={recovery.onContextRestored}
+            restoring={recovery.restoring}
             historyHours={historyWindowHours}
             controls={controls}
             onControls={setControls}
@@ -205,6 +179,17 @@ export function NewsView(props: NewsViewProps): JSX.Element {
           paused={view !== 'map'}
           covered={covered}
         />
+      )}
+
+      {problem !== null && view !== 'list' && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
+          <div
+            data-testid="news-problem"
+            className="pointer-events-auto max-w-sm rounded-2xl border border-edge bg-panel/95 p-5"
+          >
+            <NewsProblem kind={problem} />
+          </div>
+        </div>
       )}
 
       {/* In the main chunk on purpose: as a lazy chunk, the bundler split React,

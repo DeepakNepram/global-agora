@@ -9,14 +9,16 @@ import {
   useStoryStore,
   useTimeStore,
   useViewStore,
-  viewStore,
   wallClockNow,
 } from '@/state';
 
 import { revealIn, setViewFocus } from '../focus/viewFocus';
 import { plural } from '../nav/searchOptions';
+import { useNewsProblem } from '../data/useNewsProblem';
+import { NewsProblem } from '../NewsProblem';
 import { formatTimeLabel } from '../scrubber/timeLabel';
 import { StoryListRow } from './StoryListRow';
+import { StorySortSwitch } from './StorySortSwitch';
 
 export interface StoryListProps {
   /** The stories the globe draws; null until the first payload. */
@@ -29,9 +31,6 @@ const MINUTE_MS = 60_000;
 /** The story sheet's spring settles within this (sheetSpring.ts). */
 const SHEET_SETTLE_MS = 360;
 
-const SORT =
-  'flex h-8 cursor-pointer items-center rounded-full px-3 text-xs font-medium text-ink ' +
-  'has-[:checked]:bg-white/10 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent';
 const TEXT_BUTTON =
   'rounded-full px-3 py-1.5 text-sm font-medium text-accent hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
 
@@ -53,6 +52,7 @@ export function StoryList({ nodes, covered }: StoryListProps): JSX.Element {
   const sort = useViewStore((state) => state.sort);
   const selectedId = useStoryStore((state) => state.selectedId);
   const sheetOpen = useStoryStore((state) => state.sheet !== 'closed');
+  const problem = useNewsProblem();
   // What decides the rows: a story published, or aging out of the window. Play
   // moves the time every frame, and the list redraws only when this changes.
   const key = useTimeStore((state) => listKey(nodes, state.timeMs / 1000, filter));
@@ -175,27 +175,7 @@ export function StoryList({ nodes, covered }: StoryListProps): JSX.Element {
                 : `${plural(rows.length, 'story', 'stories')}, ${when}`}
             </p>
           </div>
-          <fieldset className="flex gap-0.5 rounded-full border border-ink/20 p-0.5">
-            <legend className="sr-only">Order</legend>
-            {(
-              [
-                ['newest', 'Newest'],
-                ['covered', 'Most covered'],
-              ] as const
-            ).map(([value, label]) => (
-              <label key={value} className={SORT}>
-                <input
-                  type="radio"
-                  name={`${headingId}-sort`}
-                  value={value}
-                  checked={sort === value}
-                  onChange={() => viewStore.getState().setSort(value)}
-                  className="sr-only"
-                />
-                {label}
-              </label>
-            ))}
-          </fieldset>
+          <StorySortSwitch name={`${headingId}-sort`} />
         </div>
 
         {left > 0 && isFilterActive(filter) && (
@@ -211,10 +191,17 @@ export function StoryList({ nodes, covered }: StoryListProps): JSX.Element {
           </p>
         )}
 
-        {nodes !== null && rows.length === 0 && (
-          <p className="px-1 text-sm text-muted">
-            {isFilterActive(filter) ? 'No stories match the filters.' : 'No stories by this time.'}
-          </p>
+        {problem !== null ? (
+          <NewsProblem kind={problem} />
+        ) : (
+          nodes !== null &&
+          rows.length === 0 && (
+            <p className="px-1 text-sm text-muted">
+              {isFilterActive(filter)
+                ? 'No stories match the filters.'
+                : 'No stories by this time.'}
+            </p>
+          )
         )}
 
         <ul ref={list} aria-labelledby={headingId} className="flex flex-col gap-1">

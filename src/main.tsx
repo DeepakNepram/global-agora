@@ -52,14 +52,22 @@ registerServiceWorker();
 if (path === '/admin' || path.startsWith('/admin/')) {
   // The admin pages (Prompt 4.3, 4.6) in their own chunk, instead of the globe:
   // a reader's start never pays for them.
-  void import('./ui/admin/AdminApp').then(({ AdminApp }) =>
-    root.render(
-      <StrictMode>
-        <AppErrorBoundary>
-          <AdminApp dbConfig={dbConfig} />
-        </AppErrorBoundary>
-      </StrictMode>,
-    ),
+  import('./ui/admin/AdminApp').then(
+    ({ AdminApp }) =>
+      root.render(
+        <StrictMode>
+          <AppErrorBoundary>
+            <AdminApp dbConfig={dbConfig} />
+          </AppErrorBoundary>
+        </StrictMode>,
+      ),
+    // Offline, or a deploy replaced the chunk under an old page.
+    () =>
+      root.render(
+        <p className="p-6 text-sm text-ink">
+          The admin console could not load. Check the connection, then reload.
+        </p>,
+      ),
   );
 } else {
   root.render(

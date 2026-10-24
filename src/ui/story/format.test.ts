@@ -36,7 +36,11 @@ describe('story copy', () => {
       label: 'Discussion not open yet',
     });
     expect(discussCopy('none', null).label).toBe('Discussion not open yet');
-    expect(discussCopy('closed', 40)).toEqual({ enabled: false, label: 'Discussion closed' });
+    expect(discussCopy('closed', 40)).toEqual({
+      enabled: true,
+      label: 'Read the closed discussion',
+    });
+    expect(discussCopy('closed', 40, false).enabled).toBe(false);
     expect(discussCopy('open', 12, false)).toEqual({
       enabled: false,
       label: 'Discussion needs a connection',

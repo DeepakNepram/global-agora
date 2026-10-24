@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
 
-import { useConnectivityStore } from '@/state';
+import { storyStore, useConnectivityStore } from '@/state';
 
 import { CategoryLabel } from '../category/CategoryMark';
 import { discussCopy, formatAgo, sourcesText } from './format';
@@ -98,7 +98,22 @@ export function PeekCard(props: PeekCardProps): JSX.Element {
       {summary ? summary.headline : gone ? 'This story is no longer available.' : 'Loading story…'}
     </h2>
   );
-  if (!summary) return <div className="flex flex-col gap-1.5">{heading}</div>;
+  if (!summary) {
+    return (
+      <div className="flex flex-col items-start gap-1.5">
+        {heading}
+        {gone && (
+          <button
+            type="button"
+            className={`${ACTION} mt-2 border-ink/25 text-ink hover:bg-white/10`}
+            onClick={() => storyStore.getState().close()}
+          >
+            Back to the news
+          </button>
+        )}
+      </div>
+    );
+  }
 
   const discuss = discussCopy(summary.discussion, summary.participants, online);
   const meta = [summary.outlet, formatAgo(summary.publishedAtMs, nowMs), summary.place].filter(

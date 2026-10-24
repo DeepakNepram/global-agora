@@ -2,7 +2,7 @@ import type { Page, Route } from '@playwright/test';
 
 import type { Database } from '@/core/db/types';
 
-import { OPEN_DISCUSSION_UUID, stories } from './news';
+import { CLOSED_DISCUSSION_UUID, OPEN_DISCUSSION_UUID, stories } from './news';
 
 /**
  * A stand-in for Supabase (auth, PostgREST, Edge Functions, Realtime), so
@@ -100,6 +100,14 @@ const DISCUSSION = {
   post_count: 4,
 };
 
+const CLOSED_DISCUSSION = {
+  ...DISCUSSION,
+  story_id: CLOSED_DISCUSSION_UUID,
+  prompt: 'Was the harbour toll worth it?',
+  state: 'closed',
+  closes_at: new Date(Date.now() - 3600 * 1000).toISOString(),
+};
+
 function posts(): Record<string, unknown>[] {
   const bodies: readonly [string, string, string][] = [
     ['a', 'argument', 'Commuters on the north shore lose an hour a day; a ferry fixes that.'],
@@ -126,10 +134,12 @@ function posts(): Record<string, unknown>[] {
 }
 
 /** GET rows of a table, as PostgREST answers. */
-function table(name: string, persona: Persona): unknown[] {
+function table(name: string, persona: Persona, query: URLSearchParams): unknown[] {
   switch (name) {
     case 'discussions':
-      return [DISCUSSION];
+      return [
+        query.get('story_id') === `eq.${CLOSED_DISCUSSION_UUID}` ? CLOSED_DISCUSSION : DISCUSSION,
+      ];
     case 'posts':
       return posts();
     case 'discussion_stances':
@@ -279,7 +289,7 @@ export async function routeBackend(page: Page, origin: string, persona: Persona)
         const body: unknown = request.postDataJSON();
         return fulfilJson(route, Array.isArray(body) ? body : body ? [body] : [], 201);
       }
-      const rows = table(tableMatch[1] ?? '', persona);
+      const rows = table(tableMatch[1] ?? '', persona, url.searchParams);
       const single = (request.headers()['accept'] ?? '').includes('vnd.pgrst.object');
       return fulfilJson(route, single ? (rows[0] ?? null) : rows);
     }

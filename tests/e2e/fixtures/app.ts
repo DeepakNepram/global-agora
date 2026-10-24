@@ -4,7 +4,7 @@ import { expect, test as base, type Page } from '@playwright/test';
 import { AUTH_STORAGE_KEY } from '@/core/auth';
 
 import { GUEST, routeBackend, storedSession, type Persona } from './backend';
-import { nodesPayload, outletsIndex, storyDetail, tinyTexture } from './news';
+import { emptyNodesPayload, nodesPayload, outletsIndex, storyDetail, tinyTexture } from './news';
 
 /** Where the e2e build looks for Supabase (scripts/e2e/build.ts); only the stand-in answers. */
 export const SUPABASE_ORIGIN = 'http://supabase.e2e.test';
@@ -18,6 +18,8 @@ export interface OpenOptions {
   readonly path?: string;
   /** Leave the first-run onboarding to show itself (by default it is marked done). */
   readonly onboarding?: boolean;
+  /** What GET /api/nodes answers: the 120 stories (default), none, or 503s. */
+  readonly news?: 'stories' | 'empty' | 'failing';
 }
 
 export interface App {
@@ -65,6 +67,17 @@ function createApp(page: Page): App {
     async open(options = {}) {
       const persona = options.persona ?? GUEST;
       await routeNews(page);
+      // Registered later, so it wins over routeNews's answer.
+      if (options.news === 'empty') {
+        await page.route('**/api/nodes?*', (route) =>
+          route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify(emptyNodesPayload()),
+          }),
+        );
+      } else if (options.news === 'failing') {
+        await page.route('**/api/nodes?*', (route) => route.fulfill({ status: 503, body: '' }));
+      }
       await routeBackend(page, SUPABASE_ORIGIN, persona);
       await page.emulateMedia({
         reducedMotion: options.reducedMotion ? 'reduce' : 'no-preference',
@@ -88,7 +101,10 @@ function createApp(page: Page): App {
       }, storage);
       // The DOM is enough: what each check needs, it waits for itself.
       await page.goto(options.path ?? '/', { waitUntil: 'domcontentloaded' });
-      if (!(options.path ?? '/').startsWith('/admin')) {
+      if (
+        !(options.path ?? '/').startsWith('/admin') &&
+        (options.news ?? 'stories') === 'stories'
+      ) {
         await expect(page.getByText(/120 stories/).first()).toBeVisible({ timeout: 30_000 });
       }
     },

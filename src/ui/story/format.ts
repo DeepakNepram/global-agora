@@ -49,8 +49,9 @@ export function discussCopy(
   participants: number | null,
   online = true,
 ): DiscussCopy {
-  if (state === 'open' && !online)
+  if ((state === 'open' || state === 'closed') && !online) {
     return { enabled: false, label: 'Discussion needs a connection' };
+  }
   if (state === 'open') {
     return {
       enabled: true,
@@ -60,6 +61,6 @@ export function discussCopy(
           : `Discuss · ${participants.toLocaleString('en-US')} taking part`,
     };
   }
-  if (state === 'closed') return { enabled: false, label: 'Discussion closed' };
+  if (state === 'closed') return { enabled: true, label: 'Read the closed discussion' };
   return { enabled: false, label: 'Discussion not open yet' };
 }

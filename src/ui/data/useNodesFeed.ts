@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
-import { startNodesFeed } from '@/core';
-import { nodesStore } from '@/state';
+import { retryDelayMs, startNodesFeed, type NodesFeed } from '@/core';
+import { nodesStore, wallClockNow } from '@/state';
 
 export interface NodesFeedConfig {
   /** AppConfig.apiBaseUrl. */
@@ -10,6 +10,13 @@ export interface NodesFeedConfig {
   readonly hours: number;
   /** AppConfig.payloadRefreshSeconds. */
   readonly refreshSeconds: number;
+}
+
+let activeFeed: NodesFeed | null = null;
+
+/** "Try now" after a failed load (Prompt 5.2): checks at once instead of waiting out the backoff. */
+export function retryNewsNow(): void {
+  activeFeed?.resume();
 }
 
 /**
@@ -31,7 +38,8 @@ export function useNodesFeed({ baseUrl, hours, refreshSeconds }: NodesFeedConfig
       onUpdate: (nodes, etag, savedAtMs) => nodesStore.getState().loaded(nodes, etag, savedAtMs),
       onUnchanged: (etag, savedAtMs) => nodesStore.getState().unchanged(etag, savedAtMs),
       onError: (error, failures) => {
-        nodesStore.getState().failed(failures);
+        const retryAtMs = wallClockNow() + retryDelayMs(failures, refreshSeconds * 1000);
+        nodesStore.getState().failed(failures, retryAtMs);
         console.warn('News payload check failed; retrying.', error);
       },
     });
@@ -44,12 +52,14 @@ export function useNodesFeed({ baseUrl, hours, refreshSeconds }: NodesFeedConfig
     const onOnline = (): void => {
       if (document.visibilityState === 'visible') feed.resume();
     };
+    activeFeed = feed;
     if (document.visibilityState !== 'visible') feed.pause();
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('online', onOnline);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('online', onOnline);
+      if (activeFeed === feed) activeFeed = null;
       feed.stop();
     };
   }, [baseUrl, hours, refreshSeconds]);

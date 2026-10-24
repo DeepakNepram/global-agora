@@ -29,9 +29,11 @@ export interface NodesState {
    * came from the network.
    */
   readonly savedAtMs: number | null;
+  /** After a failed check, when the next one is due (epoch ms); null otherwise. */
+  readonly retryAtMs: number | null;
   loaded(nodes: NodeBuffer, etag: string | null, savedAtMs?: number | null): void;
   unchanged(etag: string | null, savedAtMs?: number | null): void;
-  failed(failures: number): void;
+  failed(failures: number, retryAtMs?: number | null): void;
 }
 
 export type NodesStore = StoreApi<NodesState>;
@@ -45,6 +47,7 @@ export function createNodesStore(now: () => number = wallClockNow): NodesStore {
     failures: 0,
     checkedAtMs: null,
     savedAtMs: null,
+    retryAtMs: null,
 
     // A saved copy is not a confirmation that the news is current.
     loaded(nodes, etag, savedAtMs = null) {
@@ -52,6 +55,7 @@ export function createNodesStore(now: () => number = wallClockNow): NodesStore {
         nodes,
         etag,
         savedAtMs,
+        retryAtMs: null,
         status: 'ready',
         failures: 0,
         ...(savedAtMs === null ? { checkedAtMs: now() } : {}),
@@ -62,14 +66,15 @@ export function createNodesStore(now: () => number = wallClockNow): NodesStore {
       set({
         etag,
         savedAtMs,
+        retryAtMs: null,
         status: 'ready',
         failures: 0,
         ...(savedAtMs === null ? { checkedAtMs: now() } : {}),
       });
     },
 
-    failed(failures) {
-      set({ failures, status: get().nodes === null ? 'error' : 'ready' });
+    failed(failures, retryAtMs = null) {
+      set({ failures, retryAtMs, status: get().nodes === null ? 'error' : 'ready' });
     },
   }));
 }

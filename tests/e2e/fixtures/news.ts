@@ -16,6 +16,9 @@ const COUNT = 120;
 /** Story 7's discussion is open: the checks enter it. */
 export const OPEN_DISCUSSION_SEQ = 7;
 export const OPEN_DISCUSSION_UUID = '00000000-0000-4000-8000-000000000007';
+/** Story 8's discussion has closed: it can be read, not joined (Prompt 5.2). */
+export const CLOSED_DISCUSSION_SEQ = 8;
+export const CLOSED_DISCUSSION_UUID = '00000000-0000-4000-8000-000000000008';
 
 const PLACES: readonly (readonly [string, string, number, number])[] = [
   ['London, United Kingdom', 'GB', 51.51, -0.13],
@@ -113,12 +116,32 @@ export function nodesPayload(now = nowSeconds()): NodesPayload {
   };
 }
 
+/** A payload with no stories in it: a quiet hour, or a fresh database. */
+export function emptyNodesPayload(now = nowSeconds()): NodesPayload {
+  const full = nodesPayload(now);
+  const empty = {
+    id: [],
+    lonQ: [],
+    latQ: [],
+    t: [],
+    cat: [],
+    heat: [],
+    srcN: [],
+    disc: [],
+    hl: [],
+    pl: [],
+    cc: [],
+  };
+  return { ...full, nodes: empty };
+}
+
 /** GET /api/story/:seq, as the Worker answers it (parseStory reads this). */
 export function storyDetail(seq: number, now = nowSeconds()): Record<string, unknown> | null {
   const story = stories(now).find((s) => s.seq === seq);
   if (!story) return null;
   const published = new Date(story.publishedSec * 1000).toISOString();
   const open = seq === OPEN_DISCUSSION_SEQ;
+  const closed = seq === CLOSED_DISCUSSION_SEQ;
   return {
     seq,
     id: open ? OPEN_DISCUSSION_UUID : `00000000-0000-4000-8000-${String(seq).padStart(12, '0')}`,
@@ -137,7 +160,10 @@ export function storyDetail(seq: number, now = nowSeconds()): Record<string, unk
       confidence: 70,
       country_code: story.countryCode,
     },
-    discussion: { state: open ? 'open' : 'none', participants: open ? 3 : null },
+    discussion: {
+      state: open ? 'open' : closed ? 'closed' : 'none',
+      participants: open || closed ? 3 : null,
+    },
     article_count: 2,
     articles: [
       {
