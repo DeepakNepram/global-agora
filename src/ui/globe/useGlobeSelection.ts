@@ -1,16 +1,11 @@
 import { useMemo, useState } from 'react';
 
 import { PETAL_LEVEL, type NodeBuffer } from '@/core';
-import {
-  ACTIVATE_RADIUS_CSS_PX,
-  altitudeKmForZoom,
-  fitAltitudeKm,
-  type OrbitGlobeControls,
-  type PinPick,
-} from '@/globe';
+import { ACTIVATE_RADIUS_CSS_PX, altitudeKmForZoom, fitAltitudeKm, type PinPick } from '@/globe';
 import { onboardingStore, storyStore } from '@/state';
 
 import { nextAnnouncement } from '../announce';
+import type { ViewCamera } from '../nav/viewNavigation';
 import type { GlobeInputHandlers } from './bindControlInput';
 import type { PinPicker } from './pinPicker';
 import { usePinFocus, type FocusedPin } from './usePinFocus';
@@ -34,7 +29,7 @@ export interface GlobeSelection {
 }
 
 /**
- * What a tap or a key on the globe does:
+ * What a tap or a key on the globe, or the flat map, does:
  *   - a story's pin opens its peek card, or switches the open sheet to it;
  *   - a cluster's orb flies the camera to it, two levels deeper, so it blooms;
  *   - nothing closes a peek card (a full sheet stays: it covers the globe).
@@ -44,7 +39,7 @@ export interface GlobeSelection {
  * the resting view, centred on the reader's home city when they gave one.
  */
 export function useGlobeSelection(
-  controls: OrbitGlobeControls | null,
+  controls: ViewCamera | null,
   picker: PinPicker,
   nodes: NodeBuffer | null,
 ): GlobeSelection {

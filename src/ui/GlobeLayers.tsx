@@ -19,6 +19,8 @@ export interface GlobeLayersProps {
   readonly settings: RenderSettings;
   /** Which view shows the stories: the CSS vignette and scrim stand in where the globe's composer does not. */
   readonly view: NewsViewKind;
+  /** The visual view's name on the switch: "Globe", or "Map" under reduced motion. */
+  readonly visualLabel: string;
   readonly nodes: NodeBuffer | null;
   readonly target: ViewTarget;
   /** The globe's controls while the globe is on screen, for the discussion's camera shot. */
@@ -65,7 +67,7 @@ export const GlobeLayers = memo(function GlobeLayers(props: GlobeLayersProps): J
           target={target}
           apiBaseUrl={props.apiBaseUrl}
           historyHours={historyHours}
-          leading={<ViewSwitch visualLabel="Globe" />}
+          leading={<ViewSwitch visualLabel={props.visualLabel} />}
           solid={view === 'list'}
           actions={
             <>

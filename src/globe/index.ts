@@ -27,6 +27,7 @@ export {
   MIN_ALTITUDE_KM,
   altitudeToShowKm,
   fitAltitudeKm,
+  radiansPerScreenHeight,
   type CameraPose,
 } from './camera/cameraMath';
 export { easeInOutCubic, flightDurationMs, type FlightResult } from './camera/flight';
@@ -66,13 +67,42 @@ export {
 export {
   ACTIVATE_RADIUS_CSS_PX,
   PICK_RADIUS_CSS_PX,
+  drawnTargets,
+  locateRow,
+  pickPin,
+  type PickInput,
   type PinPick,
   type PinTarget,
+  type ProjectPoint,
   type ScreenPoint,
 } from './pins/pinPick';
-export { CATEGORY_HUES, PIN_HALF_SIZE_CSS_PX } from './pins/pinStyle';
-export { BADGE_CELL_ASPECT, BADGE_GLYPHS } from './pins/badgeGlyphs';
-export { BLOOM_SETTLE_SECONDS, bloomSeconds } from './pins/bloom';
+// The pins' look, for the flat map (Prompt 5.1), which draws them in 2D.
+export {
+  BADGE_INK,
+  CATEGORY_HUES,
+  CORE_RADIUS,
+  FILTERED_ALPHA,
+  FILTERED_SCALE,
+  ORB_CORE_RADIUS,
+  ORB_RIM_DARKEN,
+  PIN_HALF_SIZE_CSS_PX,
+  SELECTION_RING_GAP_CSS_PX,
+  SELECTION_RING_WIDTH_CSS_PX,
+  colorGainFor,
+  freshnessFor,
+  orbScaleFor,
+  scaleForHeat,
+} from './pins/pinStyle';
+export {
+  ORB_MARK_CENTRE,
+  ORB_MARK_OUTLINE_CSS_PX,
+  ORB_MARK_RADIUS,
+  ORB_REACH,
+  PIN_REACH,
+} from './pins/pinShapes.glsl';
+export { groupMatches } from './pins/pinFilter';
+export { BADGE_CELL_ASPECT, BADGE_GLYPHS, badgeText } from './pins/badgeGlyphs';
+export { BLOOM_SETTLE_SECONDS, bloomSeconds, petalOffset } from './pins/bloom';
 export {
   altitudeKmAt,
   altitudeKmForZoom,

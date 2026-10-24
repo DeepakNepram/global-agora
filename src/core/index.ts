@@ -175,6 +175,17 @@ export type { OutletsIndex, OutletStories } from './data/outlets';
 export { categoryAt, isNewsCategory, CATEGORY_LABELS } from './categories';
 export { nearestFirst, stepFocus, type FocusPoint } from './pinFocusOrder';
 export { listKey, listStories, LIST_PAGE_SIZE } from './storyList';
+export {
+  clampFlat,
+  flatPanBy,
+  flatProject,
+  flatUnproject,
+  flatZoomAt,
+  minFlatScale,
+  textureSpans,
+  wrapLon,
+} from './flatMap';
+export type { FlatPoint, FlatSize, FlatView, TextureSpan } from './flatMap';
 export type { StoryListResult, StorySort } from './storyList';
 export {
   shapeDistance,

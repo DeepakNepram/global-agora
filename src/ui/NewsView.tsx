@@ -11,6 +11,8 @@ import {
   viewStore,
 } from '@/state';
 
+import { FlatMap } from './flatmap/FlatMap';
+import type { FlatControls } from './flatmap/flatCamera';
 import { createPresentLog } from './globe/bloomReport';
 import { createFrameProbe } from './globe/frameProbe';
 import { LazyGlobeDevTools } from './globe/LazyGlobeDevTools';
@@ -42,8 +44,11 @@ export interface NewsViewProps {
   readonly authProviders: readonly AuthProvider[] | null;
 }
 
-/** Which view shows the stories (Prompt 5.1). */
-export type NewsViewKind = 'globe' | 'list';
+/**
+ * Which view shows the stories (Prompt 5.1): the globe, or under reduced
+ * motion the flat map, or the list.
+ */
+export type NewsViewKind = 'globe' | 'map' | 'list';
 
 /**
  * The stories and everything over them: the view that shows them, the
@@ -59,17 +64,21 @@ export function NewsView(props: NewsViewProps): JSX.Element {
   const reducedMotionPreferred = usePrefersReducedMotion();
   const motion = reducedMotionPreferred && !dev.fullMotion ? 'reduced' : 'full';
   const layout = useViewStore((state) => state.layout);
-  const view: NewsViewKind = layout === 'list' ? 'list' : 'globe';
-  // The globe mounts the first time it is wanted: a reader who keeps to the
-  // list never pays for its textures and its GPU context.
-  const [globeUsed, setGlobeUsed] = useState(view === 'globe');
-  if (view === 'globe' && !globeUsed) setGlobeUsed(true);
+  // Under reduced motion the globe is a flat map: no flights, no inertia, no pulse.
+  const visual: 'globe' | 'map' = motion === 'reduced' ? 'map' : 'globe';
+  const view: NewsViewKind = layout === 'list' ? 'list' : visual;
+  // Each mounts the first time it is wanted: a reader who keeps to the list
+  // never pays for the globe's textures and GPU context.
+  const [used, setUsed] = useState({ globe: view === 'globe', map: view === 'map' });
+  if (layout === 'visual' && !used[visual]) setUsed({ ...used, [visual]: true });
   const [controls, setControls] = useState<OrbitGlobeControls | null>(null);
-  const camera: ViewCamera | null = view === 'list' ? null : controls;
+  const [mapCamera, setMapCamera] = useState<FlatControls | null>(null);
+  const visualCamera: ViewCamera | null = visual === 'map' ? mapCamera : controls;
+  const camera = view === 'list' ? null : visualCamera;
   const pendingFly = useRef<((camera: ViewCamera) => void) | null>(null);
   const pinNodes = usePinNodes(dev.pinSource, historyWindowHours);
   const picker = useMemo(() => createPinPicker(), []);
-  const selection = useGlobeSelection(controls, picker, pinNodes);
+  const selection = useGlobeSelection(visualCamera, picker, pinNodes);
   const storyOpen = useStoryStore((state) => state.sheet !== 'closed');
   const panelOpen = usePanelStore((state) => state.panel !== null);
   const sheetOpen = storyOpen || panelOpen;
@@ -113,7 +122,7 @@ export function NewsView(props: NewsViewProps): JSX.Element {
   return (
     // Clips what slides off the bottom edge (the scrubber stepping aside, a closed sheet).
     <div className="absolute inset-0 overflow-hidden">
-      {globeUsed && (
+      {used.globe && visual === 'globe' && (
         <GlobeCanvas
           tier={tier}
           settings={settings}
@@ -133,6 +142,20 @@ export function NewsView(props: NewsViewProps): JSX.Element {
           presentLog={presentLog}
         />
       )}
+      {used.map && visual === 'map' && (
+        <FlatMap
+          tier={tier}
+          nodes={pinNodes}
+          clustering={dev.clustering}
+          picker={picker}
+          input={selection.input}
+          message={selection.message}
+          focused={selection.focused}
+          link={link}
+          onCamera={setMapCamera}
+          paused={view !== 'map'}
+        />
+      )}
 
       {/* In the main chunk on purpose: as a lazy chunk, the bundler split React,
           zustand and the stores out of it into three startup files (DECISIONS). */}
@@ -141,6 +164,7 @@ export function NewsView(props: NewsViewProps): JSX.Element {
       <GlobeLayers
         settings={settings}
         view={view}
+        visualLabel={visual === 'map' ? 'Map' : 'Globe'}
         nodes={pinNodes}
         target={target}
         globeControls={view === 'globe' ? controls : null}
