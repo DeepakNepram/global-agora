@@ -21,7 +21,9 @@ function setWaiting(worker: ServiceWorker): void {
   for (const listener of listeners) listener();
 }
 
-function watch(registration: ServiceWorkerRegistration): void {
+/** Some browsers and test harnesses resolve register() with nothing when workers are blocked. */
+function watch(registration: ServiceWorkerRegistration | undefined): void {
+  if (!registration) return;
   // A first install has no controller: there is nothing to replace, so nothing to offer.
   if (registration.waiting && navigator.serviceWorker.controller) setWaiting(registration.waiting);
   registration.addEventListener('updatefound', () => {

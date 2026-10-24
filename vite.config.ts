@@ -1,10 +1,12 @@
 /// <reference types="vitest/config" />
+import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig, type ServerOptions } from 'vite';
+import { defineConfig, type PluginOption, type ServerOptions } from 'vite';
 
 import { devReports } from './scripts/vite/devReports.ts';
 import { serviceWorker } from './scripts/vite/serviceWorker.ts';
@@ -52,8 +54,46 @@ const apiProxy = {
   },
 };
 
+/**
+ * The release a build reports errors under (Prompt 5.2): the commit it was
+ * built from, so a report finds the matching source maps.
+ */
+function releaseName(): string {
+  try {
+    return execSync('git rev-parse --short=12 HEAD', { encoding: 'utf8' }).trim();
+  } catch {
+    return 'dev';
+  }
+}
+
+/**
+ * Uploads the source maps to Sentry, for a deploy build only: when
+ * SENTRY_AUTH_TOKEN is in the environment or in the gitignored
+ * .env.sentry-build-plugin (with SENTRY_ORG and SENTRY_PROJECT), which the
+ * plugin reads itself. Every other build, CI's included, skips it. A failed
+ * upload fails the build. The maps still ship with the app: the repository
+ * is public.
+ */
+function sourceMapUpload(release: string): PluginOption {
+  const configured =
+    process.env['SENTRY_AUTH_TOKEN'] !== undefined || existsSync('.env.sentry-build-plugin');
+  return configured
+    ? sentryVitePlugin({
+        release: { name: release },
+        telemetry: false,
+        // A deploy build whose maps did not upload must fail, not ship.
+        errorHandler: (error) => {
+          throw error;
+        },
+      })
+    : null;
+}
+
+const RELEASE = releaseName();
+
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), tailwindcss(), devReports(), serviceWorker()],
+  plugins: [react(), tailwindcss(), devReports(), serviceWorker(), sourceMapUpload(RELEASE)],
+  define: { __APP_RELEASE__: JSON.stringify(RELEASE) },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -65,7 +105,8 @@ export default defineConfig(({ mode }) => ({
   // default iife format cannot split a module worker's imports.
   worker: { format: 'es' as const },
   build: {
-    // Source maps ship so Sentry can symbolicate the first Android white-screen.
+    // Source maps ship so Sentry can symbolicate the first Android white-screen
+    // (uploaded with the deploy build: sourceMapUpload above).
     sourcemap: true,
     target: 'es2022',
   },
