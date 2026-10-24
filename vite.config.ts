@@ -7,6 +7,7 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, type ServerOptions } from 'vite';
 
 import { devReports } from './scripts/vite/devReports.ts';
+import { serviceWorker } from './scripts/vite/serviceWorker.ts';
 
 const DEV_KEY = '.cert/dev-key.pem';
 const DEV_CERT = '.cert/dev-cert.pem';
@@ -52,7 +53,7 @@ const apiProxy = {
 };
 
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), tailwindcss(), devReports()],
+  plugins: [react(), tailwindcss(), devReports(), serviceWorker()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

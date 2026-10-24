@@ -133,6 +133,23 @@ describe('layer boundaries', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('the service worker imports only src/sw and src/core', () => {
+    // It is bundled on its own into one script (scripts/vite/serviceWorker.ts):
+    // React, the stores or three.js there would ship a second copy to every visitor.
+    const srcDir = resolve(repoRoot, 'src');
+    const allowed = [resolve(srcDir, 'sw'), resolve(srcDir, 'core')];
+    const offenders = importsUnder(resolve(srcDir, 'sw'))
+      .filter(({ file }) => !file.endsWith('.test.ts'))
+      .filter(
+        ({ specifier, target }) =>
+          /^@\/(ui|globe|state)(\/|$)/.test(specifier) ||
+          !(specifier.startsWith('.') || specifier.startsWith('@/core')) ||
+          (specifier.startsWith('.') && !allowed.some((dir) => isInside(target, dir))),
+      )
+      .map(({ file, specifier }) => `${file} imports '${specifier}'`);
+    expect(offenders).toEqual([]);
+  });
+
   it('the app never imports workers/ (CLAUDE.md #9)', () => {
     const workersDir = resolve(repoRoot, 'workers');
     const offenders = importsUnder(resolve(repoRoot, 'src'))

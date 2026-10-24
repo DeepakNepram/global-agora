@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Global Agora's icon: the globe at night, two stories and the arc between
+       them. Full-bleed, with everything inside the central 80% circle, so the
+       same art serves as the maskable icon (scripts/icons.ts). -->
+  <rect width="512" height="512" fill="#05070d"/>
+  <circle cx="256" cy="256" r="190" fill="none" stroke="#4da3ff" stroke-opacity="0.22" stroke-width="10"/>
+  <circle cx="256" cy="256" r="166" fill="#0b1120" stroke="#4da3ff" stroke-width="15"/>
+  <g fill="none" stroke="#4da3ff" stroke-opacity="0.55" stroke-width="7">
+    <ellipse cx="256" cy="256" rx="72" ry="166"/>
+    <path d="M90 256h332"/>
+    <path d="M111 180c94 28 196 28 290 0M111 332c94-28 196-28 290 0"/>
+  </g>
+  <path d="M176 306C192 212 266 164 346 190" fill="none" stroke="#e8edf7" stroke-width="10" stroke-linecap="round" stroke-dasharray="2 22"/>
+  <circle cx="176" cy="306" r="28" fill="#f2a541" stroke="#05070d" stroke-width="8"/>
+  <circle cx="346" cy="190" r="28" fill="#e8edf7" stroke="#05070d" stroke-width="8"/>
+</svg>

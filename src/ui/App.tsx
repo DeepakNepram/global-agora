@@ -9,6 +9,7 @@ import { useAnyModalOpen } from './focus/useModal';
 import { NewsStatus } from './NewsStatus';
 import { NewsView } from './NewsView';
 import { resolveQuality } from './platform/capabilities';
+import { UpdateNotice } from './UpdateNotice';
 
 export interface AppProps {
   readonly config: AppConfig;
@@ -51,6 +52,7 @@ export function App({ config, dbConfig = null, authProviders = [] }: AppProps): 
         <h1 className="text-lg font-semibold tracking-tight">Global Agora</h1>
         <p className="text-sm text-muted">Preview. Pins are news stories from GDELT.</p>
         <NewsStatus />
+        <UpdateNotice />
       </header>
 
       <main id="globe" tabIndex={-1} aria-label="News" className="relative min-h-0 flex-1">

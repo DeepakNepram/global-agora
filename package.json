@@ -22,6 +22,7 @@
     "textures:fetch": "node --experimental-strip-types scripts/fetch-textures.ts",
     "textures:build": "node --experimental-strip-types scripts/process-textures.ts",
     "textures": "npm run textures:fetch && npm run textures:build",
+    "icons": "node --experimental-strip-types scripts/icons.ts",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",

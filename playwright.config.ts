@@ -27,6 +27,9 @@ export default defineConfig({
     baseURL: `http://localhost:${PORT}`,
     trace: 'retain-on-failure',
     launchOptions: { args: SOFTWARE_GL },
+    // The offline shell would answer requests that page.route must see; the
+    // offline checks turn it back on for themselves.
+    serviceWorkers: 'block',
   },
   projects: [
     { name: 'desktop', use: { viewport: { width: 1280, height: 800 } } },

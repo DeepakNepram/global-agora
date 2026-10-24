@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { App } from '@/ui';
+import { registerServiceWorker } from '@/ui/platform/serviceWorker';
 import { authProvidersFromEnv, resolveConfig } from '@/core';
 // The Supabase settings without the SDK: it loads only for a signed-in reader.
 import { dbConfigFromEnv } from '@/core/db/config';
@@ -22,6 +23,9 @@ const authProviders = authProvidersFromEnv(env);
 
 const root = createRoot(container);
 const path = window.location.pathname;
+
+// The offline shell (Prompt 5.2), installed once the page has started.
+registerServiceWorker();
 
 if (path === '/admin' || path.startsWith('/admin/')) {
   // The admin pages (Prompt 4.3, 4.6) in their own chunk, instead of the globe:
