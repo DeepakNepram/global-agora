@@ -4,6 +4,8 @@ node_modules/
 # Build output
 dist/
 dist-ssr/
+# The browser checks' build (npm run test:e2e:build)
+dist-e2e/
 *.local
 
 # Env — .env.example is the only one that ships

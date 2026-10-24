@@ -34,7 +34,9 @@
     "ingest:data": "node --experimental-strip-types scripts/ingest/build-data.ts",
     "api:dev": "node --experimental-strip-types scripts/api/dev.ts",
     "api:measure": "node --experimental-strip-types scripts/api/measure.ts",
-    "places:build": "node --experimental-strip-types scripts/places/build.ts"
+    "places:build": "node --experimental-strip-types scripts/places/build.ts",
+    "test:e2e:build": "node --experimental-strip-types scripts/e2e/build.ts",
+    "test:e2e": "npm run test:e2e:build && playwright test"
   },
   "dependencies": {
     "@react-three/fiber": "^9.7.0",
@@ -47,7 +49,9 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^22.20.2",
     "@types/react": "^19.3.0",

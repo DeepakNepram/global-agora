@@ -78,3 +78,53 @@ jobs:
           npx prettier --stdin-filepath src/core/db/types.ts < "$RUNNER_TEMP/types.ts" \
             | diff -u src/core/db/types.ts - \
             || { echo "::error::src/core/db/types.ts is stale. Run npm run db:types."; exit 1; }
+
+  # Prompt 5.1: axe-core on every view, sheet and panel, and the keyboard
+  # paths through them, in Chromium against the production build. Any
+  # WCAG 2.2 A/AA or best-practice violation fails the build. The network is
+  # answered by tests/e2e/fixtures, so no API Worker or database is needed.
+  a11y:
+    name: accessibility (axe-core, keyboard)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Chromium is ~170 MB; it changes only when @playwright/test does.
+      - name: Cache Playwright's Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Chromium's system libraries
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Build for the checks
+        run: npm run test:e2e:build
+
+      - name: axe-core and keyboard checks
+        run: npx playwright test
+
+      - name: Keep the report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

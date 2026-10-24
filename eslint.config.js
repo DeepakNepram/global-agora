@@ -140,7 +140,16 @@ const clockMessage =
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'coverage/**', 'node_modules/**', '**/.wrangler/**', 'public/**'],
+    ignores: [
+      'dist/**',
+      'dist-e2e/**',
+      'test-results/**',
+      'playwright-report/**',
+      'coverage/**',
+      'node_modules/**',
+      '**/.wrangler/**',
+      'public/**',
+    ],
   },
 
   js.configs.recommended,
