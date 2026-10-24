@@ -18,7 +18,7 @@ export interface AppProps {
 }
 
 /**
- * App shell: skip link, header, the globe, and a readout of the detected quality
+ * App shell: skip link, header, the news (globe, map or list), and a readout of the detected quality
  * tier so the texture choice is verifiable in a real browser rather than only in
  * unit tests.
  */
@@ -40,7 +40,7 @@ export function App({ config, dbConfig = null, authProviders = [] }: AppProps): 
         href="#globe"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-accent focus:px-3 focus:py-2 focus:text-void"
       >
-        Skip to globe
+        Skip to the news
       </a>
 
       <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-6 py-4">
@@ -49,7 +49,7 @@ export function App({ config, dbConfig = null, authProviders = [] }: AppProps): 
         <NewsStatus />
       </header>
 
-      <main id="globe" tabIndex={-1} aria-label="News globe" className="relative min-h-0 flex-1">
+      <main id="globe" tabIndex={-1} aria-label="News" className="relative min-h-0 flex-1">
         <NewsView
           tier={quality.tier}
           historyWindowHours={config.historyWindowHours}

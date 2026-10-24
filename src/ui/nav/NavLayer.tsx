@@ -17,6 +17,10 @@ export interface NavLayerProps {
   readonly historyHours: number;
   /** Buttons at the end of the search row (Following, Saved). */
   readonly actions?: ReactNode;
+  /** First in the filter row: the view switch. */
+  readonly leading?: ReactNode;
+  /** Over the list, an opaque bar: text scrolling under see-through controls is unreadable. */
+  readonly solid?: boolean;
 }
 
 /**
@@ -36,7 +40,7 @@ export function NavLayer(props: NavLayerProps): JSX.Element {
       aria-label="Search and filters"
       // Pins under it are not visible, so keyboard focus skips them (Prompt 5.1).
       data-covers="top"
-      className="pointer-events-none absolute inset-x-0 top-0 flex flex-col gap-2 p-3 [&>*]:pointer-events-auto"
+      className={`pointer-events-none absolute inset-x-0 top-0 flex flex-col gap-2 p-3 [&>*]:pointer-events-auto ${props.solid === true ? 'bg-void' : ''}`}
     >
       <div className="flex items-center gap-2">
         <SearchBox
@@ -48,7 +52,7 @@ export function NavLayer(props: NavLayerProps): JSX.Element {
         />
         {actions}
       </div>
-      <FilterBar historyHours={historyHours} />
+      <FilterBar historyHours={historyHours} leading={props.leading} />
       <p role="status" className="sr-only">
         {announcement}
       </p>

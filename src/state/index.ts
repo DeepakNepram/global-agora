@@ -161,3 +161,12 @@ export {
   type StageTarget,
 } from './discussionStage';
 export type { KeyValueStorage } from './persist';
+export {
+  createViewStore,
+  useViewStore,
+  viewStore,
+  VIEW_STORAGE_KEY,
+  type NewsLayout,
+  type ViewState,
+  type ViewStore,
+} from './viewStore';

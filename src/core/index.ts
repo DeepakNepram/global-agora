@@ -174,6 +174,8 @@ export type { OutletsIndex, OutletStories } from './data/outlets';
 
 export { categoryAt, isNewsCategory, CATEGORY_LABELS } from './categories';
 export { nearestFirst, stepFocus, type FocusPoint } from './pinFocusOrder';
+export { listKey, listStories, LIST_PAGE_SIZE } from './storyList';
+export type { StoryListResult, StorySort } from './storyList';
 export {
   shapeDistance,
   shapeOutline,

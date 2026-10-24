@@ -8,6 +8,7 @@ import { DiscussionLayer } from './discussion/DiscussionLayer';
 import { vignetteCssGradient } from './globe/vignette';
 import { LibraryButtons } from './library/LibraryButtons';
 import { NavLayer } from './nav/NavLayer';
+import { ViewSwitch } from './nav/ViewSwitch';
 import type { ViewTarget } from './nav/viewNavigation';
 import type { NewsViewKind } from './NewsView';
 import { TimeScrubber } from './scrubber/TimeScrubber';
@@ -64,6 +65,8 @@ export const GlobeLayers = memo(function GlobeLayers(props: GlobeLayersProps): J
           target={target}
           apiBaseUrl={props.apiBaseUrl}
           historyHours={historyHours}
+          leading={<ViewSwitch visualLabel="Globe" />}
+          solid={view === 'list'}
           actions={
             <>
               <LibraryButtons />

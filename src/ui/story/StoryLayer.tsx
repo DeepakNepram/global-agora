@@ -18,6 +18,7 @@ import {
 
 import { nextAnnouncement } from '../announce';
 import { useDiscussButton } from '../discussion/useDiscussButton';
+import { focusView } from '../focus/viewFocus';
 import type { ViewCamera } from '../nav/viewNavigation';
 import { PeekCard, type ShareState } from './PeekCard';
 import { copyText, shareUrl } from './permalinkLink';
@@ -44,12 +45,6 @@ export interface StoryLayerProps {
 
 /** "Link copied" stays on the button this long. */
 const COPIED_MS = 2000;
-
-function focusGlobe(): void {
-  document.querySelector<HTMLElement>('[aria-roledescription="globe"]')?.focus({
-    preventScroll: true,
-  });
-}
 
 /**
  * The open story: its sheet, what fills it, and what its buttons do. Story
@@ -90,13 +85,14 @@ export function StoryLayer(props: StoryLayerProps): JSX.Element {
       : 'idle';
 
   // The sheet focuses the headline on opening, so a screen reader starts
-  // there; closing hands focus back to the globe, unless it already moved on.
+  // there; closing hands focus back to the view the story came from (the
+  // globe, its row in the list, the map), unless it already moved on.
   useEffect(() => {
     const wasOpen = wasOpenRef.current;
     wasOpenRef.current = open;
     if (open || !wasOpen) return;
     const active = document.activeElement;
-    if (!active || active === document.body || active.closest('[data-story-sheet]')) focusGlobe();
+    if (!active || active === document.body || active.closest('[data-story-sheet]')) focusView();
   }, [open]);
 
   useEffect(() => () => window.clearTimeout(copiedTimer.current), []);

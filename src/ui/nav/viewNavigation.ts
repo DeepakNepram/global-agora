@@ -24,6 +24,11 @@ export interface ViewTarget {
   readonly camera: ViewCamera | null;
   /** The view's size in CSS pixels. */
   viewport(): { readonly width: number; readonly height: number };
+  /**
+   * From the list: brings the globe (or map) back, then hands `then` its
+   * camera. A place is somewhere to look, so choosing one leaves the list.
+   */
+  showVisual?(then: (camera: ViewCamera) => void): void;
 }
 
 /** A city is framed as a region this wide around it: its suburbs and neighbours. */
@@ -39,9 +44,11 @@ export function flyToPlace(
   target: ViewTarget,
   place: { readonly lat: number; readonly lon: number; readonly radiusDeg: number },
 ): void {
-  if (!target.camera) return;
   const reach = place.radiusDeg > 0 ? place.radiusDeg : CITY_FRAME_DEG;
-  void target.camera.flyTo(place.lat, place.lon, altitudeToShowKm(reach, aspect(target)));
+  const fly = (camera: ViewCamera): void =>
+    void camera.flyTo(place.lat, place.lon, altitudeToShowKm(reach, aspect(target)));
+  if (target.camera) fly(target.camera);
+  else target.showVisual?.(fly);
 }
 
 /**

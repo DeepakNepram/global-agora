@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type JSX } from 'react';
+import { useEffect, useId, useRef, type JSX, type ReactNode } from 'react';
 
 import { isFilterActive, windowChoices, CATEGORY_LABELS, NEWS_CATEGORIES } from '@/core';
 import { filterStore, useFilterStore } from '@/state';
@@ -8,6 +8,8 @@ import { CategoryMark } from '../category/CategoryMark';
 export interface FilterBarProps {
   /** AppConfig.historyWindowHours: which windows are offered. */
   readonly historyHours: number;
+  /** First in the row (the view switch), scrolling with the chips on a phone. */
+  readonly leading?: ReactNode;
 }
 
 const CHIP =
@@ -20,7 +22,7 @@ const CHIP =
  * shape its pins wear, so the chips are the globe's legend and colour is
  * never the only cue (Prompt 5.1); pressed chips are filled.
  */
-export function FilterBar({ historyHours }: FilterBarProps): JSX.Element {
+export function FilterBar({ historyHours, leading }: FilterBarProps): JSX.Element {
   const filter = useFilterStore((state) => state.filter);
   const windowId = useId();
   const active = isFilterActive(filter);
@@ -39,6 +41,7 @@ export function FilterBar({ historyHours }: FilterBarProps): JSX.Element {
 
   return (
     <div ref={row} className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+      {leading}
       <div role="group" aria-label="Show only these categories" className="flex gap-1.5">
         {NEWS_CATEGORIES.map((category) => {
           const on = filter.categories.includes(category);

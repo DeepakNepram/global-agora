@@ -1,8 +1,15 @@
-import { Suspense, useMemo, useState, type JSX } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 
 import type { AuthProvider, Permalink, QualityTier } from '@/core';
 import { renderSettingsForTier, type OrbitGlobeControls } from '@/globe';
-import { useAccountStore, useDiscussionStage, usePanelStore, useStoryStore } from '@/state';
+import {
+  useAccountStore,
+  useDiscussionStage,
+  usePanelStore,
+  useStoryStore,
+  useViewStore,
+  viewStore,
+} from '@/state';
 
 import { createPresentLog } from './globe/bloomReport';
 import { createFrameProbe } from './globe/frameProbe';
@@ -15,7 +22,8 @@ import { usePinNodes } from './globe/usePinNodes';
 import { usePrefersReducedMotion } from './globe/usePrefersReducedMotion';
 import { GlobeCanvas } from './GlobeCanvas';
 import { GlobeLayers } from './GlobeLayers';
-import type { ViewTarget } from './nav/viewNavigation';
+import { StoryList } from './list/StoryList';
+import type { ViewCamera, ViewTarget } from './nav/viewNavigation';
 import { useOnboardingTrigger } from './onboarding/useOnboardingTrigger';
 import { useTimeDriving } from './scrubber/timeDriving';
 import { useOpenPermalink } from './story/permalinkLink';
@@ -50,8 +58,15 @@ export function NewsView(props: NewsViewProps): JSX.Element {
   const dev = useDevSettings(settings);
   const reducedMotionPreferred = usePrefersReducedMotion();
   const motion = reducedMotionPreferred && !dev.fullMotion ? 'reduced' : 'full';
-  const view: NewsViewKind = 'globe';
+  const layout = useViewStore((state) => state.layout);
+  const view: NewsViewKind = layout === 'list' ? 'list' : 'globe';
+  // The globe mounts the first time it is wanted: a reader who keeps to the
+  // list never pays for its textures and its GPU context.
+  const [globeUsed, setGlobeUsed] = useState(view === 'globe');
+  if (view === 'globe' && !globeUsed) setGlobeUsed(true);
   const [controls, setControls] = useState<OrbitGlobeControls | null>(null);
+  const camera: ViewCamera | null = view === 'list' ? null : controls;
+  const pendingFly = useRef<((camera: ViewCamera) => void) | null>(null);
   const pinNodes = usePinNodes(dev.pinSource, historyWindowHours);
   const picker = useMemo(() => createPinPicker(), []);
   const selection = useGlobeSelection(controls, picker, pinNodes);
@@ -62,9 +77,25 @@ export function NewsView(props: NewsViewProps): JSX.Element {
   const inDiscussion = useDiscussionStage((state) => state.phase !== 'closed');
   useOnboardingTrigger(sheetOpen || accountOpen || inDiscussion);
   const target = useMemo(
-    (): ViewTarget => ({ camera: controls, viewport: picker.viewport }),
-    [controls, picker],
+    (): ViewTarget => ({
+      camera,
+      viewport: picker.viewport,
+      showVisual: (then) => {
+        pendingFly.current = then;
+        viewStore.getState().setLayout('visual');
+      },
+    }),
+    [camera, picker],
   );
+
+  // A place chosen from the list's search goes to the map once it is up.
+  useEffect(() => {
+    const fly = pendingFly.current;
+    if (!camera || !fly) return;
+    pendingFly.current = null;
+    fly(camera);
+  }, [camera]);
+
   useLiveClock();
   useOpenPermalink(link, historyWindowHours);
   useTimeDriving(view !== 'globe', historyWindowHours, motion);
@@ -82,24 +113,30 @@ export function NewsView(props: NewsViewProps): JSX.Element {
   return (
     // Clips what slides off the bottom edge (the scrubber stepping aside, a closed sheet).
     <div className="absolute inset-0 overflow-hidden">
-      <GlobeCanvas
-        tier={tier}
-        settings={settings}
-        dev={dev}
-        motion={motion}
-        nodes={pinNodes}
-        picker={picker}
-        input={selection.input}
-        message={selection.message}
-        focused={selection.focused}
-        link={link}
-        historyHours={historyWindowHours}
-        controls={controls}
-        onControls={setControls}
-        paused={view !== 'globe'}
-        probe={probe}
-        presentLog={presentLog}
-      />
+      {globeUsed && (
+        <GlobeCanvas
+          tier={tier}
+          settings={settings}
+          dev={dev}
+          motion={motion}
+          nodes={pinNodes}
+          picker={picker}
+          input={selection.input}
+          message={selection.message}
+          focused={selection.focused}
+          link={link}
+          historyHours={historyWindowHours}
+          controls={controls}
+          onControls={setControls}
+          paused={view !== 'globe'}
+          probe={probe}
+          presentLog={presentLog}
+        />
+      )}
+
+      {/* In the main chunk on purpose: as a lazy chunk, the bundler split React,
+          zustand and the stores out of it into three startup files (DECISIONS). */}
+      {view === 'list' && <StoryList nodes={pinNodes} />}
 
       <GlobeLayers
         settings={settings}
