@@ -90,9 +90,17 @@ export function usePinFocus(
         const byKey = new Map(targets.map((t) => [keyOf(t, stories), t]));
         const pose = poseKey(view);
         const kept = round.current;
+        // The round holds while the camera is still and the same pins are
+        // drawn; a new layout (pins arriving, a cluster opening, the time
+        // moving) starts it again, even with the camera where it was.
+        const same =
+          kept !== null &&
+          kept.pose === pose &&
+          kept.keys.length === targets.length &&
+          kept.keys.every((key) => byKey.has(key));
         let keys: readonly string[];
-        if (kept && kept.pose === pose) {
-          keys = kept.keys.filter((key) => byKey.has(key));
+        if (kept && same) {
+          keys = kept.keys;
         } else {
           const box = element.getBoundingClientRect();
           const centre = { x: box.width / 2, y: box.height / 2 };
