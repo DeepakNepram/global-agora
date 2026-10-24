@@ -99,7 +99,13 @@ export function useSheetMotion(
     } else if (previous.state !== state) {
       animateTo(stops[state], position.current.v);
     } else if (previous.stops !== stops) {
-      // A drag's release already set its spring going; only a resize lands here.
+      // A drag's release already set its spring going; only a resize lands
+      // here. Any spring still running heads for the old stop, so it stops
+      // too: the first measurement arrives before the first frame, and the
+      // opening spring (aimed at a zero-height sheet's stop) used to land
+      // after it, leaving a closed sheet on screen in production builds.
+      window.cancelAnimationFrame(frame.current);
+      position.current.v = 0;
       write(stops[state]);
     }
   }, [state, stops, animateTo, write]);
