@@ -173,6 +173,17 @@ export {
 export type { OutletsIndex, OutletStories } from './data/outlets';
 
 export { categoryAt, isNewsCategory, CATEGORY_LABELS } from './categories';
+export {
+  shapeDistance,
+  shapeOutline,
+  shapePath,
+  shapeReach,
+  CATEGORY_SHAPES,
+  PLUS_ARMS,
+  RADIAL_SHAPES,
+  SHAPE_KINDS,
+} from './categoryShapes';
+export type { RadialShape, ShapeKind } from './categoryShapes';
 export { AUTH_STORAGE_KEY } from './auth';
 export {
   authReturnProblem,

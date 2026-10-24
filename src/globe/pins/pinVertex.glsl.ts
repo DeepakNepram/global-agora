@@ -16,6 +16,7 @@ import { GLOBE_RADIUS, NEWS_CATEGORIES } from '@/core';
 import { glslFloat } from '../hdr';
 import { BADGE_CODE_GLSL } from './badgeGlyphs';
 import { BLOOM_OMEGA, BLOOM_SETTLE_SECONDS } from './bloom';
+import { PIN_SHAPE_OF_VERT } from './pinShapes.glsl';
 import {
   BIRTH_POP,
   COLOR_GAIN_NEW,
@@ -89,6 +90,8 @@ varying float vHot;
 varying vec4 vOrb;
 /** 1 for the selected slot. */
 varying float vSelected;
+/** The category shape of the end that dominates the look (pinShapes.glsl.ts). */
+varying float vShape;
 
 const float GLOBE_RADIUS = ${glslFloat(GLOBE_RADIUS)};
 const float HORIZON_FADE = ${glslFloat(HORIZON_FADE_FRACTION)};
@@ -117,6 +120,7 @@ const float LOG10_2 = 0.30103;
 const float PI = 3.14159265;
 
 ${BADGE_CODE_GLSL}
+${PIN_SHAPE_OF_VERT}
 
 // look = kind + 4 · category + 32 · value; kind 0 hidden pin, 1 pin, 2 orb, 3 hidden orb.
 float lookKind(float look) { return mod(look, 4.0); }
@@ -230,6 +234,8 @@ void main() {
     badgeCode(isOrb(outerKind) * lookValue(aOuter.w)),
     smoothstep(0.3, 0.7, u)
   );
+  // The shape switches halfway along the path, under the cross-fade.
+  vShape = shapeOf(int(mod(floor((u < 0.5 ? aInner.w : aOuter.w) / 4.0), 8.0) + 0.5));
   vAlpha = visibility;
 
   if (visibility <= 0.0) {

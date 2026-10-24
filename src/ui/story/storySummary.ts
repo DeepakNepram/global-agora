@@ -1,9 +1,11 @@
 import {
+  categoryAt,
   leadOutlet,
   rowOfStory,
   vec3ToLatLon,
   type DiscussionState,
   type LatLon,
+  type NewsCategory,
   type NodeBuffer,
   type StoryDetail,
 } from '@/core';
@@ -17,6 +19,7 @@ import {
 export interface StorySummary {
   readonly id: number;
   readonly headline: string;
+  readonly category: NewsCategory;
   readonly place: string;
   readonly sourceCount: number;
   readonly publishedAtMs: number;
@@ -41,6 +44,7 @@ export function summarize(
     return {
       id,
       headline: nodes.headlines[row] ?? '',
+      category: categoryAt(nodes.categories[row] ?? 0),
       place: nodes.places[row] ?? '',
       sourceCount: nodes.sourceCounts[row] ?? 0,
       publishedAtMs: (nodes.epochSec + (nodes.publishedSec[row] ?? 0)) * 1000,
@@ -56,6 +60,7 @@ export function summarize(
   return {
     id,
     headline: full.title,
+    category: full.category,
     place: full.place.name,
     sourceCount: full.sourceCount,
     publishedAtMs: full.publishedAtMs,

@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent } from
 
 import { resultCount, type NodeBuffer } from '@/core';
 
+import { CategoryMark } from '../category/CategoryMark';
 import type { GlobeTarget } from './globeNavigation';
 import { groupsFor, plural } from './searchOptions';
 import { useSearch } from './useSearch';
@@ -156,7 +157,10 @@ export function SearchBox(props: SearchBoxProps): JSX.Element {
                   onClick={option.pick}
                   className={`cursor-pointer rounded-xl px-3 py-2 ${selected ? 'bg-white/10' : 'hover:bg-white/5'}`}
                 >
-                  <div className="truncate text-sm text-ink">{option.label}</div>
+                  <div className="flex items-center gap-1.5 text-sm text-ink">
+                    {option.category !== undefined && <CategoryMark category={option.category} />}
+                    <span className="truncate">{option.label}</span>
+                  </div>
                   {option.detail !== '' && (
                     <div className="truncate text-xs text-muted">{option.detail}</div>
                   )}

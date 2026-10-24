@@ -49,6 +49,11 @@ export const COLOR_GAIN_NEW = 1.0;
  */
 export const HOT_FRESHNESS_START = 0.45;
 export const HOT_CORE_MAX = 1.5;
+/**
+ * The white-hot spot's radius, as a fraction of the quad half-size: the old
+ * round dot's, so the bloom's energy did not grow with the shapes (5.1).
+ */
+export const HOT_RADIUS = 0.3;
 
 /** Halo brightness at the dot's edge, relative to the colour. At most 0.3 < threshold. */
 export const HALO_PEAK = 0.3;
@@ -59,8 +64,8 @@ export const HALO_PEAK = 0.3;
  * dot an edge there and is invisible against the night side.
  */
 export const SHADOW_OPACITY = 0.4;
-/** Outer edge of the shadow ring, as a fraction of the quad half-size. */
-export const SHADOW_RADIUS = 0.55;
+/** How far the shadow reaches past the pin's shape, as a fraction of the quad half-size. */
+export const SHADOW_WIDTH = 0.25;
 
 /** Heat 0 draws at SCALE_MIN, heat 255 at SCALE_MAX; sqrt so mid heat is visibly bigger. */
 export const SCALE_MIN = 0.75;
@@ -68,8 +73,12 @@ export const SCALE_MAX = 1.3;
 
 /** Quad half-size at scale 1, in CSS pixels. Pins keep this size on screen at every altitude. */
 export const PIN_HALF_SIZE_CSS_PX = 9;
-/** Dot radius as a fraction of the quad half-size (2.7 CSS px at scale 1). */
-export const CORE_RADIUS = 0.3;
+/**
+ * The pin's shape (categoryShapes.ts) at this radius has the area of a disc
+ * of this radius, as a fraction of the quad half-size: 3.8 CSS px at scale 1,
+ * up from a 2.7 px dot so a triangle reads as a triangle (Prompt 5.1).
+ */
+export const CORE_RADIUS = 0.42;
 
 /**
  * A cluster orb's quad scale (× PIN_HALF_SIZE_CSS_PX), growing a step per
@@ -129,8 +138,8 @@ export const HORIZON_FADE_FRACTION = 0.1;
 export const PULSE_CLOCK_REBASE_SECONDS = 600;
 
 /**
- * Category hues in sRGB, one per NEWS_CATEGORIES entry. A starting palette, to
- * tune by eye; hue alone is not accessible, so Phase 5 adds shape or label.
+ * Category hues in sRGB, one per NEWS_CATEGORIES entry. Never the only cue:
+ * each category also has a shape (src/core/categoryShapes.ts).
  */
 export const CATEGORY_HUES: Readonly<Record<(typeof NEWS_CATEGORIES)[number], number>> = {
   // Saturated mid-tones, scaled to full intensity below. A light pastel would

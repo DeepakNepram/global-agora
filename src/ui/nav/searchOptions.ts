@@ -1,4 +1,10 @@
-import type { NodeBuffer, PlaceResult } from '@/core';
+import {
+  categoryAt,
+  CATEGORY_LABELS,
+  type NewsCategory,
+  type NodeBuffer,
+  type PlaceResult,
+} from '@/core';
 import { filterStore, wallClockNow } from '@/state';
 
 import { formatAgo } from '../story/format';
@@ -10,6 +16,8 @@ export interface SearchOption {
   readonly id: string;
   readonly label: string;
   readonly detail: string;
+  /** A story's or topic's category: the row shows its mark (Prompt 5.1). */
+  readonly category?: NewsCategory;
   readonly pick: () => void;
 }
 
@@ -26,7 +34,8 @@ export interface OptionGroup {
 
 function storyDetail(nodes: NodeBuffer, row: number): string {
   const publishedMs = (nodes.epochSec + (nodes.publishedSec[row] ?? 0)) * 1000;
-  return [nodes.places[row], formatAgo(publishedMs, wallClockNow())]
+  const category = CATEGORY_LABELS[categoryAt(nodes.categories[row] ?? 0)];
+  return [category, nodes.places[row], formatAgo(publishedMs, wallClockNow())]
     .filter((part) => part !== undefined && part !== '')
     .join(' · ');
 }
@@ -50,6 +59,7 @@ export function groupsFor(
       id: `${prefix}-story-${id}`,
       label: nodes.headlines[row] ?? '',
       detail: storyDetail(nodes, row),
+      category: categoryAt(nodes.categories[row] ?? 0),
       pick: () => {
         close(null);
         openStoryOnGlobe(target, nodes, id);
@@ -84,6 +94,7 @@ export function groupsFor(
         id: `topic-${topic.category}`,
         label: topic.label,
         detail: `Show only this topic · ${plural(topic.count, 'story', 'stories')}`,
+        category: topic.category,
         pick: () => {
           close(topic.label);
           filterStore.getState().onlyCategory(topic.category);

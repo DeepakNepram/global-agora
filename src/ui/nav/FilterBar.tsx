@@ -1,16 +1,13 @@
 import { useEffect, useId, useRef, type JSX } from 'react';
 
 import { isFilterActive, windowChoices, CATEGORY_LABELS, NEWS_CATEGORIES } from '@/core';
-import { CATEGORY_HUES } from '@/globe';
 import { filterStore, useFilterStore } from '@/state';
+
+import { CategoryMark } from '../category/CategoryMark';
 
 export interface FilterBarProps {
   /** AppConfig.historyWindowHours: which windows are offered. */
   readonly historyHours: number;
-}
-
-function cssColor(hex: number): string {
-  return `#${hex.toString(16).padStart(6, '0')}`;
 }
 
 const CHIP =
@@ -19,7 +16,8 @@ const CHIP =
 
 /**
  * Category chips and a time window. A story they leave out is dimmed and
- * shrunk on the globe, never hidden. Each chip says its name, so colour is
+ * shrunk on the globe, never hidden. Each chip says its name beside the
+ * shape its pins wear, so the chips are the globe's legend and colour is
  * never the only cue (Prompt 5.1); pressed chips are filled.
  */
 export function FilterBar({ historyHours }: FilterBarProps): JSX.Element {
@@ -56,11 +54,7 @@ export function FilterBar({ historyHours }: FilterBarProps): JSX.Element {
                   : `${CHIP} border-ink/20 bg-panel/80 text-ink hover:bg-white/10`
               }
             >
-              <span
-                aria-hidden="true"
-                className="size-2 rounded-full"
-                style={{ backgroundColor: cssColor(CATEGORY_HUES[category]) }}
-              />
+              <CategoryMark category={category} className="size-3" />
               {CATEGORY_LABELS[category]}
             </button>
           );

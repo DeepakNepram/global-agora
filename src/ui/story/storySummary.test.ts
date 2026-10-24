@@ -47,6 +47,7 @@ const nodes = storyBuffer([
 nodes.places[1] = 'Sydney, Australia';
 nodes.sourceCounts[1] = 4;
 nodes.discussionOpen[0] = 1;
+nodes.categories[1] = 7;
 
 describe('summarize', () => {
   it('fills the card from the payload row at once', () => {
@@ -54,6 +55,7 @@ describe('summarize', () => {
     expect(summary).toMatchObject({
       id: 7,
       headline: 'Story 7',
+      category: 'health',
       place: 'Sydney, Australia',
       sourceCount: 4,
       publishedAtMs: (FIXTURE_EPOCH_SEC + 120) * 1000,
@@ -80,6 +82,7 @@ describe('summarize', () => {
     const linked = summarize(null, 7, detail());
     expect(linked).toMatchObject({
       headline: 'Full title',
+      category: 'world',
       place: 'Lagos, Nigeria',
       sourceCount: 9,
       outlet: 'lead.example',

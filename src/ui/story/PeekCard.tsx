@@ -1,5 +1,6 @@
 import type { JSX } from 'react';
 
+import { CategoryLabel } from '../category/CategoryMark';
 import { discussCopy, formatAgo, sourcesText } from './format';
 import type { StorySummary } from './storySummary';
 
@@ -76,7 +77,7 @@ function BookmarkIcon({ filled }: { filled: boolean }): JSX.Element {
 }
 
 /**
- * The peek card: headline, outlet, time ago, place, how many sources, and
+ * The peek card: headline, category, outlet, time ago, place, how many sources, and
  * Save, Share and Discuss. The headline takes focus when the card opens, so
  * a screen reader starts with it.
  */
@@ -105,6 +106,8 @@ export function PeekCard(props: PeekCardProps): JSX.Element {
     <div className="flex flex-col gap-1.5">
       {heading}
       <p className="truncate text-sm text-muted">
+        <CategoryLabel category={summary.category} />
+        {' · '}
         {/* Room is kept for the outlet so the line does not jump when it arrives. */}
         {summary.outlet === null && loading && (
           <span className="mr-1.5 inline-block h-3 w-16 rounded bg-ink/10 align-middle" />
