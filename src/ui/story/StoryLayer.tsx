@@ -18,6 +18,7 @@ import {
 
 import { nextAnnouncement } from '../announce';
 import { useDiscussButton } from '../discussion/useDiscussButton';
+import type { ViewCamera } from '../nav/viewNavigation';
 import { PeekCard, type ShareState } from './PeekCard';
 import { copyText, shareUrl } from './permalinkLink';
 import { StoryDetails, type ReportState } from './StoryDetails';
@@ -28,7 +29,10 @@ import { useStoryDetail } from './useStoryDetail';
 export interface StoryLayerProps {
   /** The stories on the globe (for the card's fast fields and nearby stories). */
   readonly nodes: NodeBuffer | null;
-  readonly controls: OrbitGlobeControls | null;
+  /** The visible view's camera: Share links its pose, Nearby flies it. */
+  readonly camera: ViewCamera | null;
+  /** The globe's controls while the globe is on screen, for the discussion's camera shot. */
+  readonly globeControls: OrbitGlobeControls | null;
   /** AppConfig.apiBaseUrl. */
   readonly apiBaseUrl: string;
   /** AppConfig.savedStoryLimit: a tier boundary. */
@@ -53,7 +57,7 @@ function focusGlobe(): void {
  * open stories the same way.
  */
 export function StoryLayer(props: StoryLayerProps): JSX.Element {
-  const { nodes, controls, apiBaseUrl, savedStoryLimit, detailsAvailable, reducedMotion } = props;
+  const { nodes, camera, apiBaseUrl, savedStoryLimit, detailsAvailable, reducedMotion } = props;
   const selectedId = useStoryStore((state) => state.selectedId);
   const sheet = useStoryStore((state) => state.sheet);
   // Re-renders on each live tick (30 s), which keeps "3 h ago" current.
@@ -104,7 +108,7 @@ export function StoryLayer(props: StoryLayerProps): JSX.Element {
     discussionOpen: open && summary?.discussion === 'open',
     selectedId,
     detail,
-    controls,
+    controls: props.globeControls,
     reducedMotion,
     announce,
   });
@@ -131,7 +135,7 @@ export function StoryLayer(props: StoryLayerProps): JSX.Element {
   const onShare = (): void => {
     if (selectedId === null) return;
     const id = selectedId;
-    const url = shareUrl(id, controls?.getState() ?? null, timeStore.getState().timeMs);
+    const url = shareUrl(id, camera?.getState() ?? null, timeStore.getState().timeMs);
     void copyText(url).then((copied) => {
       if (!copied) {
         setShared({ id, state: { kind: 'manual', url } });
@@ -165,10 +169,10 @@ export function StoryLayer(props: StoryLayerProps): JSX.Element {
   const onNearby = (row: number): void => {
     if (!nodes) return;
     storyStore.getState().open(nodes.ids[row] ?? 0);
-    if (!controls) return;
+    if (!camera) return;
     const p = nodes.positions;
     const at = vec3ToLatLon({ x: p[row * 3] ?? 0, y: p[row * 3 + 1] ?? 0, z: p[row * 3 + 2] ?? 0 });
-    void controls.flyTo(at.lat, at.lon, controls.getState().altitudeKm);
+    void camera.flyTo(at.lat, at.lon, camera.getState().altitudeKm);
   };
 
   const story = storyStore.getState();

@@ -2,12 +2,12 @@ import { useCallback, useLayoutEffect, useRef, useState, type JSX } from 'react'
 
 import { onboardingStore, useOnboardingStore } from '@/state';
 
-import type { GlobeTarget } from '../nav/globeNavigation';
+import type { ViewTarget } from '../nav/viewNavigation';
 import { ModalSheet } from '../sheets/ModalSheet';
 import { AlertsStep, HomeStep, InterestsStep } from './OnboardingSteps';
 
 export interface OnboardingLayerProps {
-  readonly target: GlobeTarget;
+  readonly target: ViewTarget;
   readonly reducedMotion: boolean;
 }
 

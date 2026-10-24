@@ -4,14 +4,14 @@ import type { NodeBuffer } from '@/core';
 import { panelStore, storyStore, usePanelStore } from '@/state';
 
 import { nextAnnouncement } from '../announce';
-import { openStoryOnGlobe, type GlobeTarget } from '../nav/globeNavigation';
+import { openStory, type ViewTarget } from '../nav/viewNavigation';
 import { FollowingPanel } from './FollowingPanel';
 import { LibrarySheet } from './LibrarySheet';
 import { SavedPanel } from './SavedPanel';
 
 export interface LibraryLayerProps {
   readonly nodes: NodeBuffer | null;
-  readonly target: GlobeTarget;
+  readonly target: ViewTarget;
   /** AppConfig.historyWindowHours. */
   readonly historyHours: number;
   /** AppConfig.savedStoryLimit. */
@@ -63,7 +63,7 @@ export default function LibraryLayer(props: LibraryLayerProps): JSX.Element {
 
   const onOpenStory = (id: number): void => {
     panelStore.getState().close();
-    openStoryOnGlobe(target, nodes, id);
+    openStory(target, nodes, id);
   };
 
   return (

@@ -7,17 +7,21 @@ import { AccountButton } from './account/AccountButton';
 import { DiscussionLayer } from './discussion/DiscussionLayer';
 import { vignetteCssGradient } from './globe/vignette';
 import { LibraryButtons } from './library/LibraryButtons';
-import type { GlobeTarget } from './nav/globeNavigation';
 import { NavLayer } from './nav/NavLayer';
+import type { ViewTarget } from './nav/viewNavigation';
+import type { NewsViewKind } from './NewsView';
 import { TimeScrubber } from './scrubber/TimeScrubber';
 import { SecondarySheets } from './SecondarySheets';
 import { StoryLayer } from './story/StoryLayer';
 
 export interface GlobeLayersProps {
   readonly settings: RenderSettings;
+  /** Which view shows the stories: the CSS vignette and scrim stand in where the globe's composer does not. */
+  readonly view: NewsViewKind;
   readonly nodes: NodeBuffer | null;
-  readonly target: GlobeTarget;
-  readonly controls: OrbitGlobeControls | null;
+  readonly target: ViewTarget;
+  /** The globe's controls while the globe is on screen, for the discussion's camera shot. */
+  readonly globeControls: OrbitGlobeControls | null;
   readonly apiBaseUrl: string;
   readonly historyHours: number;
   readonly savedStoryLimit: number;
@@ -38,10 +42,11 @@ export interface GlobeLayersProps {
  * discussion's resolution changes, and nothing here needs to with it.
  */
 export const GlobeLayers = memo(function GlobeLayers(props: GlobeLayersProps): JSX.Element {
-  const { settings, nodes, target, controls, historyHours, reducedMotion, inDiscussion } = props;
+  const { settings, view, nodes, target, historyHours, reducedMotion, inDiscussion } = props;
+  const composed = settings.postprocessing && view === 'globe';
   return (
     <>
-      {!settings.postprocessing && (
+      {!settings.postprocessing && view === 'globe' && (
         // LOW has no composer; a CSS vignette matching VignetteEffect costs no GPU pass.
         <div
           aria-hidden="true"
@@ -82,13 +87,15 @@ export const GlobeLayers = memo(function GlobeLayers(props: GlobeLayersProps): J
       />
       <StoryLayer
         nodes={nodes}
-        controls={controls}
+        camera={target.camera}
+        globeControls={props.globeControls}
         apiBaseUrl={props.apiBaseUrl}
         savedStoryLimit={props.savedStoryLimit}
         detailsAvailable={props.detailsAvailable}
         reducedMotion={reducedMotion}
       />
-      <DiscussionLayer scrim={!settings.postprocessing} apiBaseUrl={props.apiBaseUrl} />
+      {/* The globe's composer recedes it behind a discussion; anything else gets a CSS scrim. */}
+      <DiscussionLayer scrim={!composed} apiBaseUrl={props.apiBaseUrl} />
     </>
   );
 });

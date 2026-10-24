@@ -4,14 +4,14 @@ import type { NodeBuffer } from '@/core';
 
 import { nextAnnouncement } from '../announce';
 import { FilterBar } from './FilterBar';
-import type { GlobeTarget } from './globeNavigation';
+import type { ViewTarget } from './viewNavigation';
 import { SearchBox } from './SearchBox';
 import { useFilterUrl } from './useFilterUrl';
 
 export interface NavLayerProps {
   readonly nodes: NodeBuffer | null;
   /** The camera, and the canvas's size, which framing a place needs. */
-  readonly target: GlobeTarget;
+  readonly target: ViewTarget;
   readonly apiBaseUrl: string;
   /** AppConfig.historyWindowHours. */
   readonly historyHours: number;

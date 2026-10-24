@@ -5,12 +5,12 @@ import { useOnboardingStore, usePanelStore } from '@/state';
 
 import { AccountLayer } from './account/AccountLayer';
 import LibraryLayer from './library/LibraryLayer';
-import type { GlobeTarget } from './nav/globeNavigation';
+import type { ViewTarget } from './nav/viewNavigation';
 import OnboardingLayer from './onboarding/OnboardingLayer';
 
 export interface SecondarySheetsProps {
   readonly nodes: NodeBuffer | null;
-  readonly target: GlobeTarget;
+  readonly target: ViewTarget;
   readonly historyHours: number;
   readonly savedStoryLimit: number;
   readonly reducedMotion: boolean;

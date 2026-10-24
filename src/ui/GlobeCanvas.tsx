@@ -1,57 +1,56 @@
-import { Canvas } from '@react-three/fiber';
-import { Suspense, useMemo, useState, type JSX } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
+import { useEffect, useMemo, type JSX } from 'react';
 import { Color } from 'three';
 
 import {
   previewTextureSet,
   textureSetForTier,
-  type AuthProvider,
+  type NodeBuffer,
   type Permalink,
   type QualityTier,
 } from '@/core';
-import { CAMERA_FOV_DEG, renderSettingsForTier, type OrbitGlobeControls } from '@/globe';
 import {
-  onboardingStore,
-  useAccountStore,
-  useDiscussionStage,
-  usePanelStore,
-  useStoryStore,
-} from '@/state';
+  CAMERA_FOV_DEG,
+  type MotionPreference,
+  type OrbitGlobeControls,
+  type RenderSettings,
+} from '@/globe';
+import { onboardingStore, useDiscussionStage } from '@/state';
 
 import { stageRecedeNow } from './discussion/stage';
-import { createPresentLog } from './globe/bloomReport';
+import type { PresentLog } from './globe/bloomReport';
 import { ControlsHost, PipelineHost } from './globe/canvasHosts';
 import { DiscussionStageHost } from './globe/DiscussionStageHost';
 import { REST_FRAME_INTERVAL_MS } from './globe/frameGovernor';
-import { createFrameProbe } from './globe/frameProbe';
+import type { FrameProbe } from './globe/frameProbe';
 import { GlobeReticle } from './globe/GlobeReticle';
 import { GlobeScene } from './globe/GlobeScene';
-import { LazyGlobeDevTools } from './globe/LazyGlobeDevTools';
-import { createPinPicker } from './globe/pinPicker';
+import type { GlobeInputHandlers } from './globe/bindControlInput';
+import type { PinPicker } from './globe/pinPicker';
 import { PinScene } from './globe/PinScene';
-import { useDevSettings } from './globe/useDevSettings';
-import { useGlobeSelection } from './globe/useGlobeSelection';
-import { useLiveClock } from './globe/useLiveClock';
-import { usePinNodes } from './globe/usePinNodes';
-import { usePrefersReducedMotion } from './globe/usePrefersReducedMotion';
-import { GlobeLayers } from './GlobeLayers';
-import type { GlobeTarget } from './nav/globeNavigation';
-import { useOnboardingTrigger } from './onboarding/useOnboardingTrigger';
+import type { DevSettings } from './globe/useDevSettings';
 import { TimeDriver } from './scrubber/TimeDriver';
-import { useOpenPermalink } from './story/permalinkLink';
 
 export interface GlobeCanvasProps {
   readonly tier: QualityTier;
-  /** AppConfig.historyWindowHours: the scrubber's reach, and the window mock stories span. */
-  readonly historyWindowHours: number;
-  /** AppConfig.apiBaseUrl, for a story's details. */
-  readonly apiBaseUrl: string;
-  /** AppConfig.savedStoryLimit. */
-  readonly savedStoryLimit: number;
-  /** The shared view this page was opened with, if any (see src/core/permalink.ts). */
+  readonly settings: RenderSettings;
+  readonly dev: DevSettings;
+  readonly motion: MotionPreference;
+  readonly nodes: NodeBuffer | null;
+  readonly picker: PinPicker;
+  /** Taps, Enter, Escape and Home on the globe. */
+  readonly input: GlobeInputHandlers;
+  /** What the last keyboard pick did, read out politely. */
+  readonly message: string;
+  /** The shared view this page was opened with, if any. */
   readonly link: Permalink;
-  /** Ways to sign in, or null when this build has no backend (then there is no Sign in). */
-  readonly authProviders: readonly AuthProvider[] | null;
+  readonly historyHours: number;
+  readonly controls: OrbitGlobeControls | null;
+  readonly onControls: (controls: OrbitGlobeControls | null) => void;
+  /** The list is showing (Prompt 5.1): the globe keeps its state but draws nothing and takes no input. */
+  readonly paused: boolean;
+  readonly probe: FrameProbe | null;
+  readonly presentLog: PresentLog | null;
 }
 
 /** Matches --color-void, so the opaque canvas is indistinguishable from the page. */
@@ -76,10 +75,20 @@ const GLOBE_LABEL =
   'rotate, plus or minus zoom, Enter opens the story nearest the centre, and Home returns to the ' +
   'resting view.';
 
+/** Draws the frame the globe missed while paused: nothing else asks for one. */
+function ResumeHost({ paused }: { readonly paused: boolean }): null {
+  const invalidate = useThree((state) => state.invalidate);
+  useEffect(() => {
+    if (!paused) invalidate();
+  }, [paused, invalidate]);
+  return null;
+}
+
 /**
  * The one <Canvas> in the app.
  *
- * - frameloop="demand": nothing draws unless something calls invalidate().
+ * - frameloop="demand": nothing draws unless something calls invalidate();
+ *   "never" while the list covers it, so Play draws no hidden frames.
  * - The tier decides the frame path (src/globe/renderSettings.ts). With a
  *   composer, canvas MSAA and depth are wasted (the composer has its own
  *   buffers) and r3f must not tone-map (`flat`); without one, r3f's default ACES
@@ -94,39 +103,10 @@ const GLOBE_LABEL =
  *   prop on its next render.
  */
 export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
-  const { tier, historyWindowHours, apiBaseUrl, savedStoryLimit, link, authProviders } = props;
-  const settings = renderSettingsForTier(tier);
-  const dev = useDevSettings(settings);
-  const [controls, setControls] = useState<OrbitGlobeControls | null>(null);
-  const reducedMotionPreferred = usePrefersReducedMotion();
-  const pinNodes = usePinNodes(dev.pinSource, historyWindowHours);
-  const motion = reducedMotionPreferred && !dev.fullMotion ? 'reduced' : 'full';
-  const picker = useMemo(() => createPinPicker(), []);
-  const selection = useGlobeSelection(controls, picker);
-  const storyOpen = useStoryStore((state) => state.sheet !== 'closed');
-  const panelOpen = usePanelStore((state) => state.panel !== null);
-  const sheetOpen = storyOpen || panelOpen;
-  const accountOpen = useAccountStore((state) => state.sheet !== null);
+  const { tier, settings, dev, motion, nodes, picker, paused, probe, presentLog } = props;
   const inDiscussion = useDiscussionStage((state) => state.phase !== 'closed');
   const resting = useDiscussionStage(
     (state) => state.phase !== 'closed' && state.quality === 'rest',
-  );
-  useOnboardingTrigger(sheetOpen || accountOpen || inDiscussion);
-  const target = useMemo(
-    (): GlobeTarget => ({ controls, viewport: picker.viewport }),
-    [controls, picker],
-  );
-  useLiveClock();
-  useOpenPermalink(link, historyWindowHours);
-
-  // Dev tooling (and `--mode bench`); production draws without queries.
-  const probe = useMemo(
-    () => (import.meta.env.DEV || import.meta.env.MODE === 'bench' ? createFrameProbe() : null),
-    [],
-  );
-  const presentLog = useMemo(
-    () => (import.meta.env.DEV || import.meta.env.MODE === 'bench' ? createPresentLog() : null),
-    [],
   );
 
   // BASE_URL is resolved here, not in src/core, which must not read Vite globals.
@@ -150,10 +130,9 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
   );
 
   return (
-    // Clips what slides off the bottom edge (the scrubber stepping aside, a closed sheet).
-    <div className="absolute inset-0 overflow-hidden">
+    <div className={`absolute inset-0 ${paused ? 'invisible' : ''}`}>
       <Canvas
-        frameloop="demand"
+        frameloop={paused ? 'never' : 'demand'}
         flat={settings.postprocessing}
         dpr={resting ? restDpr() : DPR_RANGE}
         camera={CAMERA}
@@ -170,13 +149,14 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
         aria-roledescription="globe"
         aria-label={GLOBE_LABEL}
         tabIndex={0}
-        // Behind the discussion panel the globe takes no input (Prompt 4.5).
-        inert={inDiscussion}
+        // Behind the discussion panel, or under the list, the globe takes no input.
+        inert={inDiscussion || paused}
         style={{ touchAction: 'none' }}
         className="peer focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         fallback={
           <p className="p-6 text-sm text-muted">
-            This globe needs WebGL, which is unavailable in this browser.
+            This globe needs WebGL, which is unavailable in this browser. The list view shows every
+            story.
           </p>
         }
       >
@@ -187,9 +167,9 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
           cloudsVisible={dev.cloudsVisible}
           atmosphere={dev.atmosphere}
         />
-        <TimeDriver historyHours={historyWindowHours} motion={motion} />
+        <TimeDriver historyHours={props.historyHours} motion={motion} />
         <PinScene
-          nodes={pinNodes}
+          nodes={nodes}
           sourceKey={String(dev.pinSource)}
           visible={dev.pinsVisible}
           motion={motion}
@@ -199,12 +179,12 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
         />
         <ControlsHost
           motion={motion}
-          onReady={setControls}
-          input={selection.input}
-          initialPose={link.camera}
+          onReady={props.onControls}
+          input={props.input}
+          initialPose={props.link.camera}
           restingCenter={onboardingStore.getState().homeCity}
         />
-        <DiscussionStageHost controls={controls} />
+        <DiscussionStageHost controls={props.controls} />
         <PipelineHost
           settings={settings}
           bloomEnabled={dev.bloomEnabled}
@@ -212,39 +192,10 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
           frameIntervalMs={resting ? REST_FRAME_INTERVAL_MS : 0}
           recede={stageRecedeNow}
         />
+        <ResumeHost paused={paused} />
       </Canvas>
       {/* Straight after the canvas: it shows on the canvas's focus-visible (CSS peer). */}
-      <GlobeReticle message={selection.message} />
-
-      <GlobeLayers
-        settings={settings}
-        nodes={pinNodes}
-        target={target}
-        controls={controls}
-        apiBaseUrl={apiBaseUrl}
-        historyHours={historyWindowHours}
-        savedStoryLimit={savedStoryLimit}
-        detailsAvailable={dev.pinSource === 'live'}
-        reducedMotion={motion === 'reduced'}
-        authProviders={authProviders}
-        sheetOpen={sheetOpen}
-        inDiscussion={inDiscussion}
-      />
-
-      {LazyGlobeDevTools && (
-        <Suspense fallback={null}>
-          <LazyGlobeDevTools
-            dev={dev}
-            tier={tier}
-            settings={settings}
-            probe={probe}
-            presentLog={presentLog}
-            controls={controls}
-            reducedMotionPreferred={reducedMotionPreferred}
-            historyHours={historyWindowHours}
-          />
-        </Suspense>
-      )}
+      <GlobeReticle message={props.message} />
     </div>
   );
 }

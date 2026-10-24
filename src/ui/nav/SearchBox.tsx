@@ -3,13 +3,13 @@ import { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent } from
 import { resultCount, type NodeBuffer } from '@/core';
 
 import { CategoryMark } from '../category/CategoryMark';
-import type { GlobeTarget } from './globeNavigation';
+import type { ViewTarget } from './viewNavigation';
 import { groupsFor, plural } from './searchOptions';
 import { useSearch } from './useSearch';
 
 export interface SearchBoxProps {
   readonly nodes: NodeBuffer | null;
-  readonly target: GlobeTarget;
+  readonly target: ViewTarget;
   readonly apiBaseUrl: string;
   readonly historyHours: number;
   /** Says what a choice did, in the page's live region. */

@@ -64,7 +64,10 @@ export function DiscussionStageHost({ controls }: DiscussionStageHostProps): nul
     const s = shot.current;
     if (!(camera instanceof PerspectiveCamera)) return;
 
-    if (stage.phase === 'closed' || stage.target === null) {
+    // No saved pose: the discussion opened from the list or the flat map,
+    // and the camera takes no part (Prompt 5.1).
+    const saved = stage.target?.savedPose ?? null;
+    if (stage.phase === 'closed' || stage.target === null || saved === null) {
       if (!s.active) return;
       // Handed back: no lens shift, and the controls' exact saved pose.
       s.active = false;
@@ -72,7 +75,7 @@ export function DiscussionStageHost({ controls }: DiscussionStageHostProps): nul
       s.plannedFor = null;
       s.last = null;
       camera.clearViewOffset();
-      if (stage.target) controls?.setState(stage.target.savedPose);
+      if (saved) controls?.setState(saved);
       invalidate();
       return;
     }
@@ -89,26 +92,20 @@ export function DiscussionStageHost({ controls }: DiscussionStageHostProps): nul
     }
 
     const { target } = stage;
-    const distanceKm = shotDistanceKm(target.savedPose.altitudeKm);
+    const distanceKm = shotDistanceKm(saved.altitudeKm);
     let pose: ShotPose;
     if (stage.camera) {
       if (s.plannedFor !== stage.camera || s.move === null) {
         const to =
-          stage.camera.direction === 'in'
-            ? orbitShot(target.city, distanceKm, 0)
-            : poseShot(target.savedPose);
-        s.move = planShotMove(
-          s.last ?? poseShot(target.savedPose),
-          to,
-          controls?.getLimits().maxKm ?? 0,
-        );
+          stage.camera.direction === 'in' ? orbitShot(target.city, distanceKm, 0) : poseShot(saved);
+        s.move = planShotMove(s.last ?? poseShot(saved), to, controls?.getLimits().maxKm ?? 0);
         s.plannedFor = stage.camera;
       }
       pose = s.move.sample(cameraFraction(stage.camera, now));
     } else if (stage.orbitFromMs !== null) {
       pose = orbitShot(target.city, distanceKm, (now - stage.orbitFromMs) / 1000);
     } else {
-      pose = s.last ?? poseShot(target.savedPose);
+      pose = s.last ?? poseShot(saved);
     }
     s.last = pose;
 

@@ -5,8 +5,8 @@ import type { DbConfig } from '@/core/db/config';
 
 import { useAccountSession } from './data/useAccountSession';
 import { useNodesFeed } from './data/useNodesFeed';
-import { GlobeCanvas } from './GlobeCanvas';
 import { NewsStatus } from './NewsStatus';
+import { NewsView } from './NewsView';
 import { resolveQuality } from './platform/capabilities';
 
 export interface AppProps {
@@ -50,7 +50,7 @@ export function App({ config, dbConfig = null, authProviders = [] }: AppProps): 
       </header>
 
       <main id="globe" tabIndex={-1} aria-label="News globe" className="relative min-h-0 flex-1">
-        <GlobeCanvas
+        <NewsView
           tier={quality.tier}
           historyWindowHours={config.historyWindowHours}
           apiBaseUrl={config.apiBaseUrl}

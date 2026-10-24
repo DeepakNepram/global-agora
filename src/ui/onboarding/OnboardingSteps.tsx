@@ -5,7 +5,7 @@ import { followsStore, onboardingStore, useFollowsStore, useOnboardingStore } fr
 
 import { categoryFollow } from '../library/followInputs';
 import { PlacePicker } from '../library/PlacePicker';
-import type { GlobeTarget } from '../nav/globeNavigation';
+import type { ViewTarget } from '../nav/viewNavigation';
 import { flyHome } from './flyHome';
 
 const CHIP =
@@ -50,7 +50,7 @@ export function InterestsStep(): JSX.Element {
  * Step 2: home city. Typed, never located: no location permission and no IP
  * guess. It decides where the globe rests, and stays on this device.
  */
-export function HomeStep({ target }: { target: GlobeTarget }): JSX.Element {
+export function HomeStep({ target }: { target: ViewTarget }): JSX.Element {
   const home = useOnboardingStore((state) => state.homeCity);
   const change = useRef<HTMLButtonElement>(null);
   const chosen = useRef(false);

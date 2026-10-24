@@ -8,7 +8,7 @@ import {
 import { filterStore, wallClockNow } from '@/state';
 
 import { formatAgo } from '../story/format';
-import { flyToPlace, openStoryOnGlobe, type GlobeTarget } from './globeNavigation';
+import { flyToPlace, openStory, type ViewTarget } from './viewNavigation';
 import type { SearchModel } from './useSearch';
 
 /** What a search result offers: a line to show and what choosing it does. */
@@ -23,7 +23,7 @@ export interface SearchOption {
 
 export interface OptionContext {
   readonly nodes: NodeBuffer | null;
-  readonly target: GlobeTarget;
+  readonly target: ViewTarget;
   readonly announce: (text: string) => void;
 }
 
@@ -62,7 +62,7 @@ export function groupsFor(
       category: categoryAt(nodes.categories[row] ?? 0),
       pick: () => {
         close(null);
-        openStoryOnGlobe(target, nodes, id);
+        openStory(target, nodes, id);
       },
     };
   };

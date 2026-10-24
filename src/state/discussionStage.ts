@@ -56,7 +56,12 @@ export interface StageTarget {
   /** The story's uuid, which keys its discussion. */
   readonly storyId: string;
   readonly city: LatLon;
-  readonly savedPose: SavedPose;
+  /**
+   * Where the globe's camera was, which leaving restores; null when the
+   * globe is not on screen (the list or the flat map, Prompt 5.1) and the
+   * camera takes no part.
+   */
+  readonly savedPose: SavedPose | null;
   /** The story sheet's state before entering, given back on leaving. */
   readonly returnSheet: SheetState;
 }

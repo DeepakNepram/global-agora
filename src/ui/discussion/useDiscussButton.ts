@@ -11,6 +11,7 @@ export interface DiscussButtonOptions {
   readonly discussionOpen: boolean;
   readonly selectedId: number | null;
   readonly detail: DetailState;
+  /** The globe's controls while the globe is on screen; null in the list or on the flat map. */
   readonly controls: OrbitGlobeControls | null;
   readonly reducedMotion: boolean;
   readonly announce: (text: string) => void;
@@ -48,7 +49,7 @@ export function useDiscussButton(options: DiscussButtonOptions): DiscussButton {
     if (opening === null || enteringFor.current === opening) return;
     if (opening !== selectedId) {
       setOpening(null);
-    } else if (detail.status === 'ready' && detail.detail.id === opening && controls) {
+    } else if (detail.status === 'ready' && detail.detail.id === opening) {
       enteringFor.current = opening;
       const story = detail.detail;
       enterDiscussion({
