@@ -49,6 +49,13 @@ export type { FetchLike, FetchNodesOptions, FetchNodesResult } from './data/node
 export { retryDelayMs, startNodesFeed } from './data/nodesFeed';
 export { newestStoryMs, newsAgeText, SAVED_AT_HEADER, savedAtFrom } from './data/saved';
 export {
+  afterContextLoss,
+  CONTEXT_LOSS_WINDOW_MS,
+  CONTEXT_LOSSES_BEFORE_MAP,
+  CONTEXT_RESTORE_WAIT_MS,
+} from './contextLoss';
+export type { ContextLossVerdict } from './contextLoss';
+export {
   fetchStory,
   locationReportUrl,
   parseStory,

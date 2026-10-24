@@ -1,14 +1,22 @@
-import { Suspense, useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 
-import type { AuthProvider, Permalink, QualityTier } from '@/core';
-import { renderSettingsForTier, type OrbitGlobeControls } from '@/globe';
 import {
+  CONTEXT_RESTORE_WAIT_MS,
+  type AuthProvider,
+  type Permalink,
+  type QualityTier,
+} from '@/core';
+import { renderSettingsForTier, type CameraPose, type OrbitGlobeControls } from '@/globe';
+import {
+  globeHealthStore,
   useAccountStore,
   useDiscussionStage,
+  useGlobeHealth,
   usePanelStore,
   useStoryStore,
   useViewStore,
   viewStore,
+  wallClockNow,
 } from '@/state';
 
 import { FlatMap } from './flatmap/FlatMap';
@@ -16,6 +24,7 @@ import type { FlatControls } from './flatmap/flatCamera';
 import { useModalSheetOpen } from './focus/useModal';
 import { createPresentLog } from './globe/bloomReport';
 import { createFrameProbe } from './globe/frameProbe';
+import { GlobeErrorBoundary } from './globe/GlobeErrorBoundary';
 import { LazyGlobeDevTools } from './globe/LazyGlobeDevTools';
 import { createPinPicker } from './globe/pinPicker';
 import { useDevSettings } from './globe/useDevSettings';
@@ -29,6 +38,7 @@ import { StoryList } from './list/StoryList';
 import type { ViewCamera, ViewTarget } from './nav/viewNavigation';
 import { useOnboardingTrigger } from './onboarding/useOnboardingTrigger';
 import { useTimeDriving } from './scrubber/timeDriving';
+import { reportWarning } from './platform/errorReporting';
 import { useOpenPermalink } from './story/permalinkLink';
 
 export interface NewsViewProps {
@@ -43,6 +53,8 @@ export interface NewsViewProps {
   readonly link: Permalink;
   /** Ways to sign in, or null when this build has no backend (then there is no Sign in). */
   readonly authProviders: readonly AuthProvider[] | null;
+  /** False when the device can make no WebGL context: the flat map stands in. */
+  readonly webgl: boolean;
 }
 
 /**
@@ -59,14 +71,20 @@ export type NewsViewKind = 'globe' | 'map' | 'list';
  * the one drawing.
  */
 export function NewsView(props: NewsViewProps): JSX.Element {
-  const { tier, historyWindowHours, apiBaseUrl, savedStoryLimit, link, authProviders } = props;
+  const { tier, historyWindowHours, apiBaseUrl, savedStoryLimit, link, authProviders, webgl } =
+    props;
   const settings = renderSettingsForTier(tier);
   const dev = useDevSettings(settings);
   const reducedMotionPreferred = usePrefersReducedMotion();
   const motion = reducedMotionPreferred && !dev.fullMotion ? 'reduced' : 'full';
   const layout = useViewStore((state) => state.layout);
-  // Under reduced motion the globe is a flat map: no flights, no inertia, no pulse.
-  const visual: 'globe' | 'map' = motion === 'reduced' ? 'map' : 'globe';
+  const globeFallback = useGlobeHealth((state) => state.fallback);
+  const generation = useGlobeHealth((state) => state.generation);
+  const restoring = useGlobeHealth((state) => state.restoring);
+  // Under reduced motion the globe is a flat map: no flights, no inertia, no
+  // pulse. So it is without WebGL, or once the globe has failed (Prompt 5.2).
+  const visual: 'globe' | 'map' =
+    motion === 'reduced' || !webgl || globeFallback !== null ? 'map' : 'globe';
   const view: NewsViewKind = layout === 'list' ? 'list' : visual;
   // Each mounts the first time it is wanted: a reader who keeps to the list
   // never pays for the globe's textures and GPU context.
@@ -107,6 +125,28 @@ export function NewsView(props: NewsViewProps): JSX.Element {
     fly(camera);
   }, [camera]);
 
+  // A lost WebGL context: a new canvas takes over where the camera was,
+  // when the browser says it is back or after a short wait (Prompt 5.2).
+  const resumePose = useRef<CameraPose | null>(null);
+  const onContextLost = useCallback(() => {
+    resumePose.current = controls?.getState() ?? null;
+    globeHealthStore.getState().contextLost(wallClockNow());
+    const { lossesMs, fallback } = globeHealthStore.getState();
+    const losses = String(lossesMs.length);
+    reportWarning(
+      `WebGL context lost (${losses} in 10 min)`,
+      { tier, losses },
+      'webgl-context-lost',
+    );
+    if (fallback === 'lost') reportWarning('The globe gave way to the flat map', { tier });
+  }, [controls, tier]);
+  const onContextRestored = useCallback(() => globeHealthStore.getState().remount(), []);
+  useEffect(() => {
+    if (!restoring) return;
+    const timer = window.setTimeout(onContextRestored, CONTEXT_RESTORE_WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [restoring, onContextRestored]);
+
   useLiveClock();
   useOpenPermalink(link, historyWindowHours);
   useTimeDriving(view !== 'globe', historyWindowHours, motion);
@@ -125,25 +165,31 @@ export function NewsView(props: NewsViewProps): JSX.Element {
     // Clips what slides off the bottom edge (the scrubber stepping aside, a closed sheet).
     <div className="absolute inset-0 overflow-hidden">
       {used.globe && visual === 'globe' && (
-        <GlobeCanvas
-          tier={tier}
-          settings={settings}
-          dev={dev}
-          motion={motion}
-          nodes={pinNodes}
-          picker={picker}
-          input={selection.input}
-          message={selection.message}
-          focused={selection.focused}
-          link={link}
-          historyHours={historyWindowHours}
-          controls={controls}
-          onControls={setControls}
-          paused={view !== 'globe'}
-          covered={covered}
-          probe={probe}
-          presentLog={presentLog}
-        />
+        <GlobeErrorBoundary>
+          <GlobeCanvas
+            key={generation}
+            tier={tier}
+            settings={settings}
+            dev={dev}
+            motion={motion}
+            nodes={pinNodes}
+            picker={picker}
+            input={selection.input}
+            message={selection.message}
+            focused={selection.focused}
+            initialPose={resumePose.current ?? link.camera}
+            onContextLost={onContextLost}
+            onContextRestored={onContextRestored}
+            restoring={restoring}
+            historyHours={historyWindowHours}
+            controls={controls}
+            onControls={setControls}
+            paused={view !== 'globe'}
+            covered={covered}
+            probe={probe}
+            presentLog={presentLog}
+          />
+        </GlobeErrorBoundary>
       )}
       {used.map && visual === 'map' && (
         <FlatMap

@@ -96,8 +96,12 @@ export function startSentry(
     error: (error, context) => {
       captureException(error, context ? { extra: context } : undefined);
     },
-    warning: (message, context) => {
-      captureMessage(message, { level: 'warning', ...(context ? { extra: context } : {}) });
+    warning: (message, context, group) => {
+      captureMessage(message, {
+        level: 'warning',
+        ...(context ? { extra: context } : {}),
+        ...(group ? { fingerprint: [group] } : {}),
+      });
     },
   };
 }

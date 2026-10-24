@@ -15,7 +15,8 @@ export type ErrorContext = Readonly<Record<string, string>>;
 
 export interface ErrorReporter {
   error(error: unknown, context?: ErrorContext): void;
-  warning(message: string, context?: ErrorContext): void;
+  /** `group` puts every warning of a kind under one issue, whatever its message says. */
+  warning(message: string, context?: ErrorContext, group?: string): void;
 }
 
 export interface ErrorReportingConfig {
@@ -42,9 +43,13 @@ export function reportError(error: unknown, context?: ErrorContext): void {
   send((to) => to.error(error, context));
 }
 
-/** Something survivable that we want counted, such as a lost WebGL context. */
-export function reportWarning(message: string, context?: ErrorContext): void {
-  send((to) => to.warning(message, context));
+/**
+ * Something survivable that we want counted, such as a lost WebGL context.
+ * Give repeats different messages (Sentry drops an event identical to the
+ * one before it) and the same `group`.
+ */
+export function reportWarning(message: string, context?: ErrorContext, group?: string): void {
+  send((to) => to.warning(message, context, group));
 }
 
 export function startErrorReporting(config: ErrorReportingConfig): void {

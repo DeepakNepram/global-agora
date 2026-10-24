@@ -106,7 +106,13 @@ export function writeTierOverride(tier: QualityTier | null): void {
   }
 }
 
+export interface QualityResult extends TierDecision {
+  /** False when no WebGL context could be made at all: the flat map stands in (Prompt 5.2). */
+  readonly webgl: boolean;
+}
+
 /** Measure, read the override, decide. The one call the app actually makes. */
-export function resolveQuality(): TierDecision {
-  return decideTier(detectCapabilities(), readTierOverride());
+export function resolveQuality(): QualityResult {
+  const caps = detectCapabilities();
+  return { ...decideTier(caps, readTierOverride()), webgl: caps.maxTextureSize > 0 };
 }

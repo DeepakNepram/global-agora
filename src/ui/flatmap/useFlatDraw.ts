@@ -136,6 +136,15 @@ export function useFlatDraw(options: FlatDrawOptions): FlatDraw {
     draw.requestDraw();
   }, [nodes, paused, focused, draw]);
 
+  // A 2D canvas can lose its pixels too (Chrome, under memory pressure); draw again once it is back.
+  useEffect(() => {
+    const element = canvas.current;
+    if (!element) return;
+    const redraw = (): void => draw.requestDraw();
+    element.addEventListener('contextrestored', redraw);
+    return () => element.removeEventListener('contextrestored', redraw);
+  }, [canvas, draw]);
+
   useEffect(
     () => () => {
       // Reset as well as cancel: StrictMode remounts, and a stale handle would block every draw.

@@ -2,15 +2,10 @@ import { Canvas, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, type JSX } from 'react';
 import { Color } from 'three';
 
-import {
-  previewTextureSet,
-  textureSetForTier,
-  type NodeBuffer,
-  type Permalink,
-  type QualityTier,
-} from '@/core';
+import { previewTextureSet, textureSetForTier, type NodeBuffer, type QualityTier } from '@/core';
 import {
   CAMERA_FOV_DEG,
+  type CameraPose,
   type MotionPreference,
   type OrbitGlobeControls,
   type RenderSettings,
@@ -46,8 +41,14 @@ export interface GlobeCanvasProps {
   readonly message: string;
   /** The pin Tab has landed on, which the focus ring follows. */
   readonly focused: FocusedPin | null;
-  /** The shared view this page was opened with, if any. */
-  readonly link: Permalink;
+  /** Where the camera starts: a shared view's, or where it was before a lost context; null rests. */
+  readonly initialPose: CameraPose | null;
+  /** The WebGL context was lost (Prompt 5.2): NewsView makes a new canvas. */
+  readonly onContextLost: () => void;
+  /** The browser says the context is back: a new canvas need not wait. */
+  readonly onContextRestored: () => void;
+  /** A lost context is being replaced: "Restoring the globe…". */
+  readonly restoring: boolean;
   readonly historyHours: number;
   readonly controls: OrbitGlobeControls | null;
   readonly onControls: (controls: OrbitGlobeControls | null) => void;
@@ -112,6 +113,11 @@ function ResumeHost({ paused }: { readonly paused: boolean }): null {
 export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
   const { tier, settings, dev, motion, nodes, picker, paused, probe, presentLog, focused } = props;
   const ring = useRef<HTMLDivElement>(null);
+  // The listeners are added once, at creation; they call whatever is current.
+  const contextHandlers = useRef(props);
+  useEffect(() => {
+    contextHandlers.current = props;
+  });
   const inDiscussion = useDiscussionStage((state) => state.phase !== 'closed');
   const resting = useDiscussionStage(
     (state) => state.phase !== 'closed' && state.quality === 'rest',
@@ -152,6 +158,15 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
         // per render, for the target actually being drawn.
         onCreated={(state) => {
           state.scene.background = new Color(voidColor());
+          // preventDefault lets the browser restore it; three stops drawing meanwhile.
+          const element = state.gl.domElement;
+          element.addEventListener('webglcontextlost', (event) => {
+            event.preventDefault();
+            contextHandlers.current.onContextLost();
+          });
+          element.addEventListener('webglcontextrestored', () =>
+            contextHandlers.current.onContextRestored(),
+          );
         }}
         role="application"
         aria-roledescription="globe"
@@ -159,7 +174,8 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
         tabIndex={0}
         // Behind the discussion panel, or under the list, the globe takes no input.
         inert={inDiscussion || paused || props.covered}
-        style={{ touchAction: 'none' }}
+        // A lost context's canvas shows white in Chrome: hidden until the new one draws.
+        style={{ touchAction: 'none', ...(props.restoring ? { visibility: 'hidden' } : {}) }}
         className="peer focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         fallback={
           <p className="p-6 text-sm text-muted">
@@ -189,7 +205,7 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
           motion={motion}
           onReady={props.onControls}
           input={props.input}
-          initialPose={props.link.camera}
+          initialPose={props.initialPose}
           restingCenter={onboardingStore.getState().homeCity}
         />
         <DiscussionStageHost controls={props.controls} />
@@ -206,6 +222,14 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
       {/* After the canvas: they show on the canvas's focus-visible (CSS peer). */}
       <GlobeReticle message={props.message} pinFocused={focused !== null} />
       <PinFocusRing ring={ring} focused={focused} />
+      {props.restoring && (
+        <p
+          role="status"
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-edge bg-panel px-4 py-2 text-sm text-ink"
+        >
+          Restoring the globe…
+        </p>
+      )}
     </div>
   );
 }

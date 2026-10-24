@@ -7,6 +7,7 @@ import { useAccountSession } from './data/useAccountSession';
 import { useConnectivity } from './data/useConnectivity';
 import { useNodesFeed } from './data/useNodesFeed';
 import { useAnyModalOpen } from './focus/useModal';
+import { GlobeNotice } from './globe/GlobeNotice';
 import { NewsStatus } from './NewsStatus';
 import { NewsView } from './NewsView';
 import { OfflineBanner } from './OfflineBanner';
@@ -59,6 +60,7 @@ export function App({ config, dbConfig = null, authProviders = [] }: AppProps): 
           <UpdateNotice />
         </div>
         <OfflineBanner />
+        <GlobeNotice webgl={quality.webgl} />
       </header>
 
       <main id="globe" tabIndex={-1} aria-label="News" className="relative min-h-0 flex-1">
@@ -69,6 +71,7 @@ export function App({ config, dbConfig = null, authProviders = [] }: AppProps): 
           savedStoryLimit={config.savedStoryLimit}
           link={link}
           authProviders={dbConfig === null ? null : authProviders}
+          webgl={quality.webgl}
         />
       </main>
 
