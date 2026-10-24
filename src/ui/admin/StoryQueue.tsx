@@ -98,7 +98,8 @@ export function StoryQueue({ controller, nowMs }: StoryQueueProps): JSX.Element 
                     type="button"
                     className={SECONDARY}
                     disabled={form?.sending === true}
-                    aria-label={`Open a discussion on “${story.title}”`}
+                    // The visible words first, so a voice command saying them works (WCAG 2.5.3).
+                    aria-label={`Open discussion on “${story.title}”`}
                     onClick={() => controller.beginOpen(story.storyId)}
                   >
                     Open discussion…
@@ -125,6 +126,8 @@ export function StoryQueue({ controller, nowMs }: StoryQueueProps): JSX.Element 
 
   return (
     <section className="flex flex-col gap-3">
+      {/* The level between the page's h1 and each story's h3, for heading navigation. */}
+      <h2 className="sr-only">Hot stories</h2>
       {/* The cap's refusal, when there is one, says this already. */}
       {capped && counters !== null && message?.kind !== 'cap' && (
         <p className="rounded-lg border border-amber-300/40 bg-amber-300/10 p-3 text-sm text-ink">

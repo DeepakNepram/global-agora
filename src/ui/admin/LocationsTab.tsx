@@ -93,6 +93,8 @@ export function LocationsTab({ controller, nowMs }: LocationsTabProps): JSX.Elem
 
   return (
     <section className="flex flex-col gap-3">
+      {/* The level between the page's h1 and the editor's h3, for heading navigation. */}
+      <h2 className="sr-only">Pins in the wrong place</h2>
       <form
         className="flex flex-wrap items-end gap-2"
         onSubmit={(event) => {

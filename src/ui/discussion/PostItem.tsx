@@ -6,7 +6,7 @@ import type { ModerationResult } from '@/state/discussionRoomActions';
 
 import { VotedMark } from '../icons/StateMarks';
 import { formatAgo } from '../story/format';
-import { kindChip, linkHost, sideName, voteLabel } from './discussionView';
+import { kindChip, linkHost, sideName, voteCount } from './discussionView';
 import { PostMenu } from './PostMenu';
 
 export interface PostItemProps {
@@ -141,24 +141,23 @@ export const PostItem = memo(function PostItem(props: PostItemProps): JSX.Elemen
             <button
               type="button"
               aria-pressed={changed}
-              aria-label={voteLabel('changed_mind', post.changedMindCount)}
               onClick={() => onVote(post, 'changed_mind')}
               className="flex h-11 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-void hover:bg-accent/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-pressed:bg-ink aria-pressed:text-void"
             >
               {changed ? <VotedMark /> : <MindIcon />}
-              Changed my mind
-              <span className="tabular-nums">{post.changedMindCount}</span>
+              {/* Named by what it shows, a comma between for a screen reader (WCAG 2.5.3). */}
+              Changed my mind<span className="sr-only">, </span>
+              <span className="tabular-nums">{voteCount(post.changedMindCount)}</span>
             </button>
             <button
               type="button"
               aria-pressed={helpful}
-              aria-label={voteLabel('helpful', post.helpfulCount)}
               onClick={() => onVote(post, 'helpful')}
               className="flex h-11 items-center gap-2 rounded-full border border-ink/20 px-3 text-sm text-ink/90 hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-pressed:border-accent aria-pressed:text-accent"
             >
               {helpful ? <VotedMark /> : <HelpfulIcon />}
-              Helpful
-              <span className="tabular-nums">{post.helpfulCount}</span>
+              Helpful<span className="sr-only">, </span>
+              <span className="tabular-nums">{voteCount(post.helpfulCount)}</span>
             </button>
             <span className="ml-auto">
               <PostMenu

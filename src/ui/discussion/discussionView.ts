@@ -114,8 +114,9 @@ export function voteResultText(result: VoteResult, kind: VoteKind): string | nul
   return 'That vote could not be sent. Try again.';
 }
 
-export function voteLabel(kind: VoteKind, count: number): string {
-  return `${kind === 'helpful' ? 'Helpful' : 'Changed my mind'}, ${count.toLocaleString('en-US')}`;
+/** A vote count as its button shows it, and so as its name reads (1,234). */
+export function voteCount(count: number): string {
+  return count.toLocaleString('en-US');
 }
 
 /** The balance in words: shares are never told by colour alone. */

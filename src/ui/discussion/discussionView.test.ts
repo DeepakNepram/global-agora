@@ -11,7 +11,7 @@ import {
   sendResultText,
   sharesText,
   sideName,
-  voteLabel,
+  voteCount,
   voteResultText,
   waitText,
 } from './discussionView';
@@ -61,7 +61,7 @@ describe('copy', () => {
   });
 
   it('names votes with their counts, and explains refusals', () => {
-    expect(voteLabel('changed_mind', 1234)).toBe('Changed my mind, 1,234');
+    expect(voteCount(1234)).toBe('1,234');
     expect(voteResultText('no-side', 'helpful')).toMatch(/Pick a side/);
     expect(voteResultText('already', 'helpful')).toBeNull();
   });

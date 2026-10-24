@@ -46,9 +46,9 @@ export function FollowingPanel(props: FollowingPanelProps): JSX.Element {
   return (
     <div className="flex flex-col gap-5">
       <section aria-labelledby="following-yours">
-        <h3 id="following-yours" className="mb-2 text-sm font-semibold text-ink">
+        <h2 id="following-yours" className="mb-2 text-sm font-semibold text-ink">
           You follow
-        </h3>
+        </h2>
         {follows.length === 0 ? (
           <p className="text-sm text-muted">
             Nothing yet. Follow places, topics or single stories, and their news collects here.
@@ -78,9 +78,9 @@ export function FollowingPanel(props: FollowingPanelProps): JSX.Element {
       </section>
 
       <section aria-labelledby="following-topics" className="flex flex-col gap-3">
-        <h3 id="following-topics" className="text-sm font-semibold text-ink">
+        <h2 id="following-topics" className="text-sm font-semibold text-ink">
           Follow topics and places
-        </h3>
+        </h2>
         <div role="group" aria-label="Topics" className="flex flex-wrap gap-1.5">
           {NEWS_CATEGORIES.map((category) => {
             const on = follows.some((f) => f.kind === 'category' && f.target === category);
@@ -119,9 +119,9 @@ export function FollowingPanel(props: FollowingPanelProps): JSX.Element {
       </section>
 
       <section aria-labelledby="following-feed">
-        <h3 id="following-feed" className="mb-2 text-sm font-semibold text-ink">
+        <h2 id="following-feed" className="mb-2 text-sm font-semibold text-ink">
           Latest from what you follow
-        </h3>
+        </h2>
         {feed?.waitingForPlaces && <p className="mb-2 text-xs text-muted">Loading places…</p>}
         {nodes && feed && feed.items.length > 0 && (
           <ol className="flex flex-col">
