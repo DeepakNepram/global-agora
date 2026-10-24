@@ -7,7 +7,7 @@ discussions.
 Web first. Native mobile is a later phase, so the code stays portable — see
 [the boundary](#the-boundary-that-matters).
 
-**Status: Phase 4 in progress.** The globe shows real news from GDELT:
+**Status: Phase 5 in progress.** The globe shows real news from GDELT:
 ingested every 15 minutes, grouped into stories, served as one compact
 payload, clustered in a Web Worker, and opened with an animated bloom as you
 zoom in. A time scrubber drags or plays back through the last 24 hours, with
@@ -18,7 +18,11 @@ outlets; filters dim what they leave out; a Following tab and a Saved list
 keep what you care about, on your device or in your account. Signing in (an
 emailed link or code; Google and Apple once set up) asks once for 17+, a
 handle and the community rules, and an account can be deleted from the
-account sheet in three taps. Reading never needs one. No discussions yet.
+account sheet in three taps. Reading never needs one. Hot stories open
+sided discussions from an admin console, with moderation, and a coarse
+local badge when a reader chooses it. Everything works without the globe:
+a list view, a flat map under reduced motion, the globe's pins by Tab, and
+WCAG AA colour, checked by axe-core in CI ([accessibility](docs/ACCESSIBILITY.md)).
 
 ## Requirements
 
@@ -58,6 +62,8 @@ npm run textures
 | `npm run test`             | Vitest, once                                      |
 | `npm run test:watch`       | Vitest, watching                                  |
 | `npm run verify`           | typecheck + lint + format:check + test, in one go |
+| `npm run test:e2e`         | axe-core and keyboard checks in Chromium (below)  |
+| `npm run test:e2e:build`   | The production build those checks run against     |
 | `npm run textures`         | fetch + build the Earth textures (see below)      |
 | `npm run db:start`         | Start local Supabase in Docker (see Database)     |
 | `npm run db:reset`         | Re-apply every migration, then the seed           |
@@ -282,8 +288,8 @@ src/ui/      React components. Tailwind. Talks to core/ and globe/.
 src/state/   Zustand stores.
 workers/     Cloudflare Workers: ingest/ (cron), api/ (payload), shared/.
 supabase/    Migrations, RLS policies, edge functions.
-docs/        ARCHITECTURE.md, DATA_SCHEMA.md, DECISIONS.md
-tests/       Cross-cutting tests that do not belong to one layer.
+docs/        ARCHITECTURE.md, DATA_SCHEMA.md, DECISIONS.md, ACCESSIBILITY.md
+tests/       Cross-cutting tests; tests/e2e holds the browser checks (Playwright).
 ```
 
 ### The boundary that matters
@@ -389,4 +395,9 @@ Full rules: [`CLAUDE.md`](CLAUDE.md). Product plan:
 every push and pull request. The tests include the ingest Worker's, which run
 on real GDELT rows kept as a fixture, so CI never calls GDELT. A second job, alongside the first, starts
 Postgres with every migration and the seed, runs the pgTAP tests, and checks
-that `src/core/db/types.ts` matches the schema.
+that `src/core/db/types.ts` matches the schema. A third builds the app and
+runs `tests/e2e` in Chromium: axe-core on every view, sheet and panel at a
+desktop and a phone size, failing on any WCAG 2.2 A or AA or best-practice
+violation, and the keyboard paths through them. Locally, once
+`npx playwright install chromium` has fetched the browser:
+`npm run test:e2e` (54 checks, about 2 minutes, no database needed).

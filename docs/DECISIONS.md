@@ -6,6 +6,159 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-10-24 — Accessibility: three views, shapes for categories, axe in CI
+
+Prompt 5.1 makes the app fully usable without the globe. What each piece
+promises a reader is in [`ACCESSIBILITY.md`](ACCESSIBILITY.md); this entry
+is the why.
+
+**Your calls.**
+
+- **Categories get shapes on the pins**, and cluster orbs carry their main
+  category's shape as a mark on the rim.
+- **List rows show the number of sources**, not an outlet's name: no
+  payload change.
+- **Tab on the globe goes nearest the centre first.**
+- **The list is newest first**, with a "Most covered" order.
+
+**Shapes.**
+
+- **Geometry:** one in `src/core/categoryShapes.ts`, each shape at the area
+  of the unit circle. Three surfaces read it:
+  - the pin fragment shader, as signed distances generated from the same
+    numbers, with a CPU mirror the tests check;
+  - the flat map, through `Path2D`;
+  - labels, as SVG.
+- **Science is a ✖, not the planned hexagon:** at pin size a hexagon reads
+  as a circle (screenshot shown to you). ✖ is the usual eighth marker beside
+  ✚.
+- **Pin size:** pin cores grew from 2.7 to 3.8 CSS px so a triangle reads
+  as one. The white-hot spot keeps the old dot's size, so bloom did not grow.
+- **GPU cost:** the pin benchmark shows none. Pins-on GPU time was
+  - HIGH: 7.3 ms against 7.3 ms;
+  - MEDIUM: 5.9–6.1 ms against 5.8–6.5 ms;
+  - measured as paired runs against the previous commit, 1440×900, 3,000 pins.
+
+**Tab on the globe and the map** (`src/ui/globe/usePinFocus.ts`). The pin
+layer gained `targets()` and `locate()`, which share picking's projection.
+
+- **Tab past the last pin leaves**, so it is never a trap (2.1.2).
+- **What counts as in view:** pins under the search bar, the scrubber or an
+  open sheet are skipped, found from elements marked `data-covers`.
+- **The ring** is a DOM element placed from inside the canvas on each frame
+  drawn, so it costs no GPU pass.
+- **When the round restarts:** while the camera is still and the same pins
+  are drawn, the round holds; otherwise it starts again. The first version
+  kept a round made before the clusters arrived, so on the still flat map
+  Tab found nothing. The keyboard checks caught it.
+
+**The list and the flat map are in the main chunk.**
+
+- **What lazy cost:** as lazy chunks, each made rolldown split React, zustand
+  and the stores into three more startup files. That is the same split as
+  the 2026-10-22 entry below.
+- **The numbers:**
+  - the list: 396.4 KB over four files, against 395.2 KB in one;
+  - the map: 382.8 KB plus three files, against 399.6 KB in one.
+- **Main chunk now:** 400.2 KB gzip, up 12 KB over Phase 4's 388.3 KB, in
+  one file. That is about 60 ms on Lighthouse's slow 4G and well under that
+  on good 4G (cold start 0.3 s locally).
+
+**The list follows the globe's time and filters.**
+
+- **Its contents:** the stories published by the displayed instant, through
+  the same `matchesFilter` the globe dims with (`src/core/storyList.ts`).
+- **When it redraws:** only when a key changes, that is the number published
+  and the number aged out of the window. Play then redraws it a few times a
+  second, not every frame.
+- **Never an infinite scroll** (CLAUDE.md): Show more adds 50.
+- **The globe behind it pauses:** frameloop "never", hidden and inert. It
+  mounts only when first wanted, so a list reader never loads its textures
+  or GPU context.
+- **Play keeps running** without the globe: Play and the return to live are
+  now a per-frame step (`src/ui/scrubber/timeDriving.ts`), run by r3f on the
+  globe and by requestAnimationFrame elsewhere.
+
+**The flat map is a 2D canvas, not a second Three.js scene.**
+
+- **Why:** reduced motion asks for stillness, and a canvas drawn on demand
+  needs no WebGL context, no shaders and no animation loop.
+- **Picking:** the globe's code (`pinPick.ts`) through a flat projection,
+  so taps, Tab and the ring behave the same.
+- **The smallest scale covers the frame,** so the world never shows twice.
+  That keeps picking exact; longitude wraps for panning.
+- **Altitude and scale convert through the ground shown at the centre**
+  (`flatCamera.ts`). So these agree with the globe:
+  - search framing;
+  - shared links;
+  - the cluster level.
+- **Panning cost, at 4× CPU slowdown:** 10,000 clustered stories draw in
+  1.8 ms (p95 3.9) at 144 Hz.
+- **Unclustered** (the dev panel's switch, or a failed worker), 3,000 pins
+  each drawn take 16 ms, and raster holds frames near 70 ms. Outside the
+  dev panel, clustering is always on.
+- **Not drawn:** night and clouds. The map is meant to be calm.
+
+**Focus.**
+
+- **One trap** (`src/ui/focus/focusTrap.ts`) for the account sheets,
+  onboarding and the discussion panel. The panel was modal without one.
+- **Behind a modal, everything else is `inert`.** That stops Tab and also
+  a screen reader's reading cursor, which a trap alone does not.
+- **Closing a story's sheet** returns focus to the view it came from: the
+  globe, the map or the list row (`src/ui/focus/viewFocus.ts`).
+
+**Contrast is a unit test** (`tests/contrast.test.ts`). It reads the
+theme tokens and Tailwind's own palette, converting OKLCH, and blends each
+translucent colour over what it sits on. Over the globe, the worst case is
+sunlit cloud.
+
+What it found:
+
+| Element                                   | Before                                            | Fix                     | After             |
+| ----------------------------------------- | ------------------------------------------------- | ----------------------- | ----------------- |
+| Text fields' edges                        | 1.6:1                                             | New `edge` token        | 3:1 or more       |
+| The scrubber's bars ahead of the playhead | 1.5:1                                             | muted/30 to muted/65    | 3.3:1             |
+| The scrubber's gradient                   | Thinned too early for its muted labels over cloud | Holds void/90 up to 70% | Labels keep 4.5:1 |
+
+It also fails when a text colour class appears that its table does not
+list.
+
+**axe-core runs in CI against the production build, with the network
+mocked.**
+
+- **What is mocked:** `tests/e2e/fixtures` answers the API Worker's routes
+  and stands in for Supabase (auth, PostgREST, functions, Realtime).
+- **Typed against real shapes:** the payload types and the generated schema,
+  so drift fails the typecheck.
+- **Why not the real stack in CI:** it would add Docker, a Worker and minutes
+  to every push, for checks that are about the page, not the data. The real
+  stack was checked by hand, including a discussion entered from the list and
+  from the map.
+- **No committed keys:** the anon key and the signed-in session are made at
+  run time.
+- **Software GL in CI:** SwiftShader, at the LOW tier, two workers, one
+  retry.
+
+**Found by the checks:**
+
+- **A closed story sheet sat on screen in production builds** (fixed
+  separately). Its opening spring, aimed at an unmeasured zero-height
+  sheet, landed after the first measurement. Development's StrictMode
+  double mount hid it, and Phase 4's build had it too.
+- **Vote buttons and an admin button** were named in words they do not
+  show (2.5.3).
+- **Two pages** skipped a heading level.
+
+- **What it costs:**
+  - +12 KB gzip on the main chunk;
+  - a CI job of about 3 minutes;
+  - a fixture set to keep in step with the API;
+  - two dev dependencies with no bundle cost: `@playwright/test` (which
+    CLAUDE.md already names) and `@axe-core/playwright`.
+
+---
+
 ## 2026-10-22 — npm audit: patch bumps only, rolldown held at 1.2.11
 
 `npm audit` reported 9 advisories (2 moderate, 7 high), all in dev

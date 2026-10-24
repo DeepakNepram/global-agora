@@ -117,6 +117,15 @@ browser <──Brotli, ETag, SWR── API Worker <─────────�
     `suggest-debate` Edge Function reads the story as the caller and asks
     Claude, over fetch, for a debate prompt and two side labels, which the
     admin edits before opening.
+14. The views (Prompt 5.1, `src/ui/NewsView.tsx`). The same stories show on
+    the globe, on a flat map under reduced motion (`src/ui/flatmap/`, a 2D
+    canvas, no WebGL), or as a list (`src/ui/list/`, from
+    `src/core/storyList.ts`). Search, the sheets and Share move whichever
+    is showing through one interface, `ViewCamera`
+    (`src/ui/nav/viewNavigation.ts`); the map reads altitude as the ground
+    scale the globe would show. Tab goes through the visible pins on the
+    globe and the map alike (`src/ui/globe/usePinFocus.ts`, over the pin
+    layer's `targets()`). See [`ACCESSIBILITY.md`](ACCESSIBILITY.md).
 
 The wire format is defined once, in `src/core/data/payload.ts`, and both the
 Worker and the client validate against it.
@@ -133,6 +142,10 @@ Worker and the client validate against it.
   which match through their members, take per-slot data, and only when the
   filter or the layout changes.
 - Render on demand: stop the loop when nothing is moving.
+- A pin's category is a shape as well as a hue (`src/core/categoryShapes.ts`),
+  drawn by signed distance; never colour alone.
+- The flat map draws the same layout on a 2D canvas, on demand, through
+  the same picking; under reduced motion no WebGL context exists.
 - Frame-rate-independent smoothing only — see `src/globe/smoothing.ts`.
 
 ## Open questions
