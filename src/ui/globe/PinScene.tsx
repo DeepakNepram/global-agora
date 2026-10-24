@@ -185,8 +185,8 @@ export function PinScene(props: PinSceneProps): JSX.Element | null {
 
   useEffect(() => {
     if (!layer || !picker) return;
-    picker.attach(
-      (x, y, radiusPx) => {
+    picker.attach({
+      pick: (x, y, radiusPx) => {
         const { camera, size } = get();
         const startMs = monotonicNowMs();
         const hit = layer.pick(x, y, camera, size, radiusPx);
@@ -196,9 +196,17 @@ export function PinScene(props: PinSceneProps): JSX.Element | null {
         }
         return hit;
       },
-      () => get().size,
-    );
-    return () => picker.attach(null, null);
+      targets: (bounds) => {
+        const { camera, size } = get();
+        return layer.targets(camera, size, bounds);
+      },
+      locate: (row) => {
+        const { camera, size } = get();
+        return layer.locate(row, camera, size);
+      },
+      viewport: () => get().size,
+    });
+    return () => picker.attach(null);
   }, [layer, picker, get]);
 
   useEffect(() => {

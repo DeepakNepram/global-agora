@@ -173,6 +173,7 @@ export {
 export type { OutletsIndex, OutletStories } from './data/outlets';
 
 export { categoryAt, isNewsCategory, CATEGORY_LABELS } from './categories';
+export { nearestFirst, stepFocus, type FocusPoint } from './pinFocusOrder';
 export {
   shapeDistance,
   shapeOutline,

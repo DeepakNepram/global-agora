@@ -33,6 +33,13 @@ export interface GlobeInputHandlers {
   onEscape(): boolean;
   /** Home on the focused globe: back to the resting view. Returns true if it moved. */
   onHome(): boolean;
+  /**
+   * Tab or Shift+Tab on the focused globe: the next visible pin (Prompt
+   * 5.1). Returns false to let focus leave the globe as usual.
+   */
+  onTab(element: HTMLElement, backward: boolean): boolean;
+  /** Focus left the globe. */
+  onBlur(): void;
 }
 
 /**
@@ -105,6 +112,8 @@ export function bindControlInput(
     });
   };
 
+  const onBlur = (): void => handlers?.onBlur();
+
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.target !== element || event.metaKey || event.ctrlKey || event.altKey) return;
     const nudge = NUDGES[event.key];
@@ -117,6 +126,8 @@ export function bindControlInput(
       handlers.onActivate(rect.width / 2, rect.height / 2);
     } else if (event.key === 'Home' && handlers) {
       handled = handlers.onHome();
+    } else if (event.key === 'Tab' && handlers) {
+      handled = handlers.onTab(element, event.shiftKey);
     } else handled = event.key === 'Escape' && handlers !== null && handlers.onEscape();
     // Space would otherwise scroll the page.
     if (handled) event.preventDefault();
@@ -129,6 +140,7 @@ export function bindControlInput(
   element.addEventListener('lostpointercapture', onPointerCancel);
   element.addEventListener('wheel', onWheel, { passive: false });
   element.addEventListener('keydown', onKeyDown);
+  element.addEventListener('blur', onBlur);
 
   return () => {
     element.removeEventListener('pointerdown', onPointerDown);
@@ -138,5 +150,6 @@ export function bindControlInput(
     element.removeEventListener('lostpointercapture', onPointerCancel);
     element.removeEventListener('wheel', onWheel);
     element.removeEventListener('keydown', onKeyDown);
+    element.removeEventListener('blur', onBlur);
   };
 }

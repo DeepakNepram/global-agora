@@ -93,6 +93,8 @@ export function useGlobeControls(options: GlobeControlsOptions): void {
       onActivate: (x, y) => inputRef.current?.onActivate(x, y),
       onEscape: () => inputRef.current?.onEscape() ?? false,
       onHome: () => inputRef.current?.onHome() ?? false,
+      onTab: (element, backward) => inputRef.current?.onTab(element, backward) ?? false,
+      onBlur: () => inputRef.current?.onBlur(),
     });
   }, [controls, eventTarget]);
 

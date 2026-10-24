@@ -3,7 +3,7 @@ import type { Camera, Object3D, Texture } from 'three';
 import type { ClusterLayout, NodeBuffer, StoryFilter } from '@/core';
 
 import type { MotionPreference } from '../camera/types';
-import type { PinPick } from './pinPick';
+import type { PinPick, PinTarget, ScreenPoint } from './pinPick';
 
 /** The pin layer's public surface; createPinLayer (pinLayer.ts) implements it. */
 
@@ -34,6 +34,14 @@ export interface PresentResult {
 export interface PickViewport {
   readonly width: number;
   readonly height: number;
+}
+
+/** The part of the viewport nothing covers, CSS pixels from its top left. */
+export interface TargetBounds {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
 }
 
 export interface PinLayer {
@@ -70,6 +78,14 @@ export interface PinLayer {
     viewport: PickViewport,
     radiusPx?: number,
   ): PinPick | null;
+  /**
+   * Every story pin and orb drawn now, where the last layout placed them,
+   * inside `bounds` (the whole viewport by default): what Tab can visit on
+   * the globe (Prompt 5.1). A pass over the stories, like pick.
+   */
+  targets(camera: Camera, viewport: PickViewport, bounds?: TargetBounds): PinTarget[];
+  /** Where row `row` is drawn now, CSS pixels, or null when it is not: the focus ring's place. */
+  locate(row: number, camera: Camera, viewport: PickViewport): ScreenPoint | null;
   /**
    * Rings story `id`'s pin, or the orb holding it while it is clustered, and
    * follows it through later layouts; null clears. One uniform, no animation.

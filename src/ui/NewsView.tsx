@@ -54,7 +54,7 @@ export function NewsView(props: NewsViewProps): JSX.Element {
   const [controls, setControls] = useState<OrbitGlobeControls | null>(null);
   const pinNodes = usePinNodes(dev.pinSource, historyWindowHours);
   const picker = useMemo(() => createPinPicker(), []);
-  const selection = useGlobeSelection(controls, picker);
+  const selection = useGlobeSelection(controls, picker, pinNodes);
   const storyOpen = useStoryStore((state) => state.sheet !== 'closed');
   const panelOpen = usePanelStore((state) => state.panel !== null);
   const sheetOpen = storyOpen || panelOpen;
@@ -91,6 +91,7 @@ export function NewsView(props: NewsViewProps): JSX.Element {
         picker={picker}
         input={selection.input}
         message={selection.message}
+        focused={selection.focused}
         link={link}
         historyHours={historyWindowHours}
         controls={controls}

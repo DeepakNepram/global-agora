@@ -34,6 +34,8 @@ export function NavLayer(props: NavLayerProps): JSX.Element {
   return (
     <nav
       aria-label="Search and filters"
+      // Pins under it are not visible, so keyboard focus skips them (Prompt 5.1).
+      data-covers="top"
       className="pointer-events-none absolute inset-x-0 top-0 flex flex-col gap-2 p-3 [&>*]:pointer-events-auto"
     >
       <div className="flex items-center gap-2">

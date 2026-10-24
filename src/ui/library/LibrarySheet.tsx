@@ -125,6 +125,7 @@ export function LibrarySheet(props: LibrarySheetProps): JSX.Element {
         aria-modal="false"
         aria-label="Your library"
         data-library-sheet
+        data-covers="bottom"
         inert={panel === null}
         onKeyDown={(event) => {
           if (event.key !== 'Escape') return;

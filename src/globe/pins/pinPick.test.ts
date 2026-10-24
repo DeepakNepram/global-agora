@@ -5,7 +5,14 @@ import { FIXTURE_EPOCH_SEC, storyBuffer } from '@/core/cluster/cluster.fixture';
 import { createLayoutColumns } from '@/core/cluster/layout';
 
 import { petalOffset } from './bloom';
-import { DIMMED_PICK_PENALTY, PICK_RADIUS_CSS_PX, pickPin, type ProjectPoint } from './pinPick';
+import {
+  DIMMED_PICK_PENALTY,
+  PICK_RADIUS_CSS_PX,
+  drawnTargets,
+  locateRow,
+  pickPin,
+  type ProjectPoint,
+} from './pinPick';
 
 /**
  * A stand-in camera looking down −z at the globe: a unit-sphere point lands
@@ -141,5 +148,53 @@ describe('pickPin', () => {
     const input = { nodes, layout, nowSec: NOW, x: 500, y: 500, project };
     expect(pickPin(input)).toBeNull();
     expect(pickPin({ ...input, radiusPx: 48 })).toMatchObject({ row: 0 });
+  });
+});
+
+describe('drawnTargets and locateRow (keyboard focus, Prompt 5.1)', () => {
+  const everywhere = { left: 0, top: 0, right: 1000, bottom: 1000 };
+
+  it('lists what is drawn, where, with its kind, category and dimming', () => {
+    const { nodes, layout } = scene([
+      { at: [500, 500], role: CLUSTER_ROLE.pin },
+      { at: [300, 400], role: CLUSTER_ROLE.orb, count: 12 },
+      { at: [600, 600], role: CLUSTER_ROLE.hidden },
+      { at: [700, 500], role: CLUSTER_ROLE.pin, far: true },
+      { at: [450, 450], role: CLUSTER_ROLE.pin, t: 7200 },
+    ]);
+    layout.categories[1] = 3;
+    const targets = drawnTargets(
+      { nodes, layout, nowSec: NOW, project, dimmed: (row) => row === 0 },
+      everywhere,
+    );
+    expect(targets).toHaveLength(2);
+    expect(targets[0]).toMatchObject({ kind: 'story', row: 0, id: 100, dimmed: true });
+    expect(targets[0]?.x).toBeCloseTo(500, 6);
+    expect(targets[1]).toMatchObject({ kind: 'cluster', row: 1, count: 12, category: 3 });
+    expect(targets[1]?.y).toBeCloseTo(400, 6);
+  });
+
+  it('leaves out what sits outside the uncovered part of the view', () => {
+    const { nodes, layout } = scene([
+      { at: [500, 100], role: CLUSTER_ROLE.pin },
+      { at: [500, 500], role: CLUSTER_ROLE.pin },
+      { at: [500, 900], role: CLUSTER_ROLE.pin },
+    ]);
+    const bounds = { left: 0, top: 150, right: 1000, bottom: 800 };
+    const rows = drawnTargets({ nodes, layout, nowSec: NOW, project }, bounds).map((t) => t.row);
+    expect(rows).toEqual([1]);
+  });
+
+  it('locates a petal where the sunflower drew it, and nothing that is not drawn', () => {
+    const offset = petalOffset(5);
+    const { nodes, layout } = scene([
+      { at: [500, 500], role: CLUSTER_ROLE.petal, petal: 5 },
+      { at: [500, 500], role: CLUSTER_ROLE.hidden },
+    ]);
+    const input = { nodes, layout, nowSec: NOW, project };
+    expect(locateRow(input, 0)?.x).toBeCloseTo(500 + offset.x, 6);
+    expect(locateRow(input, 0)?.y).toBeCloseTo(500 - offset.y, 6);
+    expect(locateRow(input, 1)).toBeNull();
+    expect(locateRow(input, 7)).toBeNull();
   });
 });

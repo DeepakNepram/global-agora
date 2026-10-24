@@ -90,6 +90,7 @@ export function StorySheet(props: StorySheetProps): JSX.Element {
         ref={sheet}
         role="dialog"
         data-story-sheet
+        data-covers="bottom"
         aria-modal="false"
         aria-labelledby={labelledBy}
         inert={state === 'closed'}

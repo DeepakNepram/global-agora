@@ -7,8 +7,8 @@ import { createPinMaterial, createPinUniforms, uploadOrbMatches, uploadSlots } f
 import { createFilterState, FILTER_FADE_SECONDS } from './pinFilter';
 import { landSprings, rebaseClock, writeAppearance } from './pinInstances';
 import type { PinLayer, PinLayerOptions } from './pinLayerTypes';
-import { pickPin } from './pinPick';
-import { cameraProjection, selectedSlot } from './pinSelection';
+import { createPinPicking } from './pinPicking';
+import { selectedSlot } from './pinSelection';
 import {
   DEFAULT_CAPACITY,
   MAX_STEP_SECONDS,
@@ -24,6 +24,7 @@ import { planTransitions } from './transitions';
 export type {
   PickViewport,
   PinLayer,
+  TargetBounds,
   PinLayerOptions,
   PresentOptions,
   PresentResult,
@@ -82,6 +83,12 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
       uploadOrbMatches(storage.pins, slots.highWater);
     }
   };
+
+  const picking = createPinPicking(
+    tilt,
+    () => (nodes && shown ? { nodes, layout: shown, nowSeconds } : null),
+    (state, row) => filter.dimmed(state.nodes, state.layout, row, state.nowSeconds),
+  );
 
   return {
     object3d: tilt,
@@ -165,21 +172,7 @@ export function createPinLayer(options: PinLayerOptions): PinLayer {
       if (!reducedMotion) settlesAt = Math.max(settlesAt, clock + FILTER_FADE_SECONDS);
     },
 
-    pick(x, y, camera, viewport, radiusPx) {
-      const drawn = nodes;
-      const layout = shown;
-      if (!drawn || !layout || !tilt.visible) return null;
-      return pickPin({
-        nodes: drawn,
-        layout,
-        nowSec: nowSeconds,
-        x,
-        y,
-        ...(radiusPx === undefined ? {} : { radiusPx }),
-        project: cameraProjection(tilt, camera, viewport.width, viewport.height),
-        dimmed: (row) => filter.dimmed(drawn, layout, row, nowSeconds),
-      });
-    },
+    ...picking,
 
     setSelected(id) {
       selectedId = id;

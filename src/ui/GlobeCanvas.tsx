@@ -1,5 +1,5 @@
 import { Canvas, useThree } from '@react-three/fiber';
-import { useEffect, useMemo, type JSX } from 'react';
+import { useEffect, useMemo, useRef, type JSX } from 'react';
 import { Color } from 'three';
 
 import {
@@ -26,9 +26,11 @@ import type { FrameProbe } from './globe/frameProbe';
 import { GlobeReticle } from './globe/GlobeReticle';
 import { GlobeScene } from './globe/GlobeScene';
 import type { GlobeInputHandlers } from './globe/bindControlInput';
+import { PinFocusRing, PinFocusTracker } from './globe/PinFocusRing';
 import type { PinPicker } from './globe/pinPicker';
 import { PinScene } from './globe/PinScene';
 import type { DevSettings } from './globe/useDevSettings';
+import type { FocusedPin } from './globe/usePinFocus';
 import { TimeDriver } from './scrubber/TimeDriver';
 
 export interface GlobeCanvasProps {
@@ -40,8 +42,10 @@ export interface GlobeCanvasProps {
   readonly picker: PinPicker;
   /** Taps, Enter, Escape and Home on the globe. */
   readonly input: GlobeInputHandlers;
-  /** What the last keyboard pick did, read out politely. */
+  /** What the last keyboard move did, read out politely. */
   readonly message: string;
+  /** The pin Tab has landed on, which the focus ring follows. */
+  readonly focused: FocusedPin | null;
   /** The shared view this page was opened with, if any. */
   readonly link: Permalink;
   readonly historyHours: number;
@@ -71,9 +75,10 @@ function restDpr(): number {
 
 const GLOBE_LABEL =
   'Globe of Earth with news stories as pins, grouped into numbered clusters that open as you zoom in. ' +
-  'Drag to rotate, scroll or pinch to zoom, tap a pin to read its story. When focused, arrow keys ' +
-  'rotate, plus or minus zoom, Enter opens the story nearest the centre, and Home returns to the ' +
-  'resting view.';
+  'Drag to rotate, scroll or pinch to zoom, tap a pin to read its story. When focused, Tab goes ' +
+  'through the pins in view, nearest the centre first, and Enter opens the one with the ring; ' +
+  'arrow keys rotate, plus or minus zoom, and Home returns to the resting view. The list view ' +
+  'shows every story as a list.';
 
 /** Draws the frame the globe missed while paused: nothing else asks for one. */
 function ResumeHost({ paused }: { readonly paused: boolean }): null {
@@ -103,7 +108,8 @@ function ResumeHost({ paused }: { readonly paused: boolean }): null {
  *   prop on its next render.
  */
 export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
-  const { tier, settings, dev, motion, nodes, picker, paused, probe, presentLog } = props;
+  const { tier, settings, dev, motion, nodes, picker, paused, probe, presentLog, focused } = props;
+  const ring = useRef<HTMLDivElement>(null);
   const inDiscussion = useDiscussionStage((state) => state.phase !== 'closed');
   const resting = useDiscussionStage(
     (state) => state.phase !== 'closed' && state.quality === 'rest',
@@ -193,9 +199,11 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
           recede={stageRecedeNow}
         />
         <ResumeHost paused={paused} />
+        <PinFocusTracker row={focused?.target.row ?? null} ring={ring} picker={picker} />
       </Canvas>
-      {/* Straight after the canvas: it shows on the canvas's focus-visible (CSS peer). */}
-      <GlobeReticle message={props.message} />
+      {/* After the canvas: they show on the canvas's focus-visible (CSS peer). */}
+      <GlobeReticle message={props.message} pinFocused={focused !== null} />
+      <PinFocusRing ring={ring} focused={focused} />
     </div>
   );
 }

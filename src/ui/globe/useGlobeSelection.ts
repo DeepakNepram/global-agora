@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 
-import { PETAL_LEVEL } from '@/core';
+import { PETAL_LEVEL, type NodeBuffer } from '@/core';
 import {
   ACTIVATE_RADIUS_CSS_PX,
   altitudeKmForZoom,
@@ -13,6 +13,7 @@ import { onboardingStore, storyStore } from '@/state';
 import { nextAnnouncement } from '../announce';
 import type { GlobeInputHandlers } from './bindControlInput';
 import type { PinPicker } from './pinPicker';
+import { usePinFocus, type FocusedPin } from './usePinFocus';
 
 /** A tap on a cluster flies this many levels deeper, enough to open most clusters. */
 export const CLUSTER_TAP_LEVELS = 2;
@@ -21,32 +22,43 @@ export const CLUSTER_TAP_LEVELS = 2;
 const LEVEL_MIDDLE = 0.5;
 
 const NOTHING_AT_CENTRE =
-  'No story near the centre. Turn the globe with the arrow keys, or zoom with plus and minus.';
+  'No story near the centre. Tab goes through the pins in view, the arrow keys turn the globe, ' +
+  'and plus and minus zoom.';
 
 export interface GlobeSelection {
   readonly input: GlobeInputHandlers;
-  /** What the last keyboard pick did, for a polite live region. */
+  /** What the last keyboard move did, for a polite live region. */
   readonly message: string;
+  /** The pin Tab has landed on (Prompt 5.1), which the focus ring follows. */
+  readonly focused: FocusedPin | null;
 }
 
 /**
- * What a tap or Enter on the globe does:
+ * What a tap or a key on the globe does:
  *   - a story's pin opens its peek card, or switches the open sheet to it;
  *   - a cluster's orb flies the camera to it, two levels deeper, so it blooms;
  *   - nothing closes a peek card (a full sheet stays: it covers the globe).
- * Escape steps an open sheet down; Home flies back to the resting view,
- * centred on the reader's home city when they gave one.
+ * Tab goes through the visible pins (usePinFocus.ts) and Enter opens the
+ * focused one, or with none focused the story nearest the centre. Escape
+ * steps an open sheet down, else leaves the focused pin; Home flies back to
+ * the resting view, centred on the reader's home city when they gave one.
  */
 export function useGlobeSelection(
   controls: OrbitGlobeControls | null,
   picker: PinPicker,
+  nodes: NodeBuffer | null,
 ): GlobeSelection {
   const [message, setMessage] = useState('');
+  const announce = useMemo(
+    () =>
+      (text: string): void =>
+        setMessage((previous) => nextAnnouncement(previous, text)),
+    [],
+  );
+  const pins = usePinFocus(picker, controls, nodes, announce);
+  const { tab, current, clear, blurred } = pins;
 
   const input = useMemo((): GlobeInputHandlers => {
-    const announce = (text: string): void =>
-      setMessage((previous) => nextAnnouncement(previous, text));
-
     const flyInto = (hit: Extract<PinPick, { kind: 'cluster' }>): void => {
       if (!controls) return;
       const level = Math.min(hit.level + CLUSTER_TAP_LEVELS, PETAL_LEVEL) + LEVEL_MIDDLE;
@@ -61,7 +73,7 @@ export function useGlobeSelection(
         story.open(hit.id);
       } else if (hit?.kind === 'cluster') {
         flyInto(hit);
-        if (fromKeyboard) announce(`Zooming in on ${hit.count} stories.`);
+        if (fromKeyboard) announce(`Zooming in on ${hit.count} stories. Tab goes through them.`);
       } else if (fromKeyboard) {
         announce(NOTHING_AT_CENTRE);
       } else if (story.sheet === 'peek') {
@@ -71,11 +83,21 @@ export function useGlobeSelection(
 
     return {
       onTap: (x, y) => choose(picker.pick(x, y), false),
-      onActivate: (x, y) => choose(picker.pick(x, y, ACTIVATE_RADIUS_CSS_PX), true),
+      onActivate: (x, y) => {
+        const focused = current();
+        // The orb opens into new pins, so the next Tab starts again from the centre.
+        if (focused?.target.kind === 'cluster') clear();
+        choose(focused ? focused.target : picker.pick(x, y, ACTIVATE_RADIUS_CSS_PX), true);
+      },
       onEscape: () => {
         const story = storyStore.getState();
-        if (story.sheet === 'closed') return false;
-        story.collapse();
+        if (story.sheet !== 'closed') {
+          story.collapse();
+          return true;
+        }
+        if (current() === null) return false;
+        clear();
+        announce('Back to the whole view.');
         return true;
       },
       onHome: () => {
@@ -90,8 +112,10 @@ export function useGlobeSelection(
         announce(home ? `Back to ${home.label}.` : 'Back to the world view.');
         return true;
       },
+      onTab: tab,
+      onBlur: blurred,
     };
-  }, [controls, picker]);
+  }, [controls, picker, announce, tab, current, clear, blurred]);
 
-  return { input, message };
+  return { input, message, focused: pins.focused };
 }

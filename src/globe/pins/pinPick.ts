@@ -69,42 +69,74 @@ export interface PickInput {
   readonly dimmed?: (row: number) => boolean;
 }
 
+/** Where a drawn row sits on screen. */
+type Placement = 'pin' | 'orb' | null;
+
+/**
+ * Puts row `row` where it is drawn, in CSS pixels, into `point`: its anchor
+ * projected, plus its petal offset. 'orb' or 'pin' when it is drawn, null
+ * when it is hidden, not yet published, or not on the visible side.
+ */
+function placeRow(
+  input: Omit<PickInput, 'x' | 'y'>,
+  row: number,
+  point: ScreenPoint,
+  petal: Offset,
+): Placement {
+  const { nodes, layout, nowSec, project } = input;
+  const role = layout.roles[row];
+  if (role === CLUSTER_ROLE.hidden || role === undefined) return null;
+  const isOrb = role === CLUSTER_ROLE.orb;
+  // Orbs are never time-gated; a pin is invisible until its story is published.
+  if (!isOrb && nodes.epochSec + (nodes.publishedSec[row] ?? 0) > nowSec) return null;
+  const ax = layout.anchors[row * 3] ?? 0;
+  const ay = layout.anchors[row * 3 + 1] ?? 0;
+  const az = layout.anchors[row * 3 + 2] ?? 0;
+  if (!project(ax, ay, az, point)) return null;
+  if (role === CLUSTER_ROLE.petal) {
+    // Petal offsets are CSS pixels with y up; the screen's y runs down.
+    petalOffset(layout.petals[row] ?? 0, undefined, petal);
+    point.x += petal.x;
+    point.y -= petal.y;
+  }
+  return isOrb ? 'orb' : 'pin';
+}
+
+function rowsOf(input: Omit<PickInput, 'x' | 'y'>): number {
+  return Math.min(input.nodes.count, input.layout.count);
+}
+
+function orbAt(layout: ClusterLayout, row: number): LatLon {
+  return vec3ToLatLon({
+    x: layout.anchors[row * 3] ?? 0,
+    y: layout.anchors[row * 3 + 1] ?? 0,
+    z: layout.anchors[row * 3 + 2] ?? 0,
+  });
+}
+
 /**
  * The drawn pin or orb nearest the tap within reach, or null. "Nearest" is
  * measured against each target's own radius, so a pin right under the finger
  * beats the edge of a large orb behind it.
  */
 export function pickPin(input: PickInput): PinPick | null {
-  const { nodes, layout, nowSec, x, y, project } = input;
+  const { nodes, layout, x, y } = input;
   const radius = input.radiusPx ?? PICK_RADIUS_CSS_PX;
-  const rows = Math.min(nodes.count, layout.count);
   const point: ScreenPoint = { x: 0, y: 0 };
   const petal: Offset = { x: 0, y: 0 };
   let best = -1;
   let bestScore = Infinity;
 
-  for (let row = 0; row < rows; row++) {
-    const role = layout.roles[row];
-    if (role === CLUSTER_ROLE.hidden || role === undefined) continue;
-    const isOrb = role === CLUSTER_ROLE.orb;
-    // Orbs are never time-gated; a pin is invisible until its story is published.
-    if (!isOrb && nodes.epochSec + (nodes.publishedSec[row] ?? 0) > nowSec) continue;
-    const ax = layout.anchors[row * 3] ?? 0;
-    const ay = layout.anchors[row * 3 + 1] ?? 0;
-    const az = layout.anchors[row * 3 + 2] ?? 0;
-    if (!project(ax, ay, az, point)) continue;
-    if (role === CLUSTER_ROLE.petal) {
-      // Petal offsets are CSS pixels with y up; the screen's y runs down.
-      petalOffset(layout.petals[row] ?? 0, undefined, petal);
-      point.x += petal.x;
-      point.y -= petal.y;
-    }
-    const reach = isOrb
-      ? Math.max(
-          radius,
-          orbScaleFor(layout.counts[row] ?? 1) * PIN_HALF_SIZE_CSS_PX * ORB_CORE_RADIUS,
-        )
-      : radius;
+  for (let row = 0; row < rowsOf(input); row++) {
+    const placed = placeRow(input, row, point, petal);
+    if (placed === null) continue;
+    const reach =
+      placed === 'orb'
+        ? Math.max(
+            radius,
+            orbScaleFor(layout.counts[row] ?? 1) * PIN_HALF_SIZE_CSS_PX * ORB_CORE_RADIUS,
+          )
+        : radius;
     const distance = Math.hypot(point.x - x, point.y - y) / reach;
     if (distance > 1) continue;
     const score = input.dimmed?.(row) === true ? distance * DIMMED_PICK_PENALTY : distance;
@@ -122,11 +154,70 @@ export function pickPin(input: PickInput): PinPick | null {
     kind: 'cluster',
     row: best,
     count: layout.counts[best] ?? 1,
-    at: vec3ToLatLon({
-      x: layout.anchors[best * 3] ?? 0,
-      y: layout.anchors[best * 3 + 1] ?? 0,
-      z: layout.anchors[best * 3 + 2] ?? 0,
-    }),
+    at: orbAt(layout, best),
     level: layout.level,
   };
+}
+
+/** A pin or orb drawn on screen now, for keyboard focus (Prompt 5.1). */
+export type PinTarget = PinPick & {
+  /** Where it is drawn, CSS pixels from the canvas's top left. */
+  readonly x: number;
+  readonly y: number;
+  /** NEWS_CATEGORIES index: the story's, or the orb's main category. */
+  readonly category: number;
+  /** The filters leave it out (drawn dimmed). */
+  readonly dimmed: boolean;
+};
+
+/**
+ * Every pin and orb drawn now, as the last layout placed them, inside
+ * `bounds` (CSS pixels): what Tab can visit. One pass over the stories, like
+ * a pick; call it per key press, not per frame.
+ */
+export function drawnTargets(
+  input: Omit<PickInput, 'x' | 'y'>,
+  bounds: {
+    readonly left: number;
+    readonly top: number;
+    readonly right: number;
+    readonly bottom: number;
+  },
+): PinTarget[] {
+  const { nodes, layout } = input;
+  const point: ScreenPoint = { x: 0, y: 0 };
+  const petal: Offset = { x: 0, y: 0 };
+  const targets: PinTarget[] = [];
+  for (let row = 0; row < rowsOf(input); row++) {
+    const placed = placeRow(input, row, point, petal);
+    if (placed === null) continue;
+    if (point.x < bounds.left || point.x > bounds.right) continue;
+    if (point.y < bounds.top || point.y > bounds.bottom) continue;
+    const shared = {
+      row,
+      x: point.x,
+      y: point.y,
+      category: layout.categories[row] ?? 0,
+      dimmed: input.dimmed?.(row) === true,
+    };
+    targets.push(
+      placed === 'orb'
+        ? {
+            ...shared,
+            kind: 'cluster',
+            count: layout.counts[row] ?? 1,
+            at: orbAt(layout, row),
+            level: layout.level,
+          }
+        : { ...shared, kind: 'story', id: nodes.ids[row] ?? 0 },
+    );
+  }
+  return targets;
+}
+
+/** Where row `row` is drawn now (CSS pixels), or null when it is not drawn. */
+export function locateRow(input: Omit<PickInput, 'x' | 'y'>, row: number): ScreenPoint | null {
+  if (row < 0 || row >= rowsOf(input)) return null;
+  const point: ScreenPoint = { x: 0, y: 0 };
+  return placeRow(input, row, point, { x: 0, y: 0 }) === null ? null : point;
 }

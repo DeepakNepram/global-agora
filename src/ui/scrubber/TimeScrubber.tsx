@@ -67,6 +67,8 @@ export function TimeScrubber({
     >
       <section
         aria-label="Time scrubber"
+        // Pins under it are not visible, so keyboard focus skips them (Prompt 5.1).
+        data-covers="bottom"
         className="pointer-events-auto mx-auto flex max-w-5xl items-end gap-3"
       >
         <button

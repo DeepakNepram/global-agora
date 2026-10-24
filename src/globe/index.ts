@@ -61,8 +61,15 @@ export {
   type PinLayerOptions,
   type PresentOptions,
   type PresentResult,
+  type TargetBounds,
 } from './pins/pinLayer';
-export { ACTIVATE_RADIUS_CSS_PX, PICK_RADIUS_CSS_PX, type PinPick } from './pins/pinPick';
+export {
+  ACTIVATE_RADIUS_CSS_PX,
+  PICK_RADIUS_CSS_PX,
+  type PinPick,
+  type PinTarget,
+  type ScreenPoint,
+} from './pins/pinPick';
 export { CATEGORY_HUES, PIN_HALF_SIZE_CSS_PX } from './pins/pinStyle';
 export { BADGE_CELL_ASPECT, BADGE_GLYPHS } from './pins/badgeGlyphs';
 export { BLOOM_SETTLE_SECONDS, bloomSeconds } from './pins/bloom';
