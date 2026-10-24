@@ -5,6 +5,7 @@ import type { DbConfig } from '@/core/db/config';
 
 import { useAccountSession } from './data/useAccountSession';
 import { useNodesFeed } from './data/useNodesFeed';
+import { useAnyModalOpen } from './focus/useModal';
 import { NewsStatus } from './NewsStatus';
 import { NewsView } from './NewsView';
 import { resolveQuality } from './platform/capabilities';
@@ -28,6 +29,8 @@ export function App({ config, dbConfig = null, authProviders = [] }: AppProps): 
   // Read once: the globe applies it and then clears it from the address bar.
   const [link] = useState(() => decodePermalink(window.location.search));
   useAccountSession(dbConfig);
+  // Behind a modal (a discussion, an account sheet) the page around the news is inert.
+  const modal = useAnyModalOpen();
   useNodesFeed({
     baseUrl: config.apiBaseUrl,
     hours: config.historyWindowHours,
@@ -37,13 +40,14 @@ export function App({ config, dbConfig = null, authProviders = [] }: AppProps): 
   return (
     <div className="flex h-full flex-col bg-void text-ink">
       <a
+        inert={modal}
         href="#globe"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-accent focus:px-3 focus:py-2 focus:text-void"
       >
         Skip to the news
       </a>
 
-      <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-6 py-4">
+      <header inert={modal} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-6 py-4">
         <h1 className="text-lg font-semibold tracking-tight">Global Agora</h1>
         <p className="text-sm text-muted">Preview. Pins are news stories from GDELT.</p>
         <NewsStatus />
@@ -60,7 +64,7 @@ export function App({ config, dbConfig = null, authProviders = [] }: AppProps): 
         />
       </main>
 
-      <footer className="px-6 py-3 text-xs text-muted">
+      <footer inert={modal} className="px-6 py-3 text-xs text-muted">
         <dl className="flex flex-wrap gap-x-6 gap-y-1">
           <div className="flex gap-2">
             <dt>Quality tier</dt>

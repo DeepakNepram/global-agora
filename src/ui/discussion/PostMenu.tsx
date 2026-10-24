@@ -1,4 +1,12 @@
-import { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FocusEvent,
+  type JSX,
+  type KeyboardEvent,
+} from 'react';
 
 import { REPORT_REASONS, type ReportReason } from '@/core/moderation';
 import type { ModerationResult } from '@/state/discussionRoomActions';
@@ -29,7 +37,9 @@ const REPORT_TEXT: Readonly<Record<ModerationResult, string>> = {
  * Report and Block for a post (Prompt 4.3's tools, placed here by 4.5):
  * a menu under ⋯, then the six reasons, or a confirmation before a block,
  * which hides that account's posts from you and yours from them. Escape
- * steps back without leaving the discussion.
+ * steps back without leaving the discussion, and the menu closes when
+ * focus leaves it (Tab past its end, a click elsewhere), so it never sits
+ * open behind the keyboard (Prompt 5.1).
  */
 export function PostMenu({ handle, onReport, onBlock, announce }: PostMenuProps): JSX.Element {
   const [view, setView] = useState<View>('closed');
@@ -57,6 +67,15 @@ export function PostMenu({ handle, onReport, onBlock, announce }: PostMenuProps)
     close();
   };
 
+  const onBlur = (event: FocusEvent<HTMLDivElement>): void => {
+    if (view === 'closed' || busy) return;
+    const next = event.relatedTarget;
+    // Focus moving within the menu, or to nothing (a click on its padding), keeps it open.
+    if (next === null || event.currentTarget.contains(next)) return;
+    setView('closed');
+    setReason(null);
+  };
+
   const report = async (): Promise<void> => {
     if (reason === null || busy) return;
     setBusy(true);
@@ -82,7 +101,7 @@ export function PostMenu({ handle, onReport, onBlock, announce }: PostMenuProps)
   };
 
   return (
-    <div onKeyDown={onKeyDown} className="relative">
+    <div onKeyDown={onKeyDown} onBlur={onBlur} className="relative">
       <button
         ref={toggle}
         type="button"

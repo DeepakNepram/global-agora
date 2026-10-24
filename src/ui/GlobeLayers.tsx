@@ -5,6 +5,7 @@ import { VIGNETTE, type OrbitGlobeControls, type RenderSettings } from '@/globe'
 
 import { AccountButton } from './account/AccountButton';
 import { DiscussionLayer } from './discussion/DiscussionLayer';
+import { useModalSheetOpen } from './focus/useModal';
 import { vignetteCssGradient } from './globe/vignette';
 import { LibraryButtons } from './library/LibraryButtons';
 import { NavLayer } from './nav/NavLayer';
@@ -47,6 +48,8 @@ export interface GlobeLayersProps {
 export const GlobeLayers = memo(function GlobeLayers(props: GlobeLayersProps): JSX.Element {
   const { settings, view, nodes, target, historyHours, reducedMotion, inDiscussion } = props;
   const composed = settings.postprocessing && view === 'globe';
+  // An account or onboarding sheet is modal: everything else here waits behind it.
+  const covered = useModalSheetOpen();
   return (
     <>
       {!settings.postprocessing && view === 'globe' && (
@@ -59,7 +62,7 @@ export const GlobeLayers = memo(function GlobeLayers(props: GlobeLayersProps): J
       )}
 
       <div
-        inert={inDiscussion}
+        inert={inDiscussion || covered}
         className={`pointer-events-none absolute inset-0 transition duration-300 ${inDiscussion ? '-translate-y-3 opacity-0' : ''}`}
       >
         <NavLayer
@@ -77,12 +80,15 @@ export const GlobeLayers = memo(function GlobeLayers(props: GlobeLayersProps): J
           }
         />
       </div>
-      <TimeScrubber
-        nodes={nodes}
-        historyHours={historyHours}
-        hidden={props.sheetOpen || inDiscussion}
-      />
+      <div className="contents" inert={covered}>
+        <TimeScrubber
+          nodes={nodes}
+          historyHours={historyHours}
+          hidden={props.sheetOpen || inDiscussion}
+        />
+      </div>
       <SecondarySheets
+        covered={covered}
         nodes={nodes}
         target={target}
         historyHours={historyHours}
@@ -90,17 +96,19 @@ export const GlobeLayers = memo(function GlobeLayers(props: GlobeLayersProps): J
         reducedMotion={reducedMotion}
         authProviders={props.authProviders}
       />
-      <StoryLayer
-        nodes={nodes}
-        camera={target.camera}
-        globeControls={props.globeControls}
-        apiBaseUrl={props.apiBaseUrl}
-        savedStoryLimit={props.savedStoryLimit}
-        detailsAvailable={props.detailsAvailable}
-        reducedMotion={reducedMotion}
-      />
-      {/* The globe's composer recedes it behind a discussion; anything else gets a CSS scrim. */}
-      <DiscussionLayer scrim={!composed} apiBaseUrl={props.apiBaseUrl} />
+      <div className="contents" inert={covered}>
+        <StoryLayer
+          nodes={nodes}
+          camera={target.camera}
+          globeControls={props.globeControls}
+          apiBaseUrl={props.apiBaseUrl}
+          savedStoryLimit={props.savedStoryLimit}
+          detailsAvailable={props.detailsAvailable}
+          reducedMotion={reducedMotion}
+        />
+        {/* The globe's composer recedes it behind a discussion; anything else gets a CSS scrim. */}
+        <DiscussionLayer scrim={!composed} apiBaseUrl={props.apiBaseUrl} />
+      </div>
     </>
   );
 });

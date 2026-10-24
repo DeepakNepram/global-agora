@@ -13,6 +13,7 @@ import {
 
 import { FlatMap } from './flatmap/FlatMap';
 import type { FlatControls } from './flatmap/flatCamera';
+import { useModalSheetOpen } from './focus/useModal';
 import { createPresentLog } from './globe/bloomReport';
 import { createFrameProbe } from './globe/frameProbe';
 import { LazyGlobeDevTools } from './globe/LazyGlobeDevTools';
@@ -84,6 +85,7 @@ export function NewsView(props: NewsViewProps): JSX.Element {
   const sheetOpen = storyOpen || panelOpen;
   const accountOpen = useAccountStore((state) => state.sheet !== null);
   const inDiscussion = useDiscussionStage((state) => state.phase !== 'closed');
+  const covered = useModalSheetOpen();
   useOnboardingTrigger(sheetOpen || accountOpen || inDiscussion);
   const target = useMemo(
     (): ViewTarget => ({
@@ -138,6 +140,7 @@ export function NewsView(props: NewsViewProps): JSX.Element {
           controls={controls}
           onControls={setControls}
           paused={view !== 'globe'}
+          covered={covered}
           probe={probe}
           presentLog={presentLog}
         />
@@ -154,12 +157,13 @@ export function NewsView(props: NewsViewProps): JSX.Element {
           link={link}
           onCamera={setMapCamera}
           paused={view !== 'map'}
+          covered={covered}
         />
       )}
 
       {/* In the main chunk on purpose: as a lazy chunk, the bundler split React,
           zustand and the stores out of it into three startup files (DECISIONS). */}
-      {view === 'list' && <StoryList nodes={pinNodes} />}
+      {view === 'list' && <StoryList nodes={pinNodes} covered={inDiscussion || covered} />}
 
       <GlobeLayers
         settings={settings}

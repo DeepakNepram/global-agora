@@ -21,6 +21,8 @@ import { StoryListRow } from './StoryListRow';
 export interface StoryListProps {
   /** The stories the globe draws; null until the first payload. */
   readonly nodes: NodeBuffer | null;
+  /** A discussion or a modal sheet is over the list: it waits, inert. */
+  readonly covered: boolean;
 }
 
 const MINUTE_MS = 60_000;
@@ -45,7 +47,7 @@ function rowButton(list: HTMLElement | null, id: number): HTMLElement | null {
  * Up, Down, Home and End move between rows as well as Tab; a row opens the
  * same sheet a pin does, and closing it brings focus back to the row.
  */
-export function StoryList({ nodes }: StoryListProps): JSX.Element {
+export function StoryList({ nodes, covered }: StoryListProps): JSX.Element {
   const headingId = useId();
   const filter = useFilterStore((state) => state.filter);
   const sort = useViewStore((state) => state.sort);
@@ -151,6 +153,7 @@ export function StoryList({ nodes }: StoryListProps): JSX.Element {
   return (
     <div
       ref={scroller}
+      inert={covered}
       // Scroll padding keeps a row Tab moves to clear of the search bar and the
       // scrubber, never hidden under them (WCAG 2.4.11).
       className={`absolute inset-0 scroll-pb-44 scroll-pt-36 overflow-y-auto overscroll-contain bg-void pt-36 ${sheetOpen ? 'pb-[45vh]' : 'pb-44'}`}

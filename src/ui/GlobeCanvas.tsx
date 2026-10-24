@@ -53,6 +53,8 @@ export interface GlobeCanvasProps {
   readonly onControls: (controls: OrbitGlobeControls | null) => void;
   /** The list is showing (Prompt 5.1): the globe keeps its state but draws nothing and takes no input. */
   readonly paused: boolean;
+  /** A modal sheet is up over it: no input. */
+  readonly covered: boolean;
   readonly probe: FrameProbe | null;
   readonly presentLog: PresentLog | null;
 }
@@ -156,7 +158,7 @@ export function GlobeCanvas(props: GlobeCanvasProps): JSX.Element {
         aria-label={GLOBE_LABEL}
         tabIndex={0}
         // Behind the discussion panel, or under the list, the globe takes no input.
-        inert={inDiscussion || paused}
+        inert={inDiscussion || paused || props.covered}
         style={{ touchAction: 'none' }}
         className="peer focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         fallback={

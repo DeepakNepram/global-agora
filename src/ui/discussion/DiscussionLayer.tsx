@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type JSX } from 'r
 
 import { discussionStageStore, storyStore, useDiscussionStage } from '@/state';
 
+import { trapTab } from '../focus/focusTrap';
 import { takeDiscussionOpener } from './enterDiscussion';
 import { loadedDiscussionPanel } from './loadDiscussion';
 import { discussionStage } from './stage';
@@ -118,7 +119,10 @@ export function DiscussionLayer({ scrim, apiBaseUrl }: DiscussionLayerProps): JS
         aria-labelledby={titleId}
         inert={!active}
         onKeyDown={(event) => {
-          if (event.key !== 'Escape' || event.defaultPrevented) return;
+          if (event.defaultPrevented) return;
+          // Modal: Tab cycles inside the panel (Prompt 5.1).
+          if (panel.current && trapTab(event, panel.current)) return;
+          if (event.key !== 'Escape') return;
           event.preventDefault();
           discussionStage.leave();
         }}

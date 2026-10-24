@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type JSX } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type JSX } from 'react';
 
 import { indexPlaces, search, type PlaceResult } from '@/core';
 import {
@@ -41,6 +41,14 @@ export function LocationEditor({ controller }: LocationEditorProps): JSX.Element
   const saving = useLocationsStore((state) => state.saving);
   const places = useLocationsStore((state) => state.places);
   const [query, setQuery] = useState('');
+  const heading = useRef<HTMLHeadingElement>(null);
+  const storyId = selected?.storyId ?? null;
+
+  // Opening it (above the list) takes focus there, so the keyboard does not
+  // have to find its way back up (Prompt 5.1).
+  useEffect(() => {
+    if (storyId !== null) heading.current?.focus();
+  }, [storyId]);
   const index = useMemo(() => (places === null ? null : indexPlaces(places)), [places]);
   const results = useMemo(
     () =>
@@ -60,7 +68,9 @@ export function LocationEditor({ controller }: LocationEditorProps): JSX.Element
       className="flex flex-col gap-3 rounded-lg border border-accent/40 p-3"
     >
       <div>
-        <h3 className="text-sm font-semibold text-ink">{selected.title}</h3>
+        <h3 ref={heading} tabIndex={-1} className="text-sm font-semibold text-ink outline-none">
+          {selected.title}
+        </h3>
         <p className="text-xs text-muted">
           Now: {selected.placeName ?? 'no place'}
           {selected.countryCode !== null && ` [${selected.countryCode}]`} (

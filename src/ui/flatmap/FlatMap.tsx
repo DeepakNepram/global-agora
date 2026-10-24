@@ -36,6 +36,8 @@ export interface FlatMapProps {
   readonly onCamera: (camera: FlatControls | null) => void;
   /** The list is showing: the map keeps its view but draws nothing and takes no input. */
   readonly paused: boolean;
+  /** A modal sheet is up over it: no input. */
+  readonly covered: boolean;
 }
 
 const MAP_LABEL =
@@ -159,7 +161,7 @@ export function FlatMap(props: FlatMapProps): JSX.Element {
         aria-label={MAP_LABEL}
         tabIndex={0}
         // Behind the discussion panel, or under the list, the map takes no input.
-        inert={inDiscussion || paused}
+        inert={inDiscussion || paused || props.covered}
         className="peer absolute inset-0 cursor-grab touch-none select-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
       >
         <canvas ref={canvas} aria-hidden="true" className="absolute inset-0 h-full w-full" />

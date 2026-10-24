@@ -16,6 +16,8 @@ export interface SecondarySheetsProps {
   readonly reducedMotion: boolean;
   /** Ways to sign in, or null without a backend. */
   readonly authProviders: readonly AuthProvider[] | null;
+  /** A modal sheet is up: the library waits behind it, inert. */
+  readonly covered: boolean;
 }
 
 /**
@@ -37,13 +39,15 @@ export function SecondarySheets(props: SecondarySheetsProps): JSX.Element {
   return (
     <>
       {libraryUsed && (
-        <LibraryLayer
-          nodes={nodes}
-          target={target}
-          historyHours={historyHours}
-          savedStoryLimit={savedStoryLimit}
-          reducedMotion={reducedMotion}
-        />
+        <div className="contents" inert={props.covered}>
+          <LibraryLayer
+            nodes={nodes}
+            target={target}
+            historyHours={historyHours}
+            savedStoryLimit={savedStoryLimit}
+            reducedMotion={reducedMotion}
+          />
+        </div>
       )}
       {onboardingUsed && <OnboardingLayer target={target} reducedMotion={reducedMotion} />}
       {authProviders !== null && (

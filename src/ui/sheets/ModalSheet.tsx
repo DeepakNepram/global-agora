@@ -13,6 +13,7 @@ import {
 
 import type { SheetState } from '@/state';
 
+import { trapTab } from '../focus/focusTrap';
 import { SHEET_FULL_FRACTION, sheetStops } from '../story/sheetSpring';
 import { useSheetMotion } from '../story/useSheetMotion';
 
@@ -38,15 +39,6 @@ export interface ModalSheetProps {
   readonly focusTarget?: RefObject<HTMLElement | null> | null;
   /** Where focus goes on closing when nothing had it at opening (a sheet that opened itself). */
   readonly fallbackFocus?: () => HTMLElement | null;
-}
-
-/** Everything Tab can reach inside `root`, in order. */
-function tabbable(root: HTMLElement): HTMLElement[] {
-  return [
-    ...root.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
-    ),
-  ].filter((element) => element.closest('[hidden]') === null);
 }
 
 /**
@@ -135,19 +127,9 @@ export function ModalSheet(props: ModalSheetProps): JSX.Element {
     if (event.key === 'Escape') {
       event.preventDefault();
       onDismiss?.();
-    } else if (event.key === 'Tab' && sheet.current) {
+    } else if (sheet.current) {
       // Modal: Tab cycles inside.
-      const items = tabbable(sheet.current);
-      const first = items[0];
-      const last = items.at(-1);
-      if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
+      trapTab(event, sheet.current);
     }
   };
 

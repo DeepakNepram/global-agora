@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type JSX } from 'react';
+import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
 import { useLocationsStore, type LocationsController } from '@/state/adminLocations';
 
@@ -24,6 +24,18 @@ export function LocationsTab({ controller, nowMs }: LocationsTabProps): JSX.Elem
   const selected = useLocationsStore((state) => state.selected);
   const message = useLocationsStore((state) => state.message);
   const [link, setLink] = useState('');
+  const moveButtons = useRef(new Map<string, HTMLButtonElement>());
+  const outcome = useRef<HTMLParagraphElement>(null);
+  const lastSelected = useRef<string | null>(null);
+
+  // A closed editor hands focus back: to its story's button after Cancel,
+  // or to the outcome line after a move (the story has left the list).
+  useEffect(() => {
+    const was = lastSelected.current;
+    lastSelected.current = selected?.storyId ?? null;
+    if (selected !== null || was === null) return;
+    (moveButtons.current.get(was) ?? outcome.current)?.focus();
+  }, [selected]);
 
   useEffect(() => {
     void controller.load();
@@ -62,6 +74,10 @@ export function LocationsTab({ controller, nowMs }: LocationsTabProps): JSX.Elem
             </div>
             <button
               type="button"
+              ref={(button) => {
+                if (button) moveButtons.current.set(item.storyId, button);
+                else moveButtons.current.delete(item.storyId);
+              }}
               className={SECONDARY}
               aria-pressed={selected?.storyId === item.storyId}
               aria-label={`Move the pin of “${item.title}”`}
@@ -100,7 +116,12 @@ export function LocationsTab({ controller, nowMs }: LocationsTabProps): JSX.Elem
           Find
         </button>
       </form>
-      <p role="status" className="min-h-5 text-sm text-ink">
+      <p
+        ref={outcome}
+        role="status"
+        tabIndex={-1}
+        className="min-h-5 text-sm text-ink outline-none"
+      >
         {message === null ? '' : locationMessageText(message)}
       </p>
       <LocationEditor controller={controller} />
