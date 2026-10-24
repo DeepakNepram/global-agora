@@ -4,6 +4,7 @@ import type { DiscussionInfo, DiscussionPost, VoteKind } from '@/core/discussion
 import type { ReportReason } from '@/core/moderation';
 import type { ModerationResult } from '@/state/discussionRoomActions';
 
+import { VotedMark } from '../icons/StateMarks';
 import { formatAgo } from '../story/format';
 import { kindChip, linkHost, sideName, voteLabel } from './discussionView';
 import { PostMenu } from './PostMenu';
@@ -27,7 +28,7 @@ export interface PostItemProps {
 const STANCE_BAR: Readonly<Record<DiscussionPost['stance'], string>> = {
   a: 'bg-side-a',
   b: 'bg-side-b',
-  neutral: 'bg-muted/60',
+  neutral: 'bg-muted',
 };
 
 const STANCE_TEXT: Readonly<Record<DiscussionPost['stance'], string>> = {
@@ -108,6 +109,12 @@ export const PostItem = memo(function PostItem(props: PostItemProps): JSX.Elemen
               {post.regionLabel}
             </span>
           )}
+          {/* The tint fades; the word says it too, so "new" never rests on colour (5.1). */}
+          {fresh && (
+            <span className="rounded-full bg-accent/15 px-2 py-0.5 font-medium text-accent">
+              New
+            </span>
+          )}
         </p>
         {note && <p className="text-xs text-ink">{note}</p>}
         {!removed && (
@@ -138,7 +145,7 @@ export const PostItem = memo(function PostItem(props: PostItemProps): JSX.Elemen
               onClick={() => onVote(post, 'changed_mind')}
               className="flex h-11 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-void hover:bg-accent/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-pressed:bg-ink aria-pressed:text-void"
             >
-              <MindIcon />
+              {changed ? <VotedMark /> : <MindIcon />}
               Changed my mind
               <span className="tabular-nums">{post.changedMindCount}</span>
             </button>
@@ -149,7 +156,7 @@ export const PostItem = memo(function PostItem(props: PostItemProps): JSX.Elemen
               onClick={() => onVote(post, 'helpful')}
               className="flex h-11 items-center gap-2 rounded-full border border-ink/20 px-3 text-sm text-ink/90 hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-pressed:border-accent aria-pressed:text-accent"
             >
-              <HelpfulIcon />
+              {helpful ? <VotedMark /> : <HelpfulIcon />}
               Helpful
               <span className="tabular-nums">{post.helpfulCount}</span>
             </button>

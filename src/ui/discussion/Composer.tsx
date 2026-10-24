@@ -7,6 +7,7 @@ import { monotonicNowMs } from '@/state';
 import type { SendResult } from '@/state/discussionRoomActions';
 import { createLocalBadgeController, createLocalBadgeStore } from '@/state/localBadge';
 
+import { CheckMark } from '../icons/StateMarks';
 import {
   counterAnnouncement,
   counterView,
@@ -45,7 +46,7 @@ const drafts = new Map<string, Draft>();
 const EMPTY: Draft = { body: '', kind: 'argument', url: '' };
 
 const FIELD =
-  'w-full rounded-xl border border-ink/20 bg-void px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50';
+  'w-full rounded-xl border border-edge bg-void px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50';
 
 /**
  * The composer (Prompt 4.5): 500 characters counted as the database counts
@@ -169,7 +170,8 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
                   onChange={() => edit({ kind: option.kind })}
                   className="peer sr-only"
                 />
-                <span className="inline-flex min-h-11 items-center rounded-full border border-ink/20 px-3 text-sm text-ink peer-checked:border-accent peer-checked:bg-accent/15 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-accent">
+                <span className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ink/20 px-3 text-sm text-ink peer-checked:border-accent peer-checked:bg-accent/15 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-accent">
+                  {draft.kind === option.kind && <CheckMark />}
                   {option.label}
                 </span>
               </label>

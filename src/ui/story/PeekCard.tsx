@@ -155,7 +155,7 @@ export function PeekCard(props: PeekCardProps): JSX.Element {
           <input
             readOnly
             value={share.url}
-            className="rounded border border-ink/20 bg-void px-2 py-1.5 text-sm text-ink"
+            className="rounded border border-edge bg-void px-2 py-1.5 text-sm text-ink"
             onFocus={(event) => event.currentTarget.select()}
             // Selected for copying the moment it appears.
             ref={(input) => input?.select()}

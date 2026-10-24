@@ -19,7 +19,7 @@ export interface RoomStripProps {
 
 const SIDE_BAR: Readonly<Record<'a' | 'b' | 'neutral', string>> = {
   a: 'bg-side-a',
-  neutral: 'bg-muted/60',
+  neutral: 'bg-muted',
   b: 'bg-side-b',
 };
 

@@ -3,6 +3,7 @@ import { memo, useId, type JSX, type RefObject } from 'react';
 import type { DiscussionInfo, StanceRecord } from '@/core/discussion';
 import type { PostStance } from '@/core/posting';
 
+import { CheckMark } from '../icons/StateMarks';
 import { sideName } from './discussionView';
 
 export interface StancePickerProps {
@@ -64,7 +65,14 @@ export const StancePicker = memo(function StancePicker(props: StancePickerProps)
               className="peer sr-only"
             />
             <span className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-ink/15 px-2 py-2 text-center text-sm text-ink peer-checked:border-accent peer-checked:bg-accent/15 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-accent peer-disabled:opacity-50">
-              <span aria-hidden="true" className={`size-2.5 shrink-0 rounded-full ${DOT[side]}`} />
+              {stance?.stance === side ? (
+                <CheckMark />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className={`size-2.5 shrink-0 rounded-full ${DOT[side]}`}
+                />
+              )}
               <span className="line-clamp-2">{sideName(side, info)}</span>
             </span>
           </label>

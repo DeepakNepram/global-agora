@@ -154,7 +154,7 @@ export function LibrarySheet(props: LibrarySheetProps): JSX.Element {
                   tabIndex={selected ? 0 : -1}
                   onClick={() => onTab(tab.panel)}
                   onKeyDown={(event) => onTabKey(event, index)}
-                  className={`h-10 rounded-full px-4 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${selected ? 'bg-white/10 text-ink' : 'text-muted hover:text-ink'}`}
+                  className={`h-10 rounded-full px-4 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${selected ? 'bg-ink text-void' : 'text-muted hover:text-ink'}`}
                 >
                   {tab.label}
                 </button>

@@ -13,6 +13,9 @@
      use is next to the side's name. Both clear WCAG AA as text on the panel. */
   --color-side-a: #f2a541;
   --color-side-b: #a78bfa;
+  /* A text field's edge: 3:1 against the panel, the page and the globe, so a
+     field reads as a field (WCAG 1.4.11; tests/contrast.test.ts). */
+  --color-edge: #6b7489;
 
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }

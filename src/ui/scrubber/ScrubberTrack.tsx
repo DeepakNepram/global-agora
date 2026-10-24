@@ -71,7 +71,8 @@ export function ScrubberTrack(props: ScrubberTrackProps): JSX.Element {
               <rect x={0} y={0} width={fraction * buckets} height={1} />
             </clipPath>
           </defs>
-          <g className="fill-muted/30">
+          {/* Ahead of the playhead: 3:1 on the page, a graphic to read (WCAG 1.4.11). */}
+          <g className="fill-muted/65">
             <Bars heights={heights} />
           </g>
           <g clipPath={`url(#${clipId})`} className={playing ? 'fill-accent' : 'fill-accent/80'}>

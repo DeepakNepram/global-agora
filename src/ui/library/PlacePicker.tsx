@@ -102,7 +102,7 @@ export function PlacePicker(props: PlacePickerProps): JSX.Element {
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onKeyDown={onKeyDown}
-        className="h-10 w-full rounded-full border border-ink/20 bg-void px-4 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="h-10 w-full rounded-full border border-edge bg-void px-4 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       />
       <div
         id={listId}

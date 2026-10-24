@@ -63,7 +63,9 @@ export function TimeScrubber({
   return (
     <div
       inert={hidden}
-      className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-void/95 via-void/70 to-transparent px-4 pb-3 pt-12 transition-[translate,opacity] duration-300 motion-reduce:transition-none ${hidden ? 'translate-y-full opacity-0' : ''}`}
+      // Dark enough under every line of text (void/90 up to 70% of the way)
+      // that muted text keeps 4.5:1 over sunlit cloud (tests/contrast.test.ts).
+      className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-void via-void/90 via-70% to-transparent px-4 pb-3 pt-12 transition-[translate,opacity] duration-300 motion-reduce:transition-none ${hidden ? 'translate-y-full opacity-0' : ''}`}
     >
       <section
         aria-label="Time scrubber"
