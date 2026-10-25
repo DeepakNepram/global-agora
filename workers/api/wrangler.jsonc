@@ -1,6 +1,8 @@
 // The API Worker. Deploy: npx wrangler deploy -c workers/api/wrangler.jsonc
 // Set SUPABASE_URL and SUPABASE_ANON_KEY (the publishable key, not the secret
 // one) as vars or secrets. Locally they come from workers/api/.dev.vars.
+// Analytics: set UMAMI_WEBSITE_ID (wrangler secret put); without it, events
+// are accepted and dropped.
 //
 // The edge cache (Cache API) does nothing on *.workers.dev, so production
 // needs a route on your own domain beside the Pages app, e.g.
@@ -13,6 +15,11 @@
   // node:zlib is the only Brotli encoder in workerd.
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  // POST /api/event (Prompt 5.2): at most 60 events a minute from one
+  // connection, counted by Cloudflare and kept by no one.
+  "ratelimits": [
+    { "name": "EVENT_LIMITER", "namespace_id": "5201", "simple": { "limit": 60, "period": 60 } },
+  ],
   // Tuning; every value here is also the default in src/config.ts.
   "vars": {
     "API_NODE_LIMIT": "3000",

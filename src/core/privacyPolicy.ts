@@ -8,6 +8,7 @@
 
 import {
   ACCOUNT_SECTION,
+  COUNTING_SECTION,
   ERRORS_SECTION,
   KEEPING_SECTION,
   MODERATION_SECTION,
@@ -69,6 +70,7 @@ export function privacyDocument(site: LegalSite): LegalDocument {
       LOCAL_BADGE_POLICY,
       MODERATION_SECTION,
       ERRORS_SECTION,
+      COUNTING_SECTION,
       othersSection(site),
       KEEPING_SECTION,
       rightsSection(site),

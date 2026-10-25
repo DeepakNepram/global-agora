@@ -323,3 +323,18 @@ export type {
   AppealStatus,
   AppealSummary,
 } from './appeal';
+export {
+  ANALYTICS_EVENTS,
+  ANALYTICS_OPT_OUT_KEY,
+  analyticsAllowed,
+  COHORT_KEY,
+  DURATION_BUCKETS,
+  durationBucket,
+  isoWeek,
+  parseAnalyticsEvent,
+  parseCohort,
+  POST_MADE_EVENT,
+  weekActive,
+  weeksBetween,
+} from './analytics';
+export type { AnalyticsEvent, AnalyticsEventName, CohortRecord, DurationBucket } from './analytics';

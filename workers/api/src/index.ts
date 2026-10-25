@@ -6,7 +6,9 @@
  * SUPABASE_ANON_KEY (the publishable key), plus the tuning listed in
  * src/config.ts. Secret: REGION_LABEL_SECRET, the same value as the database's
  * Vault entry region_label_secret, which lets a post carry its local badge
- * (Prompt 4.4). Needs nodejs_compat for node:zlib's Brotli.
+ * (Prompt 4.4). Analytics (Prompt 5.2): UMAMI_WEBSITE_ID, the site's public
+ * id in Umami (unset, events are dropped), and the EVENT_LIMITER rate limit
+ * binding. Needs nodejs_compat for node:zlib's Brotli.
  */
 
 import { createLogger } from '../../shared/log.ts';
@@ -15,12 +17,16 @@ import { handleFetch } from './app.ts';
 import { createEdgeStore, createMemoryStore, createSwrCache, type EdgeCache } from './cache.ts';
 import { resolveApiConfig, type Vars } from './config.ts';
 import { createAnonDb } from './db.ts';
+import { eventsConfig, type RateLimiter } from './events.ts';
 import { postingConfig } from './posts.ts';
 
 interface Env extends Vars {
   readonly SUPABASE_URL?: string;
   readonly SUPABASE_ANON_KEY?: string;
   readonly REGION_LABEL_SECRET?: string;
+  readonly UMAMI_WEBSITE_ID?: string;
+  readonly UMAMI_ENDPOINT?: string;
+  readonly EVENT_LIMITER?: RateLimiter;
 }
 
 /** The two of Cloudflare's request.cf properties this Worker reads. */
@@ -67,6 +73,8 @@ export default {
       posting: postingConfig(env, log),
       network,
       fetch: (input, init) => fetch(input, init),
+      events: eventsConfig(env, log),
+      eventLimiter: env.EVENT_LIMITER ?? null,
     });
   },
 };

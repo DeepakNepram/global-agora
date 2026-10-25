@@ -44,6 +44,8 @@ function worker(config: DbConfig, network: NetworkPlace) {
     },
     network,
     fetch: (input, init) => fetch(input, init),
+    events: null,
+    eventLimiter: null,
   };
   return (url: string, init?: RequestInit): Promise<Response> =>
     handleFetch(new Request(`http://worker.local${url}`, init), deps);

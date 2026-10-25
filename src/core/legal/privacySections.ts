@@ -23,6 +23,11 @@ export const DEVICE_STORAGE: readonly { readonly key: string; readonly purpose: 
     key: 'agora.auth.v1-code-verifier',
     purpose: 'a one-time value that finishes a sign-in link, deleted when it has',
   },
+  { key: 'agora.analytics.v1', purpose: 'whether you turned “Count my visits” off' },
+  {
+    key: 'agora.cohort.v1',
+    purpose: 'the week of your first visit, and the last week counted (see Counting visits)',
+  },
 ];
 
 export function whoSection(site: LegalSite): LegalSection {
@@ -111,6 +116,26 @@ export const ERRORS_SECTION: LegalSection = {
   ],
 };
 
+export const COUNTING_SECTION: LegalSection = {
+  id: 'counting',
+  title: 'Counting visits',
+  paragraphs: [
+    'To learn whether Global Agora is worth building on, the app counts six things and no ' +
+      'more: how long it stays on screen each time (in bands, such as 2 to 5 minutes), stories ' +
+      'opened, whether the time scrubber was used, debates entered, posts made, and how many ' +
+      'devices come back in the week after their first. Nothing identifies you: no account, ' +
+      'no device identifier, no story, no address.',
+    'The counts go to our own server, which passes them to Umami, an analytics service, ' +
+      'without your IP address, so Umami knows neither who nor where you are. It sees the count, ' +
+      'the names of your browser and operating system, and when. Umami keeps counts for six ' +
+      'months.',
+    'For the return count, your device keeps the week of its first visit and, once a week, ' +
+      'says which week of its life this is.',
+    'If your browser sends Global Privacy Control or Do Not Track, nothing is counted. You can ' +
+      'also turn counting off on this device, here:',
+  ],
+};
+
 export function othersSection(site: LegalSite): LegalSection {
   const region = site.dataRegion ? ` Its database is in ${site.dataRegion}.` : '';
   return {
@@ -125,6 +150,7 @@ export function othersSection(site: LegalSite): LegalSection {
       'Google and Apple: sign you in, if you choose them.',
       'Anthropic: drafts debate questions from stories, for moderators.',
       'Sentry: receives error reports.',
+      'Umami: receives the six counts, from our server, without your IP address.',
       'Our email provider: sends sign-in links and codes.',
     ],
   };

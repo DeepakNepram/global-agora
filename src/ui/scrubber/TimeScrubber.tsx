@@ -3,6 +3,7 @@ import { useEffect, useReducer, type JSX } from 'react';
 import { fractionAt, historyRange, type NodeBuffer } from '@/core';
 import { LIVE_SYNC_INTERVAL_MS, timeStore, useTimeStore, wallClockNow } from '@/state';
 
+import { noteScrubberUsed } from '../platform/analytics';
 import { ScrubberTrack } from './ScrubberTrack';
 import { formatTimeLabel } from './timeLabel';
 
@@ -78,7 +79,10 @@ export function TimeScrubber({
           className={ROUND_BUTTON}
           aria-label={`Play the last ${historyHours} hours`}
           aria-pressed={playing}
-          onClick={() => setMotion(playing ? 'still' : 'playing')}
+          onClick={() => {
+            if (!playing) noteScrubberUsed();
+            setMotion(playing ? 'still' : 'playing');
+          }}
         >
           <PlayIcon playing={playing} />
         </button>

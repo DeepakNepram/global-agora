@@ -1,8 +1,9 @@
-import { Fragment, useEffect, type JSX, type ReactNode } from 'react';
+import { Fragment, useEffect, useId, type JSX, type ReactNode } from 'react';
 
 import { legalDocument } from '@/core/legal/documents';
 import { LEGAL_UPDATED_AT } from '@/core/legal/site';
 import type { LegalDocId, LegalSite } from '@/core/legal/types';
+import { useAnalyticsConsent } from '@/state';
 
 const LINK =
   'text-accent underline underline-offset-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
@@ -27,6 +28,43 @@ function linkify(text: string): ReactNode {
       </a>
     );
   });
+}
+
+/**
+ * The privacy policy's "Count my visits" (Prompt 5.2), under the section that
+ * explains it. The browser's own Global Privacy Control or Do Not Track wins.
+ */
+function CountingSwitch(): JSX.Element {
+  const counting = useAnalyticsConsent((state) => state.counting);
+  const setCounting = useAnalyticsConsent((state) => state.setCounting);
+  const id = useId();
+  const nav = navigator as Navigator & { readonly globalPrivacyControl?: boolean };
+  const blocked = nav.globalPrivacyControl === true || nav.doNotTrack === '1';
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-edge p-3">
+      <input
+        id={id}
+        type="checkbox"
+        checked={counting && !blocked}
+        disabled={blocked}
+        onChange={(event) => setCounting(event.currentTarget.checked)}
+        aria-describedby={`${id}-note`}
+        className="mt-0.5 size-5 shrink-0 accent-accent disabled:opacity-50"
+      />
+      <div>
+        <label htmlFor={id} className={blocked ? 'text-muted' : 'text-ink'}>
+          Count my visits on this device
+        </label>
+        <p id={`${id}-note`} className="text-xs text-muted">
+          {blocked
+            ? 'Your browser asks sites not to track it, so nothing is counted.'
+            : counting
+              ? 'On: the six counts above are sent, with nothing that identifies you.'
+              : 'Off: nothing is counted on this device.'}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 export interface LegalBodyProps {
@@ -78,6 +116,7 @@ export default function LegalBody({ id, site, level, section }: LegalBodyProps):
               ))}
             </ul>
           )}
+          {doc.id === 'privacy' && part.id === 'counting' && <CountingSwitch />}
         </section>
       ))}
     </div>

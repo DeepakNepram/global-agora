@@ -104,6 +104,8 @@ function deps(overrides: Partial<ApiDeps> = {}, config: Partial<ApiConfig> = {})
     log: createLogger({}, (line) => lines.push(line)),
     posting: null,
     network: { city: null, country: null },
+    events: null,
+    eventLimiter: null,
     fetch: () => Promise.reject(new Error('these routes never call Supabase directly')),
     ...overrides,
   };

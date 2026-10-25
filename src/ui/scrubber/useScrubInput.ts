@@ -10,6 +10,7 @@ import {
 
 import { fractionAt, historyRange, inMagnet, timeAt } from '@/core';
 import { timeStore, wallClockNow } from '@/state';
+import { noteScrubberUsed } from '../platform/analytics';
 
 /** The range input's resolution: 10,000 steps is finer than a pixel on any screen. */
 export const SCRUB_STEPS = 10_000;
@@ -93,10 +94,12 @@ export function useScrubInput(
         if (!pressed || pressed.pointerId !== event.pointerId) return;
         if (Math.abs(event.clientX - pressed.startX) < DRAG_SLOP_CSS_PX) return;
         timeStore.getState().setMotion('dragging');
+        noteScrubberUsed();
       },
 
       onChange(event) {
         showFraction(Number(event.target.value) / SCRUB_STEPS);
+        noteScrubberUsed();
       },
 
       onKeyDown(event) {
@@ -117,6 +120,7 @@ export function useScrubInput(
         event.preventDefault();
         if (state.motion === 'playing') state.setMotion('still');
         action();
+        noteScrubberUsed();
       },
     };
   }, [input, historyHours]);

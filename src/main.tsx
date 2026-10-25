@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 
 import { App } from '@/ui';
 import { AppErrorBoundary } from '@/ui/AppErrorBoundary';
+import { startAnalytics } from '@/ui/platform/analytics';
 import { reportError, startErrorReporting } from '@/ui/platform/errorReporting';
 import { registerServiceWorker } from '@/ui/platform/serviceWorker';
 import { authProvidersFromEnv, resolveConfig } from '@/core';
@@ -72,6 +73,8 @@ if (path === '/admin' || path.startsWith('/admin/')) {
       ),
   );
 } else if (path === '/' || path === '/index.html') {
+  // The six measures, through the API Worker (Prompt 5.2); production only.
+  startAnalytics(`${config.apiBaseUrl.replace(/\/+$/, '')}/event`);
   root.render(
     <StrictMode>
       <AppErrorBoundary>

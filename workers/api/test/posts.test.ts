@@ -41,6 +41,8 @@ function setup(
     log: createLogger({}, (line) => lines.push(line)),
     posting: POSTING,
     network: BENGALURU,
+    events: null,
+    eventLimiter: null,
     fetch: async (url, init) => {
       forwarded.push({
         url,

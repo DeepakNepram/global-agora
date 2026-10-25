@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 
+import { POST_MADE_EVENT } from '@/core';
 import type { DiscussionPost, VoteKind } from '@/core/discussion';
 import type { ReportReason } from '@/core/moderation';
 import type { PostingErrorCode, PostKind, PostStance } from '@/core/posting';
@@ -119,6 +120,8 @@ export function DiscussionPanel({
     (draft: { body: string; kind: PostKind; evidenceUrl: string | null; localBadge: boolean }) => {
       const sending = room.send({ ...draft, storyId });
       void sending.then((result) => {
+        // Counted by the analytics in the start's chunk, which shares no module with this one.
+        if (result.ok) window.dispatchEvent(new Event(POST_MADE_EVENT));
         const code: PostingErrorCode | 'no-side' | null = result.ok ? null : result.code;
         if (code === 'signed-out') accountStore.getState().openSignIn('Sign in to post.');
       });

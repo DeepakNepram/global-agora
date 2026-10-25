@@ -25,6 +25,7 @@ import type { NetworkPlace } from '../../../src/core/localBadge.ts';
 
 import type { ApiDb, Fetch, StoryRef } from './db.ts';
 import { buildNodes, buildOutlets, buildOutletStories, buildStory } from './entries.ts';
+import { routeEvents, type EventsConfig, type RateLimiter } from './events.ts';
 import { corsHeaders, jsonError, jsonReply, preflight, serveEntry } from './http.ts';
 import { routePosting, type PostingConfig } from './posts.ts';
 
@@ -45,6 +46,10 @@ export interface ApiDeps {
   /** Cloudflare's city and country for this request, and nothing else from request.cf. */
   readonly network: NetworkPlace;
   readonly fetch: Fetch;
+  /** Analytics (Prompt 5.2); null when UMAMI_WEBSITE_ID is unset. */
+  readonly events: EventsConfig | null;
+  /** Cloudflare's rate limiter for /api/event; null where there is none (tests). */
+  readonly eventLimiter: RateLimiter | null;
 }
 
 const STORY_PATH = /^\/api\/story\/([^/]+)$/;
@@ -193,6 +198,15 @@ async function route(request: Request, url: URL, deps: ApiDeps): Promise<Respons
   const allowedOrigins = deps.config.allowedOrigins;
   const posting = routePosting(request, pathname, { ...deps, allowedOrigins });
   if (posting !== null) return posting;
+  const event = routeEvents(request, pathname, {
+    events: deps.events,
+    limiter: deps.eventLimiter,
+    fetch: deps.fetch,
+    allowedOrigins,
+    log: deps.log,
+    waitUntil: deps.waitUntil,
+  });
+  if (event !== null) return event;
   const report = REPORT_PATH.exec(pathname);
   if (report) {
     if (request.method === 'OPTIONS') {

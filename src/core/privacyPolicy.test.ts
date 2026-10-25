@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { ANALYTICS_EVENTS } from './analytics';
 import { DEVICE_STORAGE } from './legal/privacySections';
 import type { LegalSite } from './legal/types';
 import { regionLabel } from './localBadge';
@@ -109,7 +110,7 @@ describe('the privacy policy on everything else (Prompt 5.2)', () => {
 
   it('names every outside service the app or its server sends data to', () => {
     const named = ['Supabase', 'Cloudflare', 'OpenAI', 'Google Cloud', 'Apple', 'Anthropic'];
-    for (const name of [...named, 'Sentry']) expect(section('others')).toContain(name);
+    for (const name of [...named, 'Sentry', 'Umami']) expect(section('others')).toContain(name);
   });
 
   it('says only a post’s text goes to moderation (moderate-post sends post.body alone)', () => {
@@ -123,6 +124,15 @@ describe('the privacy policy on everything else (Prompt 5.2)', () => {
     expect(text).toMatch(/without anything after a \? or #/);
     expect(text).toMatch(/no IP address/);
     expect(text).toMatch(/no account, email address, handle or cookie/);
+  });
+
+  it('counts as src/core/analytics.ts does: six things, no identifier, no IP to Umami', () => {
+    const text = section('counting');
+    expect(ANALYTICS_EVENTS).toHaveLength(6);
+    expect(text).toMatch(/counts six things and no more/);
+    expect(text).toMatch(/Nothing identifies you/);
+    expect(text).toMatch(/without your IP address/);
+    expect(text).toMatch(/Global Privacy Control or Do Not Track/);
   });
 
   it('says deleting an account removes what the cascades remove, at once', () => {

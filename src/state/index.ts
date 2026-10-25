@@ -45,6 +45,13 @@ export {
   type DocumentStore,
 } from './documentStore';
 export {
+  analyticsConsentStore,
+  createAnalyticsConsentStore,
+  useAnalyticsConsent,
+  type AnalyticsConsentState,
+  type AnalyticsConsentStore,
+} from './analyticsConsent';
+export {
   createStoryStore,
   ringedStory,
   storyStore,
