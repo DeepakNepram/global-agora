@@ -1,5 +1,6 @@
-import { NEWS_CATEGORIES } from '@/core/nodeBuffer';
-import { quantizeLat, quantizeLon, type NodesPayload } from '@/core/data/payload';
+// Relative, with extensions: scripts/e2e/serve.ts loads this under plain Node.
+import { NEWS_CATEGORIES } from '../../../src/core/nodeBuffer.ts';
+import { quantizeLat, quantizeLon, type NodesPayload } from '../../../src/core/data/payload.ts';
 
 /**
  * The news the accessibility checks browse (Prompt 5.1): 120 stories over
