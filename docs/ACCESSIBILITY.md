@@ -82,6 +82,7 @@ same pins are drawn. It starts again from the centre when either changes
 | Sign-in, setup, account, onboarding | Yes   | The heading, or the least destructive choice of a confirmation | The opener                                      |
 | Discussion panel                    | Yes   | The debate's question                                          | Discuss                                         |
 | A post's menu                       | No    | Its first item                                                 | Its button; it also closes when focus leaves it |
+| A document (rules, privacy, terms…) | Yes   | The heading                                                    | The link that opened it                         |
 
 **How the modals behave:**
 
@@ -91,7 +92,29 @@ same pins are drawn. It starts again from the centre when either changes
   link. Behind an account or onboarding sheet, it is also the view, the
   search bar, the scrubber, the story sheet and the library.
 - **Account sheets** opened from inside a discussion stay usable above it.
+- **A document** (Prompt 5.2) opens stacked above whatever is open, a
+  discussion or the sign-in sheet included, and closing it leaves that as
+  it was. Each also has its own page (`/rules`, `/privacy`, …).
 - **Escape** closes or steps down everything.
+
+### When something goes wrong
+
+Prompt 5.2's states keep a keyboard path and say what happened:
+
+- **Announced politely** (`role="status"`): the offline banner and how old
+  the saved news is, "A new version is ready", the globe's notices
+  (restoring, or the flat map instead) and the header's news status.
+- **The crash screen** moves focus to its heading, with Reload and Open
+  the list view.
+- **Each problem card** has its way on: Try now, Back to the news, Read the
+  closed discussion.
+- **Offline, what needs the network says so in words**: signing in, the
+  discussion's posting, voting and sides, and a story whose coverage was
+  not saved.
+- **The appeal form** sits inside the account sheet. "Appeal this
+  suspension" moves focus to the text box, whose description says how many
+  characters are left; sending moves it to the line that says it was sent,
+  and Cancel back to the button.
 
 ## Reduced motion
 
@@ -150,11 +173,13 @@ ship unaudited.
 
 ## The checks
 
-| What                                                                             | Where                        | Runs                                       |
-| -------------------------------------------------------------------------------- | ---------------------------- | ------------------------------------------ |
-| Contrast audit                                                                   | `tests/contrast.test.ts`     | `npm run test`, in CI's verify job         |
-| axe-core, WCAG 2.2 A and AA and best practice, 17 states at 1280×800 and 390×844 | `tests/e2e/a11y.spec.ts`     | `npm run test:e2e`, CI's accessibility job |
-| Keyboard paths and focus                                                         | `tests/e2e/keyboard.spec.ts` | the same                                   |
+| What                                                                                               | Where                                                                               | Runs                                       |
+| -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------ |
+| Contrast audit                                                                                     | `tests/contrast.test.ts`                                                            | `npm run test`, in CI's verify job         |
+| axe-core, WCAG 2.2 A and AA and best practice, every view, sheet and panel at 1280×800 and 390×844 | `tests/e2e/a11y.spec.ts`                                                            | `npm run test:e2e`, CI's accessibility job |
+| Keyboard paths and focus                                                                           | `tests/e2e/keyboard.spec.ts`                                                        | the same                                   |
+| axe-core on the pages, documents, offline, crash and error states (Prompt 5.2)                     | `tests/e2e/pages.spec.ts`, `states.spec.ts`, `platform.spec.ts`, `no-webgl.spec.ts` | the same                                   |
+| Lighthouse accessibility score 100, median of three                                                | `npm run budgets:lighthouse`                                                        | CI's Lighthouse job                        |
 
 **What the browser checks run against:** the production build, in
 Chromium, with software WebGL. The network is answered by

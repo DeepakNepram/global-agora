@@ -28,6 +28,7 @@ truth; the original design is the build plan's §3
 | `20261018100000_local_badge.sql`            | `region_label` written only by the API Worker, its shape  |
 | `20261020100000_discussion_live.sql`        | the live feed's broadcast, `discussion_balance`           |
 | `20261022100000_admin_console.sql`          | the console's functions, the cap, `admin_actions`         |
+| `20261025100000_appeals.sql`                | `appeals`, overturned strikes, `appeal_outcome` notices   |
 
 Each table ships with its RLS policies and grants in the same file: a table and
 its access rules are one change. Migrations are timestamped and forward-only.
@@ -70,15 +71,16 @@ its access rules are one change. Migrations are timestamped and forward-only.
   and `post_rank()`, which a post insert computes. The triggers, the
   scheduled jobs' functions and the moderation decision are closed to them.
 - **Settings tables live in `private` too** (Prompt 4.3):
-  `moderation_settings` (thresholds, strikes to suspend, retries) and
-  `posting_limits` (per tier). RLS is on and no API role holds any privilege
+  `moderation_settings` (thresholds, strikes to suspend, retries),
+  `posting_limits` (per tier) and `appeal_settings` (Prompt 5.2). RLS is on and no API role holds any privilege
   on them; the owner tunes them in SQL.
 - **Only the service role writes news.** The ingest Worker holds the service
   key and bypasses RLS (CLAUDE.md #9). A client writes only what is its
   own: a signed-in reader's library, `follows` and `saved_stories` (Prompt
   3.4); their profile, through the functions above (Prompt 4.1); taking
   part in a discussion, their side, posts and votes, by column (Prompt 4.2);
-  and their blocks, and their notices' `read_at` (Prompt 4.3).
+  their blocks, and their notices' `read_at` (Prompt 4.3); and, when
+  suspended, an appeal through `submit_appeal` (Prompt 5.2).
 - **No precise user location, ever.** No coordinates on any user-written table.
   `posts.region_label` is coarse text from the Cloudflare IP header, capped at
   64 characters (#5). Only the API Worker writes it (a secret checked against
@@ -94,34 +96,37 @@ its access rules are one change. Migrations are timestamped and forward-only.
 
 Grants and policies agree; `npm run db:test` checks both.
 
-| Table                    | Signed out | Signed in                             | Writes                          |
-| ------------------------ | ---------- | ------------------------------------- | ------------------------------- |
-| `stories`                | read       | read                                  | service role (ingest Worker)    |
-| `articles`               | read       | read                                  | service role (ingest Worker)    |
-| `discussions`            | read       | read                                  | `open_discussion` (admins only) |
-| `feature_flags`          | none       | read                                  | service role                    |
-| `posts`                  | approved   | approved, no block either way; yours  | yours, by column (Prompt 4.2)   |
-| `profiles`               | public     | public; your own private via function | your own, through functions     |
-| `votes`                  | none       | your own votes                        | yours, by column (Prompt 4.2)   |
-| `discussion_stances`     | none       | your own                              | yours, until you post or vote   |
-| `blocks`                 | none       | blocks you made                       | add by column, remove your own  |
-| `reports`                | none       | none (explicit restrictive deny)      | `report_post` only              |
-| `strikes`                | none       | none (explicit restrictive deny)      | moderation's functions          |
-| `notifications`          | none       | your own                              | `read_at` on your own           |
-| `admins`                 | none       | none (explicit restrictive deny)      | service role (SQL)              |
-| `admin_actions`          | none       | none (explicit restrictive deny)      | the console's functions         |
-| `moderation_actions`     | none       | none (explicit restrictive deny)      | `moderate_post` only            |
-| `story_signals`          | none       | none (explicit restrictive deny)      | service role (ingest Worker)    |
-| `ingest_runs`            | none       | none (explicit restrictive deny)      | service role (ingest Worker)    |
-| `story_location_reports` | none       | none (explicit restrictive deny)      | `api_report_location` only      |
-| `follows`                | none       | your own                              | add and remove your own         |
-| `saved_stories`          | none       | your own                              | add and remove your own         |
+| Table                    | Signed out | Signed in                             | Writes                           |
+| ------------------------ | ---------- | ------------------------------------- | -------------------------------- |
+| `stories`                | read       | read                                  | service role (ingest Worker)     |
+| `articles`               | read       | read                                  | service role (ingest Worker)     |
+| `discussions`            | read       | read                                  | `open_discussion` (admins only)  |
+| `feature_flags`          | none       | read                                  | service role                     |
+| `posts`                  | approved   | approved, no block either way; yours  | yours, by column (Prompt 4.2)    |
+| `profiles`               | public     | public; your own private via function | your own, through functions      |
+| `votes`                  | none       | your own votes                        | yours, by column (Prompt 4.2)    |
+| `discussion_stances`     | none       | your own                              | yours, until you post or vote    |
+| `blocks`                 | none       | blocks you made                       | add by column, remove your own   |
+| `reports`                | none       | none (explicit restrictive deny)      | `report_post` only               |
+| `strikes`                | none       | none (explicit restrictive deny)      | moderation's functions           |
+| `notifications`          | none       | your own                              | `read_at` on your own            |
+| `appeals`                | none       | your own                              | `submit_appeal`, `decide_appeal` |
+| `admins`                 | none       | none (explicit restrictive deny)      | service role (SQL)               |
+| `admin_actions`          | none       | none (explicit restrictive deny)      | the console's functions          |
+| `moderation_actions`     | none       | none (explicit restrictive deny)      | `moderate_post` only             |
+| `story_signals`          | none       | none (explicit restrictive deny)      | service role (ingest Worker)     |
+| `ingest_runs`            | none       | none (explicit restrictive deny)      | service role (ingest Worker)     |
+| `story_location_reports` | none       | none (explicit restrictive deny)      | `api_report_location` only       |
+| `follows`                | none       | your own                              | add and remove your own          |
+| `saved_stories`          | none       | your own                              | add and remove your own          |
 
 Open questions left for the prompts that own them:
 
-- **Coming back after a suspension.** A suspended reader can delete their
-  account and sign up again; closing that needs data kept after deletion
-  (Prompt 5.2, with appeals).
+- **Coming back after a suspension.** A suspended reader could delete their
+  account and sign up again. During the invite-only alpha (Prompt 5.2)
+  sign-ups are off in Supabase Auth, so a new account needs an invitation;
+  a public launch reopens this, and closing it for good needs data kept
+  after deletion.
 - **Flags before sign-in.** Guests cannot read `feature_flags`. If the app needs
   flags before sign-in, the API Worker reads them with the service key and
   serves them.
@@ -235,17 +240,43 @@ column's default; RLS checks it). A block hides posts both ways.
 
 **`strikes`** (Prompt 4.3): one per removed post at most (unique `post_id`),
 `auto` or `moderator`. A trigger keeps `profiles.strikes` and sets
-`profiles.suspended_at` at `moderation_settings.strikes_to_suspend`.
+`profiles.suspended_at` at `moderation_settings.strikes_to_suspend`. Only
+standing strikes count: a granted appeal sets `overturned_at` and
+`overturned_by` (Prompt 5.2), keeping the record, and only a new strike
+ever suspends.
 
 **`notifications`** (Prompt 4.3): `report_outcome` (`detail.outcome`: kept
-or removed) and `post_removed` (`detail`: source, flagged, strike, strikes,
-strikes_to_suspend, suspended). Their owner reads them and sets `read_at`.
+or removed), `post_removed` (`detail`: source, flagged, strike, strikes,
+strikes_to_suspend, suspended) and `appeal_outcome` (Prompt 5.2: granted or
+refused, with the moderator's reply). Their owner reads them and sets
+`read_at`.
+
+**`appeals`** (Prompt 5.2): a suspended account asking a person to look
+again, in its own words (1 to 1,000 characters).
+
+- `status` is `pending`, `granted` or `refused`; `decided_at`, `decided_by`
+  and `reply` (1 to 500 characters) are set exactly when it is decided
+  (CHECKs). One pending appeal per account (a partial unique index).
+- The owner reads their own; nobody writes the table directly.
+  `submit_appeal(body)` refuses a signed-out caller (42501), a length out
+  of range (22023), an account that is not suspended, and one inside
+  `private.appeal_settings.refusal_wait` (30 days) after a refusal (both
+  55000).
+- `decide_appeal(appeal, grant, reply)` is for admins. Granting overturns
+  the account's standing strikes and clears `suspended_at`; removed posts
+  stay removed. Either way it sends an `appeal_outcome` notice and logs
+  `grant_appeal` or `refuse_appeal` in `admin_actions`.
+  `admin_appeals()` lists them for the console, waiting ones first, each
+  with the handle, strikes and the text of the posts behind them.
+- `my_profile()` carries where the latest appeal stands, and when the
+  account may appeal again.
+- It cascades from the profile: deleting an account deletes its appeals.
 
 **`admins`** (Prompt 4.3): who may moderate, added by SQL;
 `private.is_admin()` checks it. **`moderation_actions`**: each approve,
 remove and strike, by whom and when. **`admin_actions`** (Prompt 4.6):
-each discussion opened (with its words) and each pin moved (from and to),
-by whom and when; `actor_id` and `story_id` are set null when either goes.
+each discussion opened (with its words), each pin moved (from and to) and
+each appeal decided (Prompt 5.2), by whom and when; `actor_id` and `story_id` are set null when either goes.
 
 **`private.admin_settings`** (Prompt 4.6), one row: `max_open_discussions`
 (25), `discussion_length` (48 hours) and `report_median_window` (7 days,
@@ -460,6 +491,14 @@ Measured end to end on a real 24 h window: 3000 nodes are 134,646 bytes
 (131.5 KB) with Brotli 11; 415.7 KB decoded. `cc` adds 2,557 bytes at
 Brotli 11, measured on a full real day: 136,529 bytes (133.3 KB) in all.
 
+**Budgeted in CI** (Prompt 5.2): `tests/budgets/payload.test.ts` runs one
+real day's `api_nodes` output (3000 stories, captured by
+`npm run api:capture-day`) through the Worker's own build and Brotli, and
+fails above 150 KB; it measured 137,636 bytes (134.4 KB). It also fails if
+`API_NODE_LIMIT`'s default outgrows the fixture. A pgTAP check pins
+`api_nodes` to the columns above, so a new column fails until the day is
+captured again and re-measured.
+
 **HTTP:** `Content-Encoding: br` when accepted (identity JSON otherwise),
 weak `ETag`, `If-None-Match` → 304, and
 `Cache-Control: public, max-age=60, stale-while-revalidate=900,
@@ -490,6 +529,15 @@ percent-encoded: ingest stores domains, the seed names ("Tasman Record").
 **`POST /api/story/:id/location-report`** counts one "wrong location" report:
 204, or 404 for an unknown story. No body, `no-store`, nothing about the
 reader read or kept.
+
+**`POST /api/event`** (Prompt 5.2) takes one of the six analytics events
+(`src/core/analytics.ts`): `{name}`, or `{name, data}` for `session_end`
+(`duration`, a bucket) and `week_active` (`cohort`, an ISO week such as
+`2026-W43`, and `week`). Anything else, or over a kilobyte, is a 400; a burst
+from one connection is a 429 (Cloudflare's rate limiter, 60 a minute).
+Accepted events are rebuilt from those fields alone and sent to Umami with
+the browser's name and no IP address: 204. Without `UMAMI_WEBSITE_ID` they
+are accepted and dropped.
 
 ## Monetization hooks (present, unused)
 

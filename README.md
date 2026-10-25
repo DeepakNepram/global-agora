@@ -7,7 +7,8 @@ discussions.
 Web first. Native mobile is a later phase, so the code stays portable — see
 [the boundary](#the-boundary-that-matters).
 
-**Status: Phase 5 in progress.** The globe shows real news from GDELT:
+**Status: built, ready for an invite-only alpha.** Deploying is
+[`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md), in order. The globe shows real news from GDELT:
 ingested every 15 minutes, grouped into stories, served as one compact
 payload, clustered in a Web Worker, and opened with an animated bloom as you
 zoom in. A time scrubber drags or plays back through the last 24 hours, with
@@ -23,6 +24,11 @@ sided discussions from an admin console, with moderation, and a coarse
 local badge when a reader chooses it. Everything works without the globe:
 a list view, a flat map under reduced motion, the globe's pins by Tab, and
 WCAG AA colour, checked by axe-core in CI ([accessibility](docs/ACCESSIBILITY.md)).
+It installs as an app and opens offline with the last news it saved, saying
+how old it is; it reports its own crashes, recovers a lost WebGL context, and
+explains every failure. Terms, privacy, rules and contact are linked from
+wherever they matter; a suspended account can appeal; and six counts, nothing
+personal, say whether people come back.
 
 ## Requirements
 
@@ -49,34 +55,39 @@ npm run textures
 
 ## Scripts
 
-| Script                     | What it does                                      |
-| -------------------------- | ------------------------------------------------- |
-| `npm run dev`              | Vite dev server with HMR                          |
-| `npm run build`            | Typecheck, then production build to `dist/`       |
-| `npm run preview`          | Serve the built bundle                            |
-| `npm run typecheck`        | `tsc --noEmit`                                    |
-| `npm run lint`             | ESLint, including the layer-boundary rules        |
-| `npm run lint:fix`         | ESLint with `--fix`                               |
-| `npm run format`           | Prettier write                                    |
-| `npm run format:check`     | Prettier check (what CI runs)                     |
-| `npm run test`             | Vitest, once                                      |
-| `npm run test:watch`       | Vitest, watching                                  |
-| `npm run verify`           | typecheck + lint + format:check + test, in one go |
-| `npm run test:e2e`         | axe-core and keyboard checks in Chromium (below)  |
-| `npm run test:e2e:build`   | The production build those checks run against     |
-| `npm run textures`         | fetch + build the Earth textures (see below)      |
-| `npm run db:start`         | Start local Supabase in Docker (see Database)     |
-| `npm run db:reset`         | Re-apply every migration, then the seed           |
-| `npm run db:test`          | pgTAP tests: RLS, grants, constraints             |
-| `npm run db:smoke`         | Query back through the anon key, as the app will  |
-| `npm run db:types`         | Regenerate `src/core/db/types.ts` from the schema |
-| `npm run db:seed:generate` | Regenerate `supabase/seed.sql`                    |
-| `npm run db:stop`          | Stop local Supabase                               |
-| `npm run ingest:dev`       | Run the ingest Worker locally (see Ingest)        |
-| `npm run ingest:replay`    | Replay real GDELT slots in memory, print stats    |
-| `npm run ingest:data`      | Regenerate the FIPS and outlet-country tables     |
-| `npm run api:dev`          | Run the API Worker locally on :8788 (see API)     |
-| `npm run api:measure`      | Payload size, column costs and latency, live      |
+| Script                       | What it does                                       |
+| ---------------------------- | -------------------------------------------------- |
+| `npm run dev`                | Vite dev server with HMR                           |
+| `npm run build`              | Typecheck, then production build to `dist/`        |
+| `npm run preview`            | Serve the built bundle                             |
+| `npm run typecheck`          | `tsc --noEmit`                                     |
+| `npm run lint`               | ESLint, including the layer-boundary rules         |
+| `npm run lint:fix`           | ESLint with `--fix`                                |
+| `npm run format`             | Prettier write                                     |
+| `npm run format:check`       | Prettier check (what CI runs)                      |
+| `npm run test`               | Vitest, once                                       |
+| `npm run test:watch`         | Vitest, watching                                   |
+| `npm run verify`             | typecheck + lint + format:check + test, in one go  |
+| `npm run test:e2e`           | axe-core and keyboard checks in Chromium (below)   |
+| `npm run test:e2e:build`     | The production build those checks run against      |
+| `npm run budgets:bundle`     | After `build`: startup files and gzip sizes (CI)   |
+| `npm run budgets:lighthouse` | After `test:e2e:build`: Lighthouse medians (CI)    |
+| `npm run deploy:check`       | Checks the production env, printing no values      |
+| `npm run icons`              | Regenerate the app icons from `public/favicon.svg` |
+| `npm run textures`           | fetch + build the Earth textures (see below)       |
+| `npm run db:start`           | Start local Supabase in Docker (see Database)      |
+| `npm run db:reset`           | Re-apply every migration, then the seed            |
+| `npm run db:test`            | pgTAP tests: RLS, grants, constraints              |
+| `npm run db:smoke`           | Query back through the anon key, as the app will   |
+| `npm run db:types`           | Regenerate `src/core/db/types.ts` from the schema  |
+| `npm run db:seed:generate`   | Regenerate `supabase/seed.sql`                     |
+| `npm run db:stop`            | Stop local Supabase                                |
+| `npm run ingest:dev`         | Run the ingest Worker locally (see Ingest)         |
+| `npm run ingest:replay`      | Replay real GDELT slots in memory, print stats     |
+| `npm run ingest:data`        | Regenerate the FIPS and outlet-country tables      |
+| `npm run api:dev`            | Run the API Worker locally on :8788 (see API)      |
+| `npm run api:measure`        | Payload size, column costs and latency, live       |
+| `npm run api:capture-day`    | Recapture the payload budget's real-day fixture    |
 
 ## Database
 
@@ -86,12 +97,12 @@ Docker Desktop must be running.
 ```bash
 npm run db:start   # first run downloads about 1 GB of images
 npm run db:reset   # migrations + 200 fictional seed stories from the last 24 h
-npm run db:test    # 632 pgTAP assertions: RLS, constraints, ingest, API, accounts, discussions,
-                   # moderation, the local badge, the live feed, the admin console
+npm run db:test    # 671 pgTAP assertions: RLS, constraints, ingest, API, accounts, discussions,
+                   # moderation, the local badge, the live feed, the admin console, appeals
 npm run db:smoke   # the stories come back, other tables refuse, an account's life, a discussion,
                    # known-toxic posts through the moderation pipeline, the local badge
                    # through the API Worker, a live post over Realtime, the admin console
-                   # with its debate suggestions
+                   # with its debate suggestions, an appeal granted and refused
 ```
 
 Discussions update live through Realtime, which the local stack runs
@@ -222,7 +233,9 @@ Logs are one JSON line per step (Workers Logs is enabled in `wrangler.jsonc`).
 ## API
 
 `workers/api/` serves the globe: `GET /api/nodes?hours=24`, the columnar
-payload, and `GET /api/story/:id`, one story in full. It reads with the
+payload, and `GET /api/story/:id`, one story in full. It also takes posts
+(`POST /api/posts`) and the six analytics events (`POST /api/event`), which
+it passes to Umami without the reader's IP address. It reads with the
 **publishable** key only. Format and headers:
 [`docs/DATA_SCHEMA.md`](docs/DATA_SCHEMA.md); why it is built this way:
 [`docs/DECISIONS.md`](docs/DECISIONS.md).
@@ -279,6 +292,10 @@ npx wrangler deploy -c workers/api/wrangler.jsonc
 same value in the database's Vault, in the SQL editor:
 `select vault.create_secret('<the same value>', 'region_label_secret');`.
 
+For analytics, add the Umami Cloud site's id the same way
+(`npx wrangler secret put UMAMI_WEBSITE_ID -c workers/api/wrangler.jsonc`).
+Without it, events are accepted and dropped.
+
 ## Layout
 
 ```
@@ -288,8 +305,11 @@ src/ui/      React components. Tailwind. Talks to core/ and globe/.
 src/state/   Zustand stores.
 workers/     Cloudflare Workers: ingest/ (cron), api/ (payload), shared/.
 supabase/    Migrations, RLS policies, edge functions.
-docs/        ARCHITECTURE.md, DATA_SCHEMA.md, DECISIONS.md, ACCESSIBILITY.md
-tests/       Cross-cutting tests; tests/e2e holds the browser checks (Playwright).
+src/sw/      The service worker: the offline shell and saved news.
+docs/        ARCHITECTURE.md, DATA_SCHEMA.md, DECISIONS.md, ACCESSIBILITY.md,
+             LAUNCH_CHECKLIST.md
+tests/       Cross-cutting tests; tests/e2e holds the browser checks (Playwright),
+             tests/budgets the payload budget.
 ```
 
 ### The boundary that matters
@@ -351,7 +371,8 @@ location.reload();
 
 Clear it with `localStorage.removeItem('agora.quality-tier')`. The override is
 still clamped by `MAX_TEXTURE_SIZE`, since that is a hard GPU limit. The current
-tier and the reason for it are shown in the app footer.
+tier and the reason for it are on the app's root element, as
+`data-quality-tier` and `data-quality-reason`.
 
 ### Benchmarks
 
@@ -377,6 +398,11 @@ slower than 60 fps. A plain `npm run build` leaves the dev panel out.
 `.env.example` lists everything, split into two blocks. **Anything prefixed
 `VITE_` is inlined into the public bundle** — service keys live in Workers only.
 
+A production build reads `.env.production.local` (gitignored) and, for
+anything it leaves out, `.env.local`, which holds the local stack's values.
+`npm run deploy:check` loads them as the build will and says what is missing
+or local, without printing a value.
+
 ## Conventions
 
 - TypeScript strict, plus `noUncheckedIndexedAccess` and
@@ -391,13 +417,24 @@ Full rules: [`CLAUDE.md`](CLAUDE.md). Product plan:
 
 ## CI
 
-`.github/workflows/ci.yml` runs typecheck, lint, format check, test and build on
-every push and pull request. The tests include the ingest Worker's, which run
-on real GDELT rows kept as a fixture, so CI never calls GDELT. A second job, alongside the first, starts
-Postgres with every migration and the seed, runs the pgTAP tests, and checks
-that `src/core/db/types.ts` matches the schema. A third builds the app and
-runs `tests/e2e` in Chromium: axe-core on every view, sheet and panel at a
-desktop and a phone size, failing on any WCAG 2.2 A or AA or best-practice
-violation, and the keyboard paths through them. Locally, once
-`npx playwright install chromium` has fetched the browser:
-`npm run test:e2e` (54 checks, about 2 minutes, no database needed).
+`.github/workflows/ci.yml` runs four jobs on every push and pull request:
+
+- **verify:** typecheck, lint, format check, tests and build, then the bundle
+  budget. The tests include the ingest Worker's, on real GDELT rows kept as a
+  fixture (CI never calls GDELT), and the payload budget: one real day of
+  `api_nodes` output through the API Worker's own compression, under 150 KB.
+- **database:** Postgres with every migration and the seed, the pgTAP tests,
+  and a check that `src/core/db/types.ts` matches the schema.
+- **accessibility:** builds the app and runs `tests/e2e` in Chromium against
+  the fixture server (`scripts/e2e/serve.ts`, production headers included):
+  axe-core on every view, sheet, panel, page and error state at a desktop
+  and a phone size, failing on any WCAG 2.2 A or AA or best-practice
+  violation; the keyboard paths; offline; a lost WebGL context; a crash.
+- **Lighthouse:** the desktop preset, median of three runs, within
+  `budgets.json` (accessibility 100, best practices, SEO, a performance
+  floor, CLS, LCP and bytes).
+
+Budgets are in [`budgets.json`](budgets.json); changing one is a decision for
+`docs/DECISIONS.md`. Locally, once `npx playwright install chromium` has
+fetched the browser: `npm run test:e2e` (90 checks, about 2½ minutes, no
+database needed), then `npm run budgets:lighthouse`.

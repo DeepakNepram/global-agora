@@ -126,6 +126,43 @@ browser <──Brotli, ETag, SWR── API Worker <─────────�
     scale the globe would show. Tab goes through the visible pins on the
     globe and the map alike (`src/ui/globe/usePinFocus.ts`, over the pin
     layer's `targets()`). See [`ACCESSIBILITY.md`](ACCESSIBILITY.md).
+15. Offline (Prompt 5.2). A hand-written service worker (`src/sw/`, built
+    into `dist/sw.js` by `scripts/vite/serviceWorker.ts`) precaches the
+    reader's shell and keeps the last good news replies. Which request gets
+    which treatment is one pure function (`src/sw/routes.ts`); Supabase,
+    Sentry, analytics and every write pass straight through. A saved reply
+    carries `x-agora-saved-at`, so the offline banner can say how old the
+    news is. It registers after the first frame; a new build waits until
+    the reader presses Reload.
+16. When the platform fails (Prompt 5.2). A small shim in the start
+    (`src/ui/platform/errorReporting.ts`) catches errors from the first
+    line and hands them to Sentry, a lazy chunk loaded at idle, with URLs
+    stripped of queries and no user data. A root boundary shows a crash
+    screen; one around the globe falls back to the flat map. A lost WebGL
+    context remounts the canvas with the camera kept
+    (`src/ui/globe/useGlobeRecovery.ts`), and three losses in ten minutes,
+    or no WebGL at all, mean the flat map (`src/core/contextLoss.ts`).
+17. Documents and appeals (Prompt 5.2). The about, rules, privacy, terms and
+    contact texts are data in `src/core/legal/`, built from the deploy's
+    operator settings. They render as pages (`/privacy`, the `PagesApp`
+    chunk) and, inside the app, in a stacked sheet that keeps whatever was
+    open underneath. A suspended account appeals through `submit_appeal`;
+    admins decide in the console's Appeals tab (`decide_appeal`).
+18. Counting (Prompt 5.2). Six events (`src/core/analytics.ts`) go to the
+    API Worker's `POST /api/event`, which forwards them to Umami without the
+    reader's IP address. Nothing identifies a reader; week-two return is
+    counted from the device's first ISO week alone. Off under Global
+    Privacy Control, Do Not Track or the privacy page's switch.
+
+```
+browser ──/api/event──> API Worker ──name + fields, no IP──> Umami Cloud
+browser ──errors, at idle──> Sentry (no IP, no queries, no user)
+```
+
+CI holds the budgets (Prompt 5.2): the start's size and file count
+(`npm run budgets:bundle`), the payload on a real day
+(`tests/budgets/payload.test.ts`), and Lighthouse's medians
+(`npm run budgets:lighthouse`), all from `budgets.json` or the test.
 
 The wire format is defined once, in `src/core/data/payload.ts`, and both the
 Worker and the client validate against it.
