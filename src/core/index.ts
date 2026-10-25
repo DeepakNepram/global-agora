@@ -246,6 +246,7 @@ export {
   REPORT_REASONS,
 } from './moderation';
 export type {
+  AppealOutcomeNotice,
   AppNotice,
   BlockedAccount,
   ModerationErrorCode,
@@ -314,3 +315,11 @@ export {
   legalSiteFromEnv,
 } from './legal/site';
 export type { LegalDocId, LegalDocument, LegalSection, LegalSite } from './legal/types';
+export { APPEAL_MAX_LENGTH, APPEAL_REPLY_MAX_LENGTH, appealStanding } from './appeal';
+export type {
+  AdminAppeal,
+  AppealsRemote,
+  AppealStanding,
+  AppealStatus,
+  AppealSummary,
+} from './appeal';

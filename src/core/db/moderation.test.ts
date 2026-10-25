@@ -79,6 +79,16 @@ describe('toNotice', () => {
     });
   });
 
+  it('reads an appeal outcome (Prompt 5.2)', () => {
+    const notice = toNotice({
+      ...ROW,
+      discussions: null,
+      kind: 'appeal_outcome',
+      detail: { granted: true, reply: 'Fair.' },
+    });
+    expect(notice).toMatchObject({ kind: 'appeal_outcome', granted: true, reply: 'Fair.' });
+  });
+
   it('skips a kind this build does not know', () => {
     expect(toNotice({ ...ROW, kind: 'something_new', detail: {} })).toBeNull();
   });

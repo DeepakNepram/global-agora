@@ -1,4 +1,4 @@
-import type { AccountRemote } from '@/core';
+import type { AccountRemote, AppealsRemote } from '@/core';
 // Directly, not through the barrels: only the /admin chunk carries these.
 import type { AdminConsoleRemote } from '@/core/admin';
 import type { DbConfig } from '@/core/db';
@@ -16,6 +16,8 @@ export interface AdminSession {
   readonly admin: AdminRemote;
   /** The hot stories, the counters and the locations (4.6). */
   readonly console: AdminConsoleRemote;
+  /** Suspended accounts' appeals (5.2). */
+  readonly appeals: AppealsRemote;
   /** Whether a reader is signed in on this device. */
   signedIn(): Promise<boolean>;
 }
@@ -27,6 +29,7 @@ export async function loadAdminSession(config: DbConfig): Promise<AdminSession> 
     account: db.createAccountRemote(client),
     admin: db.createAdminRemote(client),
     console: db.createAdminConsoleRemote(client),
+    appeals: db.createAppealsRemote(client),
     async signedIn() {
       const { data } = await client.auth.getSession();
       return data.session !== null;

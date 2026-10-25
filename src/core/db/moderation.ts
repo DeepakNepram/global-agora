@@ -83,6 +83,14 @@ export function toNotice(row: NoticeRow): AppNotice | null {
       suspended: detail.suspended === true,
     };
   }
+  if (row.kind === 'appeal_outcome') {
+    return {
+      ...base,
+      kind: 'appeal_outcome',
+      granted: detail.granted === true,
+      reply: typeof detail.reply === 'string' ? detail.reply : '',
+    };
+  }
   return null;
 }
 

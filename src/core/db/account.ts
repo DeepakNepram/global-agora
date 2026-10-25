@@ -13,6 +13,7 @@ import {
   type OAuthProvider,
   type Profile,
 } from '../account.ts';
+import type { AppealStatus } from '../appeal.ts';
 import type { DbClient } from './client';
 
 interface ServerError {
@@ -58,6 +59,10 @@ interface ProfileRow {
   readonly strikes: number;
   readonly suspended_at: string | null;
   readonly is_admin: boolean;
+  readonly appeal_status: AppealStatus | null;
+  readonly appeal_sent_at: string | null;
+  readonly appeal_reply: string | null;
+  readonly appeal_again_at: string | null;
 }
 
 function toProfile(row: ProfileRow): Profile {
@@ -70,7 +75,24 @@ function toProfile(row: ProfileRow): Profile {
     strikes: row.strikes,
     suspendedAtMs: row.suspended_at === null ? null : Date.parse(row.suspended_at),
     isAdmin: row.is_admin,
+    appeal:
+      row.appeal_status === null || row.appeal_sent_at === null
+        ? null
+        : {
+            status: row.appeal_status,
+            sentAtMs: Date.parse(row.appeal_sent_at),
+            reply: row.appeal_reply,
+            againAtMs: row.appeal_again_at === null ? null : Date.parse(row.appeal_again_at),
+          },
   };
+}
+
+/** submit_appeal's refusals, as ours (supabase/migrations/20261025100000_appeals.sql). */
+export function appealErrorCode(error: ServerError): AccountErrorCode {
+  if (error.code === '23505') return 'appeal-waiting';
+  if (error.code === '55000') return 'appeal-not-now';
+  if (error.code === '22023') return 'appeal-invalid';
+  return accountErrorCode(error);
 }
 
 export function createAccountRemote(client: DbClient): AccountRemote {
@@ -132,6 +154,11 @@ export function createAccountRemote(client: DbClient): AccountRemote {
       const { data, error } = await client.rpc('accept_rules');
       fail('agree to the rules', error);
       return Date.parse(data ?? '');
+    },
+
+    async submitAppeal(body) {
+      const { error } = await client.rpc('submit_appeal', { p_body: body });
+      if (error) throw new AccountError(appealErrorCode(error), `appeal: ${error.message}`);
     },
 
     async deleteAccount() {

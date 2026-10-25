@@ -29,4 +29,5 @@ export {
   toLocationItem,
   toSuggestion,
 } from './admin';
+export { createAppealsRemote, toAdminAppeal } from './appeals';
 export type { Database, Json, Tables, TablesInsert, TablesUpdate } from './types';

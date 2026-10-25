@@ -47,6 +47,8 @@ export interface AccountController {
   notNow(): Promise<void>;
   signOut(): Promise<void>;
   deleteAccount(): Promise<boolean>;
+  /** Appeals a suspension (Prompt 5.2); true once sent, and the profile shows it waiting. */
+  sendAppeal(body: string): Promise<boolean>;
   /** Reads the account again after it could not be reached. */
   retry(): Promise<void>;
   dispose(): void;

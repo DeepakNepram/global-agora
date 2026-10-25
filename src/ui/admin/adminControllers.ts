@@ -1,6 +1,11 @@
 import { fetchPlaces } from '@/core';
 import type { DbConfig } from '@/core/db';
 // Directly, not through the barrel: only the /admin chunk carries these.
+import {
+  appealsStore,
+  createAppealsController,
+  type AppealsController,
+} from '@/state/adminAppeals';
 import { createConsoleController, type ConsoleController } from '@/state/adminConsole';
 import { consoleStore } from '@/state/adminConsoleStore';
 import {
@@ -11,10 +16,11 @@ import {
 import { loadAdminSession, sharedSession } from '@/state/adminSession';
 import { createQueueController, queueStore, type QueueController } from '@/state/moderationQueue';
 
-/** The console's three controllers, sharing one connection. */
+/** The console's controllers, sharing one connection. */
 export interface AdminControllers {
   readonly console: ConsoleController;
   readonly queue: QueueController;
+  readonly appeals: AppealsController;
   readonly locations: LocationsController;
 }
 
@@ -23,6 +29,7 @@ export function createAdminControllers(dbConfig: DbConfig): AdminControllers {
   return {
     console: createConsoleController({ store: consoleStore, connect }),
     queue: createQueueController({ store: queueStore, load: connect }),
+    appeals: createAppealsController({ store: appealsStore, connect }),
     locations: createLocationsController({
       store: locationsStore,
       connect,

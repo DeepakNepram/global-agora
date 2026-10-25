@@ -49,7 +49,14 @@ export interface PostRemovedNotice extends NoticeBase {
   readonly suspended: boolean;
 }
 
-export type AppNotice = ReportOutcomeNotice | PostRemovedNotice;
+/** A moderator decided your appeal (Prompt 5.2), with their reply. */
+export interface AppealOutcomeNotice extends NoticeBase {
+  readonly kind: 'appeal_outcome';
+  readonly granted: boolean;
+  readonly reply: string;
+}
+
+export type AppNotice = ReportOutcomeNotice | PostRemovedNotice | AppealOutcomeNotice;
 
 export interface NoticeText {
   readonly title: string;
@@ -92,6 +99,21 @@ function standing(notice: PostRemovedNotice): string {
 }
 
 export function describeNotice(notice: AppNotice): NoticeText {
+  if (notice.kind === 'appeal_outcome') {
+    return notice.granted
+      ? {
+          title: 'Appeal granted',
+          body:
+            'A moderator granted your appeal. Your account can post, vote and take sides again, ' +
+            `and the strikes behind the suspension no longer count. They wrote: “${notice.reply}”`,
+        }
+      : {
+          title: 'Appeal refused',
+          body:
+            'A moderator looked at your appeal, and the suspension stays. They wrote: ' +
+            `“${notice.reply}” Your account says when you can appeal again.`,
+        };
+  }
   if (notice.kind === 'report_outcome') {
     return notice.outcome === 'removed'
       ? {

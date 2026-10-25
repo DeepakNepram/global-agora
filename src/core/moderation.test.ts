@@ -32,6 +32,27 @@ function removed(overrides: Partial<PostRemovedNotice> = {}): PostRemovedNotice 
 }
 
 describe('describeNotice', () => {
+  it('tells an account how its appeal went, with the reply (Prompt 5.2)', () => {
+    const base = { ...BASE, postId: null, storyId: null, prompt: null };
+    const granted = describeNotice({
+      ...base,
+      kind: 'appeal_outcome',
+      granted: true,
+      reply: 'Fair.',
+    });
+    expect(granted.title).toBe('Appeal granted');
+    expect(granted.body).toMatch(/can post, vote and take sides again/);
+    expect(granted.body).toMatch(/“Fair\.”/);
+    const refused = describeNotice({
+      ...base,
+      kind: 'appeal_outcome',
+      granted: false,
+      reply: 'No.',
+    });
+    expect(refused.title).toBe('Appeal refused');
+    expect(refused.body).toMatch(/the suspension stays/);
+  });
+
   it('tells a reporter the outcome, and nothing about the author', () => {
     const kept: ReportOutcomeNotice = { ...BASE, kind: 'report_outcome', outcome: 'kept' };
     expect(describeNotice(kept)).toEqual({

@@ -7,7 +7,7 @@ import type { LocationMessage } from '@/state/adminLocations';
  * tested once and reads the same in every tab.
  */
 
-export type AdminTab = 'stories' | 'moderation' | 'locations';
+export type AdminTab = 'stories' | 'moderation' | 'appeals' | 'locations';
 
 export const ADMIN_TABS: readonly {
   readonly id: AdminTab;
@@ -16,6 +16,7 @@ export const ADMIN_TABS: readonly {
 }[] = [
   { id: 'stories', label: 'Hot stories', path: '/admin' },
   { id: 'moderation', label: 'Moderation', path: '/admin/moderation' },
+  { id: 'appeals', label: 'Appeals', path: '/admin/appeals' },
   { id: 'locations', label: 'Locations', path: '/admin/locations' },
 ];
 

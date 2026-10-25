@@ -25,6 +25,7 @@ import type { Database } from '../../src/core/db/types.ts';
 
 import { accountChecks } from './smoke-account.ts';
 import { adminConsoleChecks } from './smoke-admin.ts';
+import { appealChecks } from './smoke-appeals.ts';
 import { discussionChecks } from './smoke-discussion.ts';
 import { liveDiscussionChecks } from './smoke-discussion-live.ts';
 import { localBadgeChecks } from './smoke-local-badge.ts';
@@ -204,7 +205,7 @@ record(
 
 // --- Signed in: library (3.4), account (4.1), discussion (4.2), moderation
 // (4.3), the local badge through the Worker (4.4), the live discussion feed
-// over Realtime (4.5), the admin console (4.6); local only. `-- --record`
+// over Realtime (4.5), the admin console (4.6), appeals (5.2); local only. `-- --record`
 // saves the live models' replies (4.3). ---
 if (serviceKey !== null) {
   await libraryChecks(config, serviceKey, record);
@@ -216,6 +217,7 @@ if (serviceKey !== null) {
   await localBadgeChecks(config, serviceKey, record);
   await liveDiscussionChecks(config, serviceKey, record);
   await adminConsoleChecks(config, serviceKey, record);
+  await appealChecks(config, serviceKey, record);
 }
 
 // --- Report. ------------------------------------------------------------------

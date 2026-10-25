@@ -64,6 +64,7 @@ function setup(options: { admin?: boolean; signedIn?: boolean } = {}) {
     account: { myProfile: async () => profile } as unknown as AccountRemote,
     admin: {} as AdminRemote,
     console: remote,
+    appeals: { list: async () => [], decide: async () => 'refused' },
     signedIn: async () => options.signedIn ?? true,
   };
   const store = createConsoleStore();

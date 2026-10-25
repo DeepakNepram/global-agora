@@ -3,12 +3,14 @@ import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
 import type { DbConfig } from '@/core/db';
 import { wallClockNow } from '@/state';
 // Directly, not through the barrel: only this chunk carries the console.
+import { pendingCount, useAppealsStore } from '@/state/adminAppeals';
 import { useConsoleStore } from '@/state/adminConsoleStore';
 import { useLocationsStore } from '@/state/adminLocations';
 import { useQueueStore } from '@/state/moderationQueue';
 
 import { PRIMARY, QUIET, SECONDARY } from '../account/accountStyles';
 import { createAdminControllers } from './adminControllers';
+import { AppealsTab } from './AppealsTab';
 import { AdminTabs } from './AdminTabs';
 import { ADMIN_TABS, panelId, tabForPath, tabId, type AdminTab } from './adminView';
 import { CountersBar } from './CountersBar';
@@ -42,6 +44,9 @@ export function AdminApp({ dbConfig }: AdminAppProps): JSX.Element {
   const locationCount = useLocationsStore((state) =>
     state.status === 'ready' ? state.items.length : null,
   );
+  const appealCount = useAppealsStore((state) =>
+    state.status === 'ready' ? pendingCount(state.items) : null,
+  );
   const [tab, setTab] = useState<AdminTab>(() => tabForPath(window.location.pathname));
   const [nowMs, setNowMs] = useState(wallClockNow);
   const controllers = useMemo(
@@ -52,6 +57,11 @@ export function AdminApp({ dbConfig }: AdminAppProps): JSX.Element {
   useEffect(() => {
     void controllers?.console.start();
   }, [controllers]);
+
+  // The appeals' count shows on their tab from the start (Prompt 5.2).
+  useEffect(() => {
+    if (access === 'ready') void controllers?.appeals.load();
+  }, [access, controllers]);
 
   useEffect(() => {
     const label = ADMIN_TABS.find((entry) => entry.id === tab)?.label ?? 'Admin';
@@ -121,6 +131,7 @@ export function AdminApp({ dbConfig }: AdminAppProps): JSX.Element {
           counts={{
             ...(storiesReady ? { stories: storyCount } : {}),
             ...(queueCount === null ? {} : { moderation: queueCount }),
+            ...(appealCount === null ? {} : { appeals: appealCount }),
             ...(locationCount === null ? {} : { locations: locationCount }),
           }}
           onSelect={select}
@@ -128,6 +139,7 @@ export function AdminApp({ dbConfig }: AdminAppProps): JSX.Element {
         <div role="tabpanel" id={panelId(tab)} aria-labelledby={tabId(tab)}>
           {tab === 'stories' && <StoryQueue controller={controllers.console} nowMs={nowMs} />}
           {tab === 'moderation' && <ModerationTab controller={controllers.queue} nowMs={nowMs} />}
+          {tab === 'appeals' && <AppealsTab controller={controllers.appeals} nowMs={nowMs} />}
           {tab === 'locations' && <LocationsTab controller={controllers.locations} nowMs={nowMs} />}
         </div>
       </>
@@ -152,6 +164,7 @@ export function AdminApp({ dbConfig }: AdminAppProps): JSX.Element {
                   setNowMs(wallClockNow());
                   void controllers.console.refresh();
                   if (tab === 'moderation') void controllers.queue.refresh();
+                  void controllers.appeals.load();
                   if (tab === 'locations') void controllers.locations.load();
                 }}
               >

@@ -93,6 +93,8 @@ export type AdminErrorCode =
   /** The story is not (or no longer) in the queue. */
   | 'not-queued'
   | 'missing'
+  /** Someone decided the appeal first (Prompt 5.2). */
+  | 'decided'
   /** The database refused the words or the coordinates. */
   | 'invalid'
   | 'network'

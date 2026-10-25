@@ -14,6 +14,7 @@ import { ModalSheet } from '../sheets/ModalSheet';
 import { DocLink } from '../legal/DocLink';
 import { accountButtonElement } from './accountFocus';
 import { BODY, DANGER, HEADING, PRIMARY, QUIET, SECONDARY } from './accountStyles';
+import { AppealSection } from './AppealSection';
 import { BlockedList } from './BlockedList';
 import { UpdatesList } from './UpdatesList';
 
@@ -134,6 +135,7 @@ export function AccountSheet({ reducedMotion }: AccountSheetProps): JSX.Element 
             {libraryProblem ?? 'Your follows and saves are kept in your account, on every device.'}
           </p>
           {profile !== null && <Standing profile={profile} />}
+          {profile !== null && <AppealSection profile={profile} />}
           {status === 'signed-in' && <UpdatesList />}
           {status === 'signed-in' && <BlockedList />}
           <div className="flex flex-wrap gap-2">

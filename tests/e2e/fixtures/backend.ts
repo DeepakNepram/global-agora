@@ -21,11 +21,14 @@ export interface Persona {
   readonly admin?: boolean;
   /** Has taken a side in the open discussion. */
   readonly side?: 'a' | 'b' | 'neutral' | null;
+  /** Suspended after three strikes, with no appeal yet (Prompt 5.2). */
+  readonly suspended?: boolean;
 }
 
 export const GUEST: Persona = { signedIn: false };
 export const READER: Persona = { signedIn: true, handle: 'river_reader', side: 'a' };
 export const ADMIN: Persona = { signedIn: true, handle: 'desk_editor', admin: true };
+export const SUSPENDED: Persona = { signedIn: true, handle: 'struck_reader', suspended: true };
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 
@@ -83,8 +86,8 @@ function profile(persona: Persona): Rpc['my_profile']['Returns'] {
       is_adult: true,
       // After the rules' last update (communityRules.ts), or setup asks again.
       rules_accepted_at: iso(86_400),
-      strikes: 0,
-      suspended_at: null as unknown as string,
+      strikes: persona.suspended ? 3 : 0,
+      suspended_at: persona.suspended ? iso(86_400) : (null as unknown as string),
       tier: 'free',
       // No appeal (Prompt 5.2). The generated types say string; PostgREST sends null.
       appeal_status: null as unknown as string,
@@ -223,6 +226,28 @@ function rpc(name: string, persona: Persona, args: Record<string, unknown>): unk
     }
     case 'moderation_queue':
       return [];
+    case 'submit_appeal':
+      return '44444444-4444-4444-8444-000000000001';
+    case 'decide_appeal':
+      return args['p_grant'] === true ? 'granted' : 'refused';
+    case 'admin_appeals': {
+      const appeals: Rpc['admin_appeals']['Returns'] = [
+        {
+          id: '44444444-4444-4444-8444-000000000001',
+          user_id: '33333333-3333-4333-8333-000000000009',
+          handle: 'struck_reader',
+          body: 'The second post quoted the article; it was not my own words.',
+          status: 'pending',
+          created_at: iso(3600),
+          decided_at: null as unknown as string,
+          reply: null as unknown as string,
+          strikes: 3,
+          suspended_at: iso(86_400),
+          removed_posts: [{ body: 'A quoted line from the article.', created_at: iso(90_000) }],
+        },
+      ];
+      return appeals;
+    }
     default:
       return null;
   }

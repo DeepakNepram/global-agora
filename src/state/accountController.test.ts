@@ -29,6 +29,7 @@ function profileOf(handle: string, rulesAcceptedAtMs: number | null): Profile {
     strikes: 0,
     suspendedAtMs: null,
     isAdmin: false,
+    appeal: null,
   };
 }
 
@@ -73,6 +74,13 @@ function fakeServer(start: { user?: SessionUser | null; profile?: Profile | null
     }),
     deleteAccount: vi.fn(async () => {
       profile = null;
+    }),
+    submitAppeal: vi.fn(async () => {
+      if (profile?.suspendedAtMs == null) throw new AccountError('appeal-not-now', 'not now');
+      profile = {
+        ...profile,
+        appeal: { status: 'pending', sentAtMs: 5, reply: null, againAtMs: null },
+      };
     }),
   };
   const session: AccountSession = {
@@ -336,6 +344,23 @@ describe('a signed-in account', () => {
       sheet: 'account',
       notice: DELETED_NOTICE,
     });
+  });
+
+  it('sends an appeal for a suspended account, and shows it waiting (Prompt 5.2)', async () => {
+    const suspended = { ...profileOf('heron_one', AGREED), strikes: 3, suspendedAtMs: 1 };
+    const server = fakeServer({ user: USER, profile: suspended });
+    const { controller, store } = setup(server, fakeEnvironment({ stored: true }));
+    await controller.start();
+    await settle();
+    expect(await controller.sendAppeal('  It was a quotation.  ')).toBe(true);
+    expect(server.account.submitAppeal).toHaveBeenCalledWith('It was a quotation.');
+    expect(store.getState().profile?.appeal?.status).toBe('pending');
+  });
+
+  it('says why an appeal cannot be sent', async () => {
+    const { controller, store } = await signedIn();
+    expect(await controller.sendAppeal('Please.')).toBe(false);
+    expect(store.getState().notice).toMatch(/cannot appeal right now/);
   });
 
   it('keeps the account when deletion fails, and says why', async () => {

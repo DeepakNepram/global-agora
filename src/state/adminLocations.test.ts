@@ -61,6 +61,7 @@ function setup() {
     account: {} as AccountRemote,
     admin: {} as AdminRemote,
     console: remote,
+    appeals: { list: async () => [], decide: async () => 'refused' },
     signedIn: async () => true,
   };
   const store = createLocationsStore();

@@ -1,4 +1,4 @@
-import { ADMIN, READER, type Persona } from './fixtures/backend';
+import { ADMIN, READER, SUSPENDED, type Persona } from './fixtures/backend';
 import { test, expect } from './fixtures/app';
 import { OPEN_DISCUSSION_SEQ } from './fixtures/news';
 
@@ -101,14 +101,28 @@ test.describe('accounts', () => {
   test('the account sheet', async ({ app }) => {
     await app.open({ persona: READER });
     await app.page.getByRole('button', { name: '@river_reader' }).click();
-    await expect(app.page.getByRole('dialog').last()).toBeVisible();
+    await expect(app.page.getByRole('dialog', { name: '@river_reader' })).toBeVisible();
     await app.expectAccessible('account sheet');
+  });
+
+  test('a suspended account, and its appeal form', async ({ app }) => {
+    await app.open({ persona: SUSPENDED });
+    await app.page.getByRole('button', { name: '@struck_reader' }).click();
+    const sheet = app.page.getByRole('dialog', { name: '@struck_reader' });
+    await sheet.getByRole('button', { name: 'Appeal this suspension' }).click();
+    const field = sheet.getByLabel('Why should the suspension end?');
+    await expect(field).toBeFocused();
+    await app.expectAccessible('appeal form');
+    await field.fill('The second post quoted the article.');
+    await sheet.getByRole('button', { name: 'Send appeal' }).click();
+    // The fixture's profile has no appeal, so the form stays: what matters is the call went.
   });
 
   test('setup, before a handle is chosen', async ({ app }) => {
     const newcomer: Persona = { signedIn: true, handle: null };
     await app.open({ persona: newcomer });
-    await expect(app.page.getByRole('dialog').last()).toBeVisible();
+    // The open sheet: a closed one is inert (the documents' sheet is always there).
+    await expect(app.page.locator('[role="dialog"]:not([inert])')).toBeVisible();
     await app.expectAccessible('setup sheet');
   });
 });
@@ -138,6 +152,7 @@ test.describe('the admin console', () => {
   for (const [tab, path] of [
     ['hot stories', '/admin'],
     ['moderation', '/admin/moderation'],
+    ['appeals', '/admin/appeals'],
     ['locations', '/admin/locations'],
   ] as const) {
     test(tab, async ({ app }) => {
@@ -147,4 +162,14 @@ test.describe('the admin console', () => {
       await app.expectAccessible(`admin, ${tab}`);
     });
   }
+});
+
+test('the admin console: deciding an appeal', async ({ app }) => {
+  await app.open({ persona: ADMIN, path: '/admin/appeals' });
+  const card = app.page.getByRole('article', { name: /@struck_reader/ });
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  await card.getByLabel(/Reply to @struck_reader/).fill('Granted: it was a quotation.');
+  await card.getByRole('button', { name: 'Grant…' }).click();
+  await expect(card.getByRole('button', { name: 'Grant the appeal' })).toBeFocused();
+  await app.expectAccessible('admin, appeal confirmation');
 });

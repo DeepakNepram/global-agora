@@ -262,6 +262,16 @@ export function createAccountController(options: AccountControllerOptions): Acco
       return true;
     },
 
+    async sendAppeal(body) {
+      const profile = await attempt(async (loaded) => {
+        await loaded.account.submitAppeal(body.trim());
+        return loaded.account.myProfile();
+      });
+      if (profile === null) return false;
+      set({ profile });
+      return true;
+    },
+
     async retry() {
       if (session === null || user === null) return;
       await settle(await session, generation);

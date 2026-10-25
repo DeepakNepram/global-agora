@@ -10,6 +10,7 @@
  * and vote.
  */
 
+import type { AppealSummary } from './appeal';
 import type { EnvBag } from './config';
 
 export type OAuthProvider = 'google' | 'apple';
@@ -45,6 +46,8 @@ export interface Profile {
   readonly suspendedAtMs: number | null;
   /** Whether this account moderates (the queue at /admin). */
   readonly isAdmin: boolean;
+  /** The latest appeal (Prompt 5.2), or null if it never appealed. */
+  readonly appeal: AppealSummary | null;
 }
 
 export type AccountErrorCode =
@@ -62,6 +65,12 @@ export type AccountErrorCode =
   | 'bad-email'
   /** No account for that address, and sign-ups are off: the alpha is by invitation (Prompt 5.2). */
   | 'invite-only'
+  /** An appeal is already waiting (Prompt 5.2). */
+  | 'appeal-waiting'
+  /** Not suspended, or too soon after a refusal. */
+  | 'appeal-not-now'
+  /** Empty, or over the limit. */
+  | 'appeal-invalid'
   /** The session is gone (signed out elsewhere, or deleted). */
   | 'signed-out'
   /** The server could not be reached. */
@@ -100,4 +109,6 @@ export interface AccountRemote {
   acceptRules(): Promise<number>;
   /** Deletes the account and everything in it, for good. */
   deleteAccount(): Promise<void>;
+  /** Appeals the account's suspension (Prompt 5.2). */
+  submitAppeal(body: string): Promise<void>;
 }

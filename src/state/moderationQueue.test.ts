@@ -40,6 +40,7 @@ function setup(start: { signedIn?: boolean; admin?: boolean; queue?: QueueItem[]
     strikes: 0,
     suspendedAtMs: null,
     isAdmin: start.admin ?? true,
+    appeal: null,
   };
   const failing: { act: ModerationError | null } = { act: null };
   const admin: AdminRemote = {
@@ -57,6 +58,7 @@ function setup(start: { signedIn?: boolean; admin?: boolean; queue?: QueueItem[]
     admin,
     // The queue never touches the console's remote.
     console: {} as AdminConsoleRemote,
+    appeals: { list: async () => [], decide: async () => 'refused' },
     signedIn: async () => start.signedIn ?? true,
   };
   const store = createQueueStore();

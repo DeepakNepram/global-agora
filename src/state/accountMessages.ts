@@ -32,6 +32,12 @@ export function accountProblem(error: unknown): string {
       return 'That does not look like an email address.';
     case 'invite-only':
       return INVITE_ONLY_MESSAGE;
+    case 'appeal-waiting':
+      return 'Your appeal is already with a moderator. The answer will appear here.';
+    case 'appeal-not-now':
+      return 'This account cannot appeal right now. Close this sheet and open it again to see why.';
+    case 'appeal-invalid':
+      return 'Write your appeal, in 1000 characters or fewer.';
     case 'signed-out':
       return 'You were signed out. Please sign in again.';
     case 'network':
