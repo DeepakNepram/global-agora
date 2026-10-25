@@ -3,5 +3,28 @@
 # No page of this app may ask for the device's location (CLAUDE.md #5): the
 # browser refuses any request for it, from our code or anyone else's, without
 # ever showing a prompt. The local badge uses the API Worker's Cloudflare data.
+#
+# Content-Security-Policy (Prompt 5.2), a second line behind React's
+# escaping: scripts only from this site; connections only to this site (the
+# news API and analytics, both through our Worker), Supabase, Sentry, and a
+# *.workers.dev API for a deploy without its own domain; nothing may frame the
+# app. Styles allow inline attributes (React's style props).
+#
+# X-Robots-Tag keeps the invite-only alpha out of search engines: remove it
+# at the public launch (docs/LAUNCH_CHECKLIST.md).
 /*
   Permissions-Policy: geolocation=()
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.workers.dev; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Cross-Origin-Opener-Policy: same-origin
+  X-Robots-Tag: noindex
+
+# Hashed build files never change: a year, and never revalidated.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The service worker is checked on every visit (the page registers it with
+# updateViaCache: 'none' as well).
+/sw.js
+  Cache-Control: no-cache

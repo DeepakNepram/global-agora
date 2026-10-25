@@ -113,6 +113,24 @@ describe('the privacy policy on everything else (Prompt 5.2)', () => {
     for (const name of [...named, 'Sentry', 'Umami']) expect(section('others')).toContain(name);
   });
 
+  it('names whoever the CSP lets the page talk to (public/_headers)', () => {
+    const headers = readFileSync('public/_headers', 'utf8');
+    const connect = /connect-src ([^;\n]*)/.exec(headers)?.[1] ?? '';
+    const outside = connect.split(/\s+/).filter((source) => source !== '' && source !== "'self'");
+    const services: Readonly<Record<string, string>> = {
+      'supabase.co': 'Supabase',
+      'sentry.io': 'Sentry',
+      // A deploy without its own domain: our own API Worker, on Cloudflare.
+      'workers.dev': 'Cloudflare',
+    };
+    expect(outside.length).toBeGreaterThan(0);
+    for (const source of outside) {
+      const domain = Object.keys(services).find((suffix) => source.endsWith(suffix));
+      expect(domain, `${source} is in the CSP but not in the privacy policy`).toBeDefined();
+      expect(section('others')).toContain(services[domain ?? ''] ?? '');
+    }
+  });
+
   it('says only a post’s text goes to moderation (moderate-post sends post.body alone)', () => {
     expect(section('moderation')).toMatch(/its text, and nothing else/);
     expect(section('moderation')).toMatch(/OpenAI/);
