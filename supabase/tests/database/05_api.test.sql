@@ -5,7 +5,7 @@
 -- whatever the seed or a local ingest left in the table.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(33);
+select plan(34);
 
 insert into public.stories
   (id, title, category, lat, lon, place_name, place_source, place_conf, country_code,
@@ -60,6 +60,12 @@ select is((select json_array_length(all_rows->'payload'->'nodes'->'id') from n),
 select is((select (r->'payload'->'nodes'->>'hl') from n),
           '["Oldest in the window","Middle story","Newest story"]',
           'nodes come in time order, coolest dropped');
+-- The payload budget (tests/budgets/payload.test.ts) was measured with exactly
+-- these columns: a new one fails here until the day is captured again.
+select is((select array_agg(key order by ord)
+             from n, json_object_keys(r->'payload'->'nodes') with ordinality as k(key, ord)),
+          array['id','lonQ','latQ','t','cat','heat','srcN','disc','hl','pl','cc'],
+          'the nodes carry exactly the columns the payload budget measured');
 select is((select (r->'payload'->'nodes'->>'id') from n),
           (select array_to_json(array[
              (select seq from seqs where id = '00000000-0000-4000-8000-0000000000b1'),

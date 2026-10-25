@@ -22,6 +22,8 @@ coverage/
 # Playwright (Phase 5)
 /test-results/
 /playwright-report/
+# Lighthouse budget reports (npm run budgets:lighthouse)
+/lighthouse-report/
 /blob-report/
 /playwright/.cache/
 

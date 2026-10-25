@@ -37,7 +37,10 @@
     "api:measure": "node --experimental-strip-types scripts/api/measure.ts",
     "places:build": "node --experimental-strip-types scripts/places/build.ts",
     "test:e2e:build": "node --experimental-strip-types scripts/e2e/build.ts",
-    "test:e2e": "npm run test:e2e:build && playwright test"
+    "test:e2e": "npm run test:e2e:build && playwright test",
+    "budgets:bundle": "node --experimental-strip-types scripts/budgets/bundle.ts",
+    "api:capture-day": "node --experimental-strip-types scripts/api/capture-day.ts",
+    "budgets:lighthouse": "node --experimental-strip-types scripts/budgets/lighthouse.ts"
   },
   "dependencies": {
     "@react-three/fiber": "^9.7.0",
@@ -66,6 +69,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.6",
     "globals": "^17.12.0",
+    "lighthouse": "13.5.0",
     "prettier": "^3.9.6",
     "sharp": "^0.35.5",
     "supabase": "^2.117.0",

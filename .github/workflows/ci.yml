@@ -39,10 +39,15 @@ jobs:
       - name: Test
         run: npm run test
 
-      # Proves the app still builds, and surfaces bundle size early. The 150KB
-      # budget in CLAUDE.md is for the data payload, but watch this number too.
+      # The payload budget (150 KB, CLAUDE.md #1) runs with the tests above:
+      # tests/budgets/payload.test.ts, on one real day of api_nodes output.
       - name: Build
         run: npm run build
+
+      # Prompt 5.2: the start stays one script and one stylesheet, and the
+      # entry, CSS, named lazy chunks and precache stay within budgets.json.
+      - name: Bundle budget
+        run: npm run budgets:bundle
 
   # RLS and constraints, tested against a real Postgres. Runs beside `verify`,
   # so a policy regression fails the build instead of waiting for someone to
@@ -127,4 +132,55 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report/
+          retention-days: 14
+
+  # Prompt 5.2: Lighthouse's desktop preset on the production build, served as
+  # Pages serves it (scripts/e2e/serve.ts). The median of three runs must stay
+  # within budgets.json: accessibility 100, best practices, SEO, CLS, LCP,
+  # bytes, and a performance floor. WebGL is drawn on the CPU here, so that
+  # floor guards against regressions on this runner; it is not a field number.
+  lighthouse:
+    name: Lighthouse budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # The same Chromium as the a11y job, from the same cache.
+      - name: Cache Playwright's Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Chromium's system libraries
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Build for the checks
+        run: npm run test:e2e:build
+
+      - name: Lighthouse budget
+        run: npm run budgets:lighthouse
+
+      - name: Keep the reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: lighthouse-report/
           retention-days: 14

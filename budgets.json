@@ -1,0 +1,31 @@
+{
+  "$comment": "Prompt 5.2. gzipKB: gzip sizes in kB (1000 bytes, level 9), checked by npm run budgets:bundle after npm run build, set at the 2026-10-25 sizes plus about 2%. lighthouse: medians of Lighthouse's desktop preset on the e2e build with WebGL on the CPU, checked by npm run budgets:lighthouse after npm run test:e2e:build; set 2026-10-25 from 5 local runs (performance 0.99-1.00, LCP 671-695 ms, 340,892 bytes, CLS 0.011) with room for CI's slower runners. Changing a budget is a decision for docs/DECISIONS.md.",
+  "startupFiles": { "js": 1, "css": 1 },
+  "gzipKB": {
+    "entry": 412,
+    "css": 9,
+    "precache": 449,
+    "chunks": {
+      "db": 61,
+      "sentry": 31.5,
+      "AdminApp": 13,
+      "DiscussionPanel": 12,
+      "LegalBody": 7,
+      "PagesApp": 1
+    }
+  },
+  "lighthouse": {
+    "runs": 3,
+    "minScore": {
+      "performance": 0.9,
+      "accessibility": 1,
+      "best-practices": 0.95,
+      "seo": 0.9
+    },
+    "maxNumeric": {
+      "cumulative-layout-shift": 0.02,
+      "largest-contentful-paint": 1500,
+      "total-byte-weight": 350000
+    }
+  }
+}
