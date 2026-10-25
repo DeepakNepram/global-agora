@@ -209,6 +209,7 @@ export type { RadialShape, ShapeKind } from './categoryShapes';
 export { AUTH_STORAGE_KEY } from './auth';
 export {
   authReturnProblem,
+  INVITE_ONLY_MESSAGE,
   isCodeVerifierKey,
   readAuthReturn,
   stripAuthHash,

@@ -187,6 +187,9 @@ enable_refresh_token_rotation = true
 # Requires enable_refresh_token_rotation = true.
 refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
+# On here for development. Off on the hosted project during the invite-only
+# alpha (Prompt 5.2): invited people are added in the dashboard, and the app
+# tells anyone else that it is invite-only (docs/LAUNCH_CHECKLIST.md).
 enable_signup = true
 # Allow/disallow anonymous sign-ins to your project.
 enable_anonymous_sign_ins = false

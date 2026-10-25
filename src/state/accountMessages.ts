@@ -1,4 +1,4 @@
-import { AccountError } from '@/core';
+import { AccountError, INVITE_ONLY_MESSAGE } from '@/core';
 
 /**
  * What the account side says to the reader (Prompt 4.1), in our own words:
@@ -30,6 +30,8 @@ export function accountProblem(error: unknown): string {
       return 'That code is wrong or has expired. Check the email, or ask for a new one.';
     case 'bad-email':
       return 'That does not look like an email address.';
+    case 'invite-only':
+      return INVITE_ONLY_MESSAGE;
     case 'signed-out':
       return 'You were signed out. Please sign in again.';
     case 'network':

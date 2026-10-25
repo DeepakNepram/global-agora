@@ -86,6 +86,8 @@ describe('authReturnProblem', () => {
     expect(authReturnProblem('otp_expired')).toMatch(/expired or was already used/);
     expect(authReturnProblem('access_denied')).toBe('Sign-in was cancelled.');
     expect(authReturnProblem('missing_verifier')).toMatch(/different browser/);
+    // Google or Apple for an address with no account, while sign-ups are off.
+    expect(authReturnProblem('signup_disabled')).toMatch(/invite-only/);
   });
 
   it('never repeats text from the URL', () => {

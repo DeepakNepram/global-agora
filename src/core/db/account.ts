@@ -31,6 +31,8 @@ export function accountErrorCode(error: ServerError): AccountErrorCode {
   if (code === '42501' || code === 'PGRST301' || code === 'PGRST303') return 'signed-out';
   if (error.status === 429 || code.includes('rate_limit')) return 'rate-limited';
   if (code === 'otp_expired') return 'bad-code';
+  // Sign-ups off (the invite-only alpha): a new address by link or code, or by Google or Apple.
+  if (code === 'otp_disabled' || code === 'signup_disabled') return 'invite-only';
   if (code === 'email_address_invalid' || code === 'validation_failed') return 'bad-email';
   if (code === 'session_not_found' || code === 'user_not_found') return 'signed-out';
   if (

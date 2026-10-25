@@ -24,6 +24,14 @@ describe('accountErrorCode', () => {
     );
   });
 
+  it('reads sign-ups being off as the invite-only alpha (Prompt 5.2)', () => {
+    const otp = { message: 'Signups not allowed for otp', code: 'otp_disabled', status: 422 };
+    expect(accountErrorCode(otp)).toBe('invite-only');
+    expect(accountErrorCode({ message: 'x', code: 'signup_disabled', status: 422 })).toBe(
+      'invite-only',
+    );
+  });
+
   it('tells a network failure from anything else', () => {
     expect(accountErrorCode({ message: 'x', name: 'AuthRetryableFetchError', status: 0 })).toBe(
       'network',

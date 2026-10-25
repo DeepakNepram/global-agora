@@ -75,9 +75,19 @@ export function isCodeVerifierKey(key: string): boolean {
   return key.startsWith(`${AUTH_STORAGE_KEY}-`) && key.endsWith('code-verifier');
 }
 
+/**
+ * Sign-ups are off during the invite-only alpha (Prompt 5.2): an address
+ * with no account cannot make one, by email or by Google or Apple.
+ */
+export const INVITE_ONLY_MESSAGE =
+  'Global Agora is invite-only for now. If you were invited, sign in with the email address ' +
+  'the invitation went to.';
+
 /** What to tell the reader about a failed return. Our words only, by code. */
 export function authReturnProblem(code: string | null): string {
   switch (code) {
+    case 'signup_disabled':
+      return INVITE_ONLY_MESSAGE;
     case 'otp_expired':
       return 'That sign-in link has expired or was already used. Ask for a new one.';
     case 'access_denied':

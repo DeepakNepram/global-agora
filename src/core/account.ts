@@ -60,6 +60,8 @@ export type AccountErrorCode =
   | 'bad-code'
   /** Not an email address the server accepts. */
   | 'bad-email'
+  /** No account for that address, and sign-ups are off: the alpha is by invitation (Prompt 5.2). */
+  | 'invite-only'
   /** The session is gone (signed out elsewhere, or deleted). */
   | 'signed-out'
   /** The server could not be reached. */
