@@ -68,6 +68,54 @@ export type Database = {
           },
         ];
       };
+      appeals: {
+        Row: {
+          body: string;
+          created_at: string;
+          decided_at: string | null;
+          decided_by: string | null;
+          id: string;
+          reply: string | null;
+          status: string;
+          user_id: string;
+        };
+        Insert: {
+          body: string;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          id?: string;
+          reply?: string | null;
+          status?: string;
+          user_id: string;
+        };
+        Update: {
+          body?: string;
+          created_at?: string;
+          decided_at?: string | null;
+          decided_by?: string | null;
+          id?: string;
+          reply?: string | null;
+          status?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'appeals_decided_by_fkey';
+            columns: ['decided_by'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'appeals_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       articles: {
         Row: {
           headline: string;
@@ -731,6 +779,8 @@ export type Database = {
           created_at: string;
           id: string;
           issued_by: string | null;
+          overturned_at: string | null;
+          overturned_by: string | null;
           post_id: string | null;
           source: string;
           user_id: string;
@@ -739,6 +789,8 @@ export type Database = {
           created_at?: string;
           id?: string;
           issued_by?: string | null;
+          overturned_at?: string | null;
+          overturned_by?: string | null;
           post_id?: string | null;
           source: string;
           user_id: string;
@@ -747,6 +799,8 @@ export type Database = {
           created_at?: string;
           id?: string;
           issued_by?: string | null;
+          overturned_at?: string | null;
+          overturned_by?: string | null;
           post_id?: string | null;
           source?: string;
           user_id?: string;
@@ -755,6 +809,13 @@ export type Database = {
           {
             foreignKeyName: 'strikes_issued_by_fkey';
             columns: ['issued_by'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'strikes_overturned_by_fkey';
+            columns: ['overturned_by'];
             isOneToOne: false;
             referencedRelation: 'profiles';
             referencedColumns: ['id'];
@@ -820,6 +881,22 @@ export type Database = {
     };
     Functions: {
       accept_rules: { Args: never; Returns: string };
+      admin_appeals: {
+        Args: { p_limit?: number };
+        Returns: {
+          body: string;
+          created_at: string;
+          decided_at: string;
+          handle: string;
+          id: string;
+          removed_posts: Json;
+          reply: string;
+          status: string;
+          strikes: number;
+          suspended_at: string;
+          user_id: string;
+        }[];
+      };
       admin_counters: {
         Args: { p_day_start: string };
         Returns: {
@@ -896,6 +973,10 @@ export type Database = {
       };
       claim_handle: {
         Args: { p_handle: string; p_is_adult: boolean };
+        Returns: string;
+      };
+      decide_appeal: {
+        Args: { p_appeal: string; p_grant: boolean; p_reply: string };
         Returns: string;
       };
       delete_my_account: { Args: never; Returns: undefined };
@@ -990,6 +1071,10 @@ export type Database = {
       my_profile: {
         Args: never;
         Returns: {
+          appeal_again_at: string;
+          appeal_reply: string;
+          appeal_sent_at: string;
+          appeal_status: string;
           created_at: string;
           display_name: string;
           handle: string;
@@ -1023,6 +1108,7 @@ export type Database = {
         Args: { p_post: string; p_reason: string };
         Returns: undefined;
       };
+      submit_appeal: { Args: { p_body: string }; Returns: string };
     };
     Enums: {
       [_ in never]: never;

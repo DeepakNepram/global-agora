@@ -2,7 +2,7 @@
 -- Run with `npm run db:test`. Each file runs in a transaction that rolls back.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(55);
+select plan(57);
 
 -- CLAUDE.md #8, checked generically so a table added later is covered too.
 select is(
@@ -28,12 +28,13 @@ select is(
 -- A new table fails here until someone decides its row in the matrix below.
 select tables_are(
   'public',
-  array['admin_actions', 'admins', 'articles', 'blocks', 'discussion_stances', 'discussions',
+  array['admin_actions', 'admins', 'appeals', 'articles', 'blocks', 'discussion_stances', 'discussions',
         'feature_flags', 'follows', 'ingest_runs', 'moderation_actions', 'notifications', 'posts',
         'profiles', 'reports', 'saved_stories', 'stories', 'story_location_reports',
         'story_signals', 'strikes', 'votes'],
   'public holds exactly the v1 tables, the ingest ledger, the location reports, the library, '
-  'stances, moderation''s strikes, notifications, admins and log, and the admin console''s log'
+  'stances, moderation''s strikes, notifications, admins and log, the admin console''s log, '
+  'and appeals'
 );
 
 -- The private schema's tables (settings) are for definer functions only.
@@ -70,6 +71,7 @@ select table_privs_are('public', 'follows',       'anon', '{}'::text[],   'anon:
 select table_privs_are('public', 'saved_stories', 'anon', '{}'::text[],   'anon: nothing on saved_stories');
 select table_privs_are('public', 'strikes',       'anon', '{}'::text[],   'anon: nothing on strikes');
 select table_privs_are('public', 'notifications', 'anon', '{}'::text[],   'anon: nothing on notifications');
+select table_privs_are('public', 'appeals',       'anon', '{}'::text[],   'anon: nothing on appeals');
 select table_privs_are('public', 'admins',        'anon', '{}'::text[],   'anon: nothing on admins');
 select table_privs_are('public', 'moderation_actions', 'anon', '{}'::text[],
   'anon: nothing on the moderation log');
@@ -96,6 +98,8 @@ select table_privs_are('public', 'strikes',       'authenticated', '{}'::text[],
   'signed in: nothing on strikes (the count comes through my_profile)');
 select table_privs_are('public', 'notifications', 'authenticated', array['SELECT'],
   'signed in: read notifications (RLS: own); mark read by column');
+select table_privs_are('public', 'appeals', 'authenticated', array['SELECT'],
+  'signed in: read appeals (RLS: own); written only through submit_appeal (Prompt 5.2)');
 select table_privs_are('public', 'admins',        'authenticated', '{}'::text[],
   'signed in: nothing on admins (my_profile says whether you are one)');
 select table_privs_are('public', 'moderation_actions', 'authenticated', '{}'::text[],
@@ -162,7 +166,8 @@ select is(
 -- first sign-in's flow and account deletion (Prompt 4.1), and reporting a
 -- post and the admins' queue (4.3, which refuses non-admins itself), and a
 -- discussion's balance (4.5, which runs as the caller), and the admin
--- console's functions (4.6, which refuse non-admins themselves).
+-- console's functions (4.6, which refuse non-admins themselves), and
+-- appeals (5.2: a suspended account's, and the moderators' list and decision).
 -- Anything else a client could call is a mistake.
 select is(
   (select coalesce(array_agg(p.proname::text order by p.proname), '{}')
@@ -171,12 +176,12 @@ select is(
     where n.nspname = 'public'
       and (has_function_privilege('anon', p.oid, 'execute')
            or has_function_privilege('authenticated', p.oid, 'execute'))),
-  array['accept_rules', 'admin_counters', 'admin_location_queue', 'admin_story_brief',
+  array['accept_rules', 'admin_appeals', 'admin_counters', 'admin_location_queue', 'admin_story_brief',
         'admin_story_queue', 'api_nodes', 'api_outlet_stories', 'api_outlets',
-        'api_report_location', 'api_story', 'api_window', 'claim_handle', 'delete_my_account',
-        'discussion_balance', 'discussion_participants', 'fix_story_location',
-        'handles_available', 'moderate_post', 'moderation_queue', 'my_profile',
-        'open_discussion', 'report_post'],
+        'api_report_location', 'api_story', 'api_window', 'claim_handle', 'decide_appeal',
+        'delete_my_account', 'discussion_balance', 'discussion_participants',
+        'fix_story_location', 'handles_available', 'moderate_post', 'moderation_queue',
+        'my_profile', 'open_discussion', 'report_post', 'submit_appeal'],
   'client roles can call exactly the API functions'
 );
 

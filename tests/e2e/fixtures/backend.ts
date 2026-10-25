@@ -86,6 +86,11 @@ function profile(persona: Persona): Rpc['my_profile']['Returns'] {
       strikes: 0,
       suspended_at: null as unknown as string,
       tier: 'free',
+      // No appeal (Prompt 5.2). The generated types say string; PostgREST sends null.
+      appeal_status: null as unknown as string,
+      appeal_sent_at: null as unknown as string,
+      appeal_reply: null as unknown as string,
+      appeal_again_at: null as unknown as string,
     },
   ];
 }
