@@ -10,6 +10,10 @@ import {
 
 import { REPORT_REASONS, type ReportReason } from '@/core/moderation';
 import type { ModerationResult } from '@/state/discussionRoomActions';
+import { DiscussionDocLink } from './DiscussionDocLink';
+
+const RULES_LINK =
+  'text-accent underline underline-offset-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
 
 export interface PostMenuProps {
   readonly handle: string | null;
@@ -162,6 +166,13 @@ export function PostMenu({ handle, onReport, onBlock, announce }: PostMenuProps)
                   {option.label}
                 </label>
               ))}
+              <p className="text-xs text-muted">
+                What breaks them: the{' '}
+                <DiscussionDocLink doc="rules" className={RULES_LINK}>
+                  community rules
+                </DiscussionDocLink>
+                .
+              </p>
               <div className="mt-2 flex gap-2">
                 <button
                   type="button"

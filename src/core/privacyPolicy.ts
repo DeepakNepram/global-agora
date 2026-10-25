@@ -1,21 +1,27 @@
 /**
- * The privacy policy's text, as Prompt 5.2's privacy page will show it.
- *
- * A DRAFT, like communityRules.ts: the owner edits the wording, and 5.2 adds
- * the other sections (accounts, the services that check posts, analytics,
- * contact). Each section is written against the code it describes, and
+ * The privacy policy (Prompt 4.4's local badge section, Prompt 5.2's whole
+ * page). A DRAFT, like communityRules.ts: the owner edits the wording.
+ * Each section is written against the code it describes, and
  * privacyPolicy.test.ts checks its facts, so a change to what the app
  * collects fails a test until the policy says so too.
  */
 
+import {
+  ACCOUNT_SECTION,
+  ERRORS_SECTION,
+  KEEPING_SECTION,
+  MODERATION_SECTION,
+  othersSection,
+  READING_SECTION,
+  rightsSection,
+  TAKING_PART_SECTION,
+  whoSection,
+} from './legal/privacySections.ts';
+import type { LegalDocument, LegalSection, LegalSite } from './legal/types.ts';
 // Explicit .ts: scripts/db/smoke.ts loads core modules under plain Node.
 import { regionLabel } from './localBadge.ts';
 
-export interface PolicySection {
-  readonly id: string;
-  readonly title: string;
-  readonly paragraphs: readonly string[];
-}
+export type PolicySection = LegalSection;
 
 /** The real format, from the code that makes it, never a hand-typed copy. */
 const EXAMPLE = regionLabel({ city: 'Bengaluru', country: 'IN' }) ?? '';
@@ -47,5 +53,25 @@ export const LOCAL_BADGE_POLICY: PolicySection = {
   ],
 };
 
-/** The sections written so far, in page order. */
-export const PRIVACY_POLICY: readonly PolicySection[] = [LOCAL_BADGE_POLICY];
+/** The whole policy, in page order. */
+export function privacyDocument(site: LegalSite): LegalDocument {
+  return {
+    id: 'privacy',
+    title: 'Privacy policy',
+    summary:
+      'What Global Agora collects, why, who else handles it and for how long. In short: reading ' +
+      'needs nothing from you, and an account keeps only what taking part needs.',
+    sections: [
+      whoSection(site),
+      READING_SECTION,
+      ACCOUNT_SECTION,
+      TAKING_PART_SECTION,
+      LOCAL_BADGE_POLICY,
+      MODERATION_SECTION,
+      ERRORS_SECTION,
+      othersSection(site),
+      KEEPING_SECTION,
+      rightsSection(site),
+    ],
+  };
+}

@@ -305,3 +305,11 @@ export {
   TEXTURE_LAYERS,
 } from './textures';
 export type { PreviewLayer, PreviewTextureSet, TextureLayer, TextureSet } from './textures';
+export {
+  LEGAL_PAGES,
+  LEGAL_UPDATED_AT,
+  legalPage,
+  legalPageAt,
+  legalSiteFromEnv,
+} from './legal/site';
+export type { LegalDocId, LegalDocument, LegalSection, LegalSite } from './legal/types';

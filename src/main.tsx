@@ -8,6 +8,7 @@ import { registerServiceWorker } from '@/ui/platform/serviceWorker';
 import { authProvidersFromEnv, resolveConfig } from '@/core';
 // The Supabase settings without the SDK: it loads only for a signed-in reader.
 import { dbConfigFromEnv } from '@/core/db/config';
+import { legalSiteFromEnv } from '@/core/legal/site';
 
 import './ui/styles/index.css';
 
@@ -30,6 +31,7 @@ if (!container) {
 const config = resolveConfig(env);
 const dbConfig = dbConfigFromEnv(env);
 const authProviders = authProvidersFromEnv(env);
+const site = legalSiteFromEnv(env);
 
 /** Render errors, caught by a boundary or not, go to the console and to Sentry alike. */
 function onRenderError(
@@ -69,12 +71,31 @@ if (path === '/admin' || path.startsWith('/admin/')) {
         </p>,
       ),
   );
-} else {
+} else if (path === '/' || path === '/index.html') {
   root.render(
     <StrictMode>
       <AppErrorBoundary>
-        <App config={config} dbConfig={dbConfig} authProviders={authProviders} />
+        <App config={config} dbConfig={dbConfig} authProviders={authProviders} site={site} />
       </AppErrorBoundary>
     </StrictMode>,
+  );
+} else {
+  // The documents' pages (/privacy, /terms…) and "Page not found" for any
+  // other path, in their own chunk (Prompt 5.2).
+  import('./ui/pages/PagesApp').then(
+    ({ PagesApp }) =>
+      root.render(
+        <StrictMode>
+          <AppErrorBoundary>
+            <PagesApp path={path} site={site} />
+          </AppErrorBoundary>
+        </StrictMode>,
+      ),
+    () =>
+      root.render(
+        <p className="p-6 text-sm text-ink">
+          This page could not load. Check the connection, then reload.
+        </p>,
+      ),
   );
 }

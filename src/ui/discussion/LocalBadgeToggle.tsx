@@ -2,7 +2,11 @@ import { useEffect, useId, type ReactElement } from 'react';
 
 import type { LocalBadgeStatus } from '@/state/localBadge';
 
+import { DiscussionDocLink } from './DiscussionDocLink';
 import { localBadgeView } from './localBadgeView';
+
+const RULES_LINK =
+  'text-accent underline underline-offset-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
 
 interface LocalBadgeToggleProps {
   readonly status: LocalBadgeStatus;
@@ -51,6 +55,9 @@ export function LocalBadgeToggle({
         <p id={`${id}-note`} aria-live="polite" className="mt-0.5 text-xs text-muted">
           {view.note}
         </p>
+        <DiscussionDocLink doc="privacy" section="local-badge" className={`${RULES_LINK} text-xs`}>
+          How the badge works
+        </DiscussionDocLink>
       </div>
     </div>
   );

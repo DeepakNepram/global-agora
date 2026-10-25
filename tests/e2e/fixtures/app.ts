@@ -100,11 +100,11 @@ function createApp(page: Page): App {
         for (const [key, value] of Object.entries(entries)) localStorage.setItem(key, value);
       }, storage);
       // The DOM is enough: what each check needs, it waits for itself.
-      await page.goto(options.path ?? '/', { waitUntil: 'domcontentloaded' });
-      if (
-        !(options.path ?? '/').startsWith('/admin') &&
-        (options.news ?? 'stories') === 'stories'
-      ) {
+      const path = options.path ?? '/';
+      await page.goto(path, { waitUntil: 'domcontentloaded' });
+      // Only the app itself loads the news: not /admin, nor a document's page.
+      const isApp = path === '/' || path.startsWith('/?');
+      if (isApp && (options.news ?? 'stories') === 'stories') {
         await expect(page.getByText(/120 stories/).first()).toBeVisible({ timeout: 30_000 });
       }
     },

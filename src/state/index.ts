@@ -38,6 +38,13 @@ export {
   type GlobeHealthStore,
 } from './globeHealthStore';
 export {
+  createDocumentStore,
+  documentStore,
+  useDocumentStore,
+  type DocumentState,
+  type DocumentStore,
+} from './documentStore';
+export {
   createStoryStore,
   ringedStory,
   storyStore,

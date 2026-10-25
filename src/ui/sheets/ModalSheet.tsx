@@ -39,7 +39,15 @@ export interface ModalSheetProps {
   readonly focusTarget?: RefObject<HTMLElement | null> | null;
   /** Where focus goes on closing when nothing had it at opening (a sheet that opened itself). */
   readonly fallbackFocus?: () => HTMLElement | null;
+  /**
+   * Opens above any other modal sheet, which then leaves focus inside this
+   * one alone (the documents, Prompt 5.2, open from inside the account sheets).
+   */
+  readonly stacked?: boolean;
 }
+
+/** Marks a stacked sheet, so the sheets below it do not pull focus back from it. */
+const STACKED = 'data-stacked-modal';
 
 /**
  * A modal sheet on the story sheet's spring (onboarding, sign-in, setup, the
@@ -91,9 +99,11 @@ export function ModalSheet(props: ModalSheetProps): JSX.Element {
   useEffect(() => {
     if (!open) return;
     const onFocusIn = (event: FocusEvent): void => {
-      if (event.target instanceof Node && !sheet.current?.contains(event.target)) {
-        heading.current?.focus({ preventScroll: true });
-      }
+      const target = event.target;
+      if (!(target instanceof Node) || sheet.current?.contains(target)) return;
+      // A sheet stacked above this one holds focus now.
+      if (target instanceof Element && target.closest(`[${STACKED}]`)) return;
+      heading.current?.focus({ preventScroll: true });
     };
     document.addEventListener('focusin', onFocusIn);
     return () => document.removeEventListener('focusin', onFocusIn);
@@ -142,6 +152,7 @@ export function ModalSheet(props: ModalSheetProps): JSX.Element {
       <section
         ref={sheet}
         role={props.role ?? 'dialog'}
+        {...(props.stacked ? { [STACKED]: '' } : {})}
         aria-modal="true"
         aria-labelledby={titleId}
         inert={!open}
@@ -153,12 +164,13 @@ export function ModalSheet(props: ModalSheetProps): JSX.Element {
           ...(height > 0 ? {} : { transform: 'translate3d(0, 100%, 0)' }),
         }}
       >
-        <header
+        {/* A div, not <header>: inside a dialog it would read as the page's banner. */}
+        <div
           data-sheet-handle
           className="flex touch-none items-center justify-between gap-2 px-5 pt-4"
         >
           {header}
-        </header>
+        </div>
         <div className="flex min-h-0 flex-col gap-4 overflow-y-auto px-5 pb-6 pt-2">{children}</div>
       </section>
     </div>

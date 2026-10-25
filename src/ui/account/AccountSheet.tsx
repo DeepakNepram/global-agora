@@ -11,6 +11,7 @@ import {
 } from '@/state';
 
 import { ModalSheet } from '../sheets/ModalSheet';
+import { DocLink } from '../legal/DocLink';
 import { accountButtonElement } from './accountFocus';
 import { BODY, DANGER, HEADING, PRIMARY, QUIET, SECONDARY } from './accountStyles';
 import { BlockedList } from './BlockedList';
@@ -28,7 +29,10 @@ function Standing({ profile }: { profile: Profile }): JSX.Element | null {
     return (
       <p className="rounded-xl border border-red-400/50 px-3 py-2 text-sm text-ink">
         Posting, voting and taking sides are suspended on this account after {profile.strikes}{' '}
-        strikes for removed posts. You can still read, report, block and delete your account.
+        strikes for removed posts. You can still read, report, block and delete your account.{' '}
+        <DocLink doc="rules" section="enforcement">
+          The rules and how they are enforced
+        </DocLink>
       </p>
     );
   }
@@ -150,6 +154,10 @@ export function AccountSheet({ reducedMotion }: AccountSheetProps): JSX.Element 
               Delete account
             </button>
           </div>
+          <p className={BODY}>
+            <DocLink doc="privacy">Privacy policy</DocLink> ·{' '}
+            <DocLink doc="terms">Terms of use</DocLink> · <DocLink doc="contact">Contact</DocLink>
+          </p>
         </>
       )}
 

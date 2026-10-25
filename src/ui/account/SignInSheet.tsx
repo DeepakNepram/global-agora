@@ -9,6 +9,7 @@ import {
   wallClockNow,
 } from '@/state';
 
+import { DocLink } from '../legal/DocLink';
 import { ModalSheet } from '../sheets/ModalSheet';
 import { accountButtonElement } from './accountFocus';
 import { BODY, HEADING, INPUT, LABEL, PRIMARY, QUIET, SECONDARY } from './accountStyles';
@@ -160,6 +161,11 @@ export function SignInSheet({ providers, reducedMotion }: SignInSheetProps): JSX
               </button>
             </form>
           )}
+          <p className={BODY}>
+            Accounts are by invitation during the alpha. Signing in means accepting the{' '}
+            <DocLink doc="terms">terms of use</DocLink> and the{' '}
+            <DocLink doc="privacy">privacy policy</DocLink>.
+          </p>
         </>
       ) : (
         <>

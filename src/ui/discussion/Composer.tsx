@@ -17,7 +17,11 @@ import {
   sendResultText,
   waitText,
 } from './discussionView';
+import { DiscussionDocLink } from './DiscussionDocLink';
 import { LocalBadgeToggle } from './LocalBadgeToggle';
+
+const RULES_LINK =
+  'text-accent underline underline-offset-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
 
 export interface ComposerProps {
   readonly storyId: string;
@@ -220,6 +224,9 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
           >
             {sending ? 'Posting…' : 'Post'}
           </button>
+          <DiscussionDocLink doc="rules" className={`${RULES_LINK} text-sm`}>
+            Community rules
+          </DiscussionDocLink>
           {waiting && retryAtMs !== null && (
             <p className="text-sm text-muted">
               You can post again in {waitText((retryAtMs - nowMs) / 1000)}.

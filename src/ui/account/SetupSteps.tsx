@@ -3,6 +3,7 @@ import { useEffect, useId, useState, type FormEvent, type JSX } from 'react';
 import { handleProblem, normalizeHandle, suggestHandles, COMMUNITY_RULES } from '@/core';
 import { accountStore, getAccountController, useAccountStore } from '@/state';
 
+import { DocLink } from '../legal/DocLink';
 import { BODY, INPUT, LABEL, PRIMARY, SECONDARY } from './accountStyles';
 
 /** Quiet time after the last keystroke before asking whether a handle is free. */
@@ -166,7 +167,10 @@ export function RulesStep(): JSX.Element {
       <p className={BODY}>
         {agreedBefore
           ? 'The community rules have changed since you last agreed. Please read them again.'
-          : 'Every account agrees to these before taking part.'}
+          : 'Every account agrees to these before taking part.'}{' '}
+        <DocLink doc="rules" section="enforcement">
+          How they are enforced
+        </DocLink>
       </p>
       <ol className="flex list-decimal flex-col gap-3 pl-5 text-sm text-ink marker:text-muted">
         {COMMUNITY_RULES.map((rule) => (
@@ -193,6 +197,10 @@ export function RulesStep(): JSX.Element {
           </button>
         )}
       </div>
+      <p className={BODY}>
+        Agreeing also means accepting the <DocLink doc="terms">terms of use</DocLink>. The{' '}
+        <DocLink doc="privacy">privacy policy</DocLink> says what an account keeps.
+      </p>
     </>
   );
 }

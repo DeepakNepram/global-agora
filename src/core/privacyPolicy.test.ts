@@ -1,7 +1,34 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
+import { DEVICE_STORAGE } from './legal/privacySections';
+import type { LegalSite } from './legal/types';
 import { regionLabel } from './localBadge';
-import { LOCAL_BADGE_POLICY, PRIVACY_POLICY } from './privacyPolicy';
+import { LOCAL_BADGE_POLICY, privacyDocument } from './privacyPolicy';
+
+const SITE: LegalSite = {
+  operator: 'Example Operator',
+  country: 'India',
+  contactEmail: 'hello@agora.example',
+  dataRegion: 'the EU (Frankfurt)',
+};
+const POLICY = privacyDocument(SITE);
+
+function section(id: string): string {
+  const found = POLICY.sections.find((candidate) => candidate.id === id);
+  return found ? [...found.paragraphs, ...(found.items ?? [])].join(' ') : '';
+}
+
+/** Every source file under src, tests left out. */
+function sources(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) return sources(full);
+    return /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name) ? [full] : [];
+  });
+}
 
 /**
  * The privacy policy must describe the local badge accurately (Prompt 4.4).
@@ -55,7 +82,53 @@ describe('the privacy policy on the local badge', () => {
   });
 
   it('is part of the policy', () => {
-    expect(PRIVACY_POLICY).toContain(LOCAL_BADGE_POLICY);
-    expect(new Set(PRIVACY_POLICY.map((section) => section.id)).size).toBe(PRIVACY_POLICY.length);
+    expect(POLICY.sections).toContain(LOCAL_BADGE_POLICY);
+    expect(new Set(POLICY.sections.map((part) => part.id)).size).toBe(POLICY.sections.length);
+  });
+});
+
+describe('the privacy policy on everything else (Prompt 5.2)', () => {
+  it('lists every key the app keeps in browser storage, and only those', () => {
+    const keys = new Set<string>();
+    for (const file of sources('src')) {
+      for (const match of readFileSync(file, 'utf8').matchAll(/['`](agora\.[a-z0-9.-]+)['`]/g)) {
+        if (match[1]) keys.add(match[1]);
+      }
+    }
+    const listed = DEVICE_STORAGE.map((entry) => entry.key);
+    expect([...keys].sort()).toEqual([...listed].sort());
+    for (const key of listed) expect(section('reading')).toContain(key);
+  });
+
+  it('names who runs it, where the data is, and the contact address', () => {
+    expect(section('who')).toContain('Example Operator, based in India');
+    expect(section('who')).toContain('hello@agora.example');
+    expect(section('others')).toContain('the EU (Frankfurt)');
+    expect(section('rights')).toContain('hello@agora.example');
+  });
+
+  it('names every outside service the app or its server sends data to', () => {
+    const named = ['Supabase', 'Cloudflare', 'OpenAI', 'Google Cloud', 'Apple', 'Anthropic'];
+    for (const name of [...named, 'Sentry']) expect(section('others')).toContain(name);
+  });
+
+  it('says only a post’s text goes to moderation (moderate-post sends post.body alone)', () => {
+    expect(section('moderation')).toMatch(/its text, and nothing else/);
+    expect(section('moderation')).toMatch(/OpenAI/);
+    expect(section('moderation')).toMatch(/Google Cloud/);
+  });
+
+  it('describes error reports as src/ui/platform/sentry.ts sends them', () => {
+    const text = section('errors');
+    expect(text).toMatch(/without anything after a \? or #/);
+    expect(text).toMatch(/no IP address/);
+    expect(text).toMatch(/no account, email address, handle or cookie/);
+  });
+
+  it('says deleting an account removes what the cascades remove, at once', () => {
+    const text = section('keeping');
+    expect(text).toMatch(/removes at once your profile, posts, votes, sides, blocks/);
+    expect(text).toMatch(/Reports you made stay, with nothing linking them to you/);
+    expect(text).toMatch(/removed after 7 days/);
   });
 });
