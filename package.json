@@ -40,7 +40,8 @@
     "test:e2e": "npm run test:e2e:build && playwright test",
     "budgets:bundle": "node --experimental-strip-types scripts/budgets/bundle.ts",
     "api:capture-day": "node --experimental-strip-types scripts/api/capture-day.ts",
-    "budgets:lighthouse": "node --experimental-strip-types scripts/budgets/lighthouse.ts"
+    "budgets:lighthouse": "node --experimental-strip-types scripts/budgets/lighthouse.ts",
+    "deploy:check": "node --experimental-strip-types scripts/deploy/check.ts"
   },
   "dependencies": {
     "@react-three/fiber": "^9.7.0",
