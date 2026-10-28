@@ -216,6 +216,21 @@ each value without printing it:
   and `@/state` barrels, or a window event (`POST_MADE_EVENT`).
 - **The guard:** the bundle budget fails on a second startup file.
 
+**Found by the first GitHub run** (2026-10-28): axe's target-size rule
+failed the drawn-up story sheet at 1280×800 on GitHub's Linux runner,
+though it passed on Windows.
+
+- **The cause:** the sheet rises to 90 % of the view (Prompt 3.3), so its
+  top edge crosses the filter row, which stayed focusable behind it. On
+  Linux's wider fonts the time-window select slid under the sheet's Close
+  button.
+- **The fix:** a navigation row that a full-height sheet covers fades out
+  and turns inert until the sheet folds (`src/ui/nav/useUnderFullSheet.ts`).
+  It is measured, so a tall window where the sheet stops below the filters
+  keeps them.
+- **Reproduced locally** with wider letter spacing before the fix; the
+  check now also asserts the row hides and comes back.
+
 **What it costs:**
 
 - **The main chunk:** 400.2 to 408.5 KB gzip (+8.2 KB, above the plan's +6),

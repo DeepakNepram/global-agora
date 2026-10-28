@@ -92,6 +92,9 @@ same pins are drawn. It starts again from the centre when either changes
   link. Behind an account or onboarding sheet, it is also the view, the
   search bar, the scrubber, the story sheet and the library.
 - **Account sheets** opened from inside a discussion stay usable above it.
+- **A sheet drawn to full height** (a story, the library) reaches into the
+  navigation on most windows. The rows it covers fade out and turn inert, so
+  nothing half-hidden stays in the Tab order; they return when it folds.
 - **A document** (Prompt 5.2) opens stacked above whatever is open, a
   discussion or the sign-in sheet included, and closing it leaves that as
   it was. Each also has its own page (`/rules`, `/privacy`, …).

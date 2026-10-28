@@ -42,7 +42,13 @@ test.describe('a story', () => {
     await app.expectAccessible('story peek card');
     await app.page.getByRole('button', { name: 'Expand story' }).click();
     await expect(sheet.getByRole('link').first()).toBeVisible();
+    // Drawn up to 90 %, the sheet covers the filter row, which steps out of
+    // sight and of the Tab order rather than sit half-hidden behind it.
+    const filters = app.page.getByRole('group', { name: 'Show only these categories' });
+    await expect(filters).toBeHidden();
     await app.expectAccessible('story full sheet');
+    await app.page.getByRole('button', { name: 'Collapse story' }).click();
+    await expect(filters).toBeVisible();
   });
 
   test('from the list', async ({ app }) => {
