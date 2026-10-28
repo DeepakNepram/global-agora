@@ -21,7 +21,7 @@ const GOOD = {
   VITE_AUTH_PROVIDERS: 'google,email',
   VITE_API_BASE_URL: '',
   VITE_SENTRY_DSN: 'https://0123456789abcdef@o42.ingest.de.sentry.io/4507',
-  VITE_CONTACT_EMAIL: 'hello@agora.news',
+  VITE_CONTACT_EMAIL: 'hello@agora.invalid',
   VITE_OPERATOR_NAME: 'Agora Operator',
   VITE_OPERATOR_COUNTRY: 'India',
   VITE_DATA_REGION: 'the EU (Frankfurt)',
@@ -82,9 +82,9 @@ describe('deploy:check', () => {
     const findings = checkProductionEnv(
       {
         ...GOOD,
-        VITE_SUPABASE_URL: 'https://db.agora.news',
-        VITE_API_BASE_URL: 'https://api.agora.news/api',
-        VITE_SENTRY_DSN: 'https://0123abcd@sentry.agora.news/1',
+        VITE_SUPABASE_URL: 'https://db.agora.invalid',
+        VITE_API_BASE_URL: 'https://api.agora.invalid/api',
+        VITE_SENTRY_DSN: 'https://0123abcd@sentry.agora.invalid/1',
       },
       CONNECT,
     );
