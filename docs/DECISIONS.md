@@ -6,6 +6,237 @@ and what it costs. Stack-level choices and their tradeoffs live in
 
 ---
 
+## 2026-10-25 — Production readiness: an offline shell, Sentry at idle, budgets in CI
+
+Prompt 5.2 readies the invite-only alpha. What to do to launch it is
+[`LAUNCH_CHECKLIST.md`](LAUNCH_CHECKLIST.md); this entry is the why.
+
+**Your calls.**
+
+- **Analytics:** Umami Cloud's free plan, reached through our API Worker,
+  so Umami never receives a reader's IP address.
+- **Contact:** a mailto link to `VITE_CONTACT_EMAIL`.
+- **Invite-only:** reading stays open; sign-ups are off in Supabase, and
+  invited people are added by hand.
+- **A granted appeal** ends the suspension and overturns the strikes behind
+  it; the removed posts stay removed.
+
+**The service worker is hand-written** (`src/sw/`).
+
+- **Why not Workbox** (vite-plugin-pwa): a large dependency tree for about a
+  hundred lines, and untested on rolldown.
+- **Built on its own** after the app (`scripts/vite/serviceWorker.ts`): it
+  must be one classic script, and as an entry of the app's build it would
+  share chunks with the page. 1.4 KB gzip.
+- **One pure function decides each request** (`src/sw/routes.ts`,
+  unit-tested):
+  - the shell is precached;
+  - other hashed files are kept after first use;
+  - navigations go to the network first;
+  - textures are stale-while-revalidate;
+  - the news API goes to the network first, saving the last good reply;
+  - everything else, every write, Supabase and Sentry included, is
+    untouched.
+- **Not precached:** the admin pages, the Supabase SDK, Sentry and the dev
+  tools. A reader's first visit never downloads them.
+- **Registered at idle after load**, so it never competes with the globe's
+  first frame. **Updates wait** for "Reload": nobody is switched to new code
+  mid-session.
+- **Saved news says how old it is.** A saved reply carries
+  `x-agora-saved-at` (its HTTP Date), and the banner gives the age of the
+  newest story shown. GDELT runs about an hour behind, so fresh news reads
+  "an hour ago": the truth, not a fault.
+- **Story details are capped** at 60 saved.
+- **Installable:** a manifest, and icons rendered by sharp from one SVG
+  (`npm run icons`).
+
+**Sentry loads after the start.**
+
+- **A shim of a few hundred bytes** in the start catches errors from the
+  first line, React 19's root `onUncaughtError` and `onCaughtError`
+  included, and holds up to 20.
+- **`@sentry/browser`** (its own 31 KB chunk) loads at idle, and only when
+  the build has a DSN.
+- **Nothing about the reader:**
+  - `dataCollection.userInfo` is off (Sentry 11 has no `sendDefaultPii`), so
+    no IP address is inferred;
+  - every URL in events and breadcrumbs loses its query and fragment
+    (`src/core/scrub.ts`), which removes sign-in codes and Supabase filters;
+  - no click breadcrumbs, since a button's label can name a post's author;
+  - no tracing, replay or sessions.
+- **Source maps** upload from the deploy build, only when a Sentry token is
+  present (`.env.sentry-build-plugin`). A failed upload fails the build. The
+  maps still ship: the repository is public.
+- **Repeated warnings:** Sentry's dedupe dropped a second identical
+  context-loss warning, so each is numbered and grouped by fingerprint.
+- **Its first catch:** in Playwright's blocked-worker mode, `register()`
+  resolves to undefined, and the update watcher crashed. Now guarded.
+
+**A lost WebGL context gets a new canvas.**
+
+- **Why a new canvas:** it rebuilds the scene from the same data by the same
+  path as the first start (the textures come from the HTTP cache), with the
+  camera's pose carried over. Restoring in place would rely on three.js,
+  postprocessing and the pin layer each restoring itself.
+- **When:** on `webglcontextrestored`, or after 1.5 s, since some browsers
+  never send it.
+- **Giving up:** three losses inside ten minutes (`src/core/contextLoss.ts`)
+  and the app shows the flat map, which needs no WebGL. No WebGL at all
+  starts there, with a notice.
+- **Crashes:** one inside the 3D tree also falls back to the map
+  (`GlobeErrorBoundary`); anything else gets the root crash screen.
+- **Checked** with `WEBGL_lose_context` in Playwright. The check finds
+  three.js's canvas by `data-engine`: asking for a context first would
+  create one.
+
+**The documents are data, and tests keep them honest.**
+
+- **Data in `src/core/legal/`**, filled from the deploy's operator, country,
+  data region and contact address.
+- **Two ways to read them:** pages at `/about`, `/rules`, `/privacy`,
+  `/terms` and `/contact`, in their own chunk; and in the app, a sheet
+  stacked above whatever is open, so reading the rules never closes a
+  discussion.
+- **The privacy policy can't drift silently.** `privacyPolicy.test.ts`
+  fails when an `agora.*` storage key or a CSP origin appears that the
+  policy does not name, and checks the counting section against the
+  analytics module's six events.
+- **Drafts, not advice:** a legal review is on the checklist, with the 17+
+  question under India's DPDP Act.
+
+**Invite-only is Supabase's sign-up switch.**
+
+- **How it shows:** with sign-ups off, Auth answers `signup_disabled` or
+  `otp_disabled`, which the sign-in sheet turns into "Global Agora is
+  invite-only for now".
+- **How people are added:** Dashboard → Add user. Supabase's "Invite user"
+  email sends a link that our PKCE sign-in cannot finish.
+- **Checked** against the local Auth server with sign-ups off: an added
+  address gets its code, and an unknown one gets the message.
+- **It also closes 4.3's gap**, a suspended reader deleting the account and
+  signing up again, for as long as sign-ups stay off.
+
+**Appeals overturn strikes rather than delete them**
+(`20261025100000_appeals.sql`).
+
+- `strikes.overturned_at` keeps the record for moderators. Only standing
+  strikes count, and only a new strike can suspend.
+- One pending appeal per account. After a refusal there is a wait,
+  `private.appeal_settings.refusal_wait` (30 days, a setting).
+- The outcome reaches the account as an `appeal_outcome` notice, and the
+  decision is logged with the console's other actions.
+
+**Analytics goes through our Worker.**
+
+- **Why:** Umami turns a request's IP address into a location.
+  `POST /api/event` rebuilds each event from its name and fields alone and
+  forwards it with only the browser's name, so Umami stores neither.
+- **Exactly six events**, defined once (`src/core/analytics.ts`). The Worker
+  refuses anything else, and Cloudflare's rate limiter cuts a burst at 60 a
+  minute.
+- **Week-two return without an identifier:** the device keeps only the ISO
+  week of its first visit, and once per calendar week says which week of
+  its life this is. A cohort's return rate is its week-1 events over its
+  week-0 events.
+- **Off** in development and bench builds, under Global Privacy Control or
+  Do Not Track, and when the reader turns "Count my visits" off.
+- **What it costs:**
+  - Umami's own visitor, session and country panels are meaningless, since
+    every event comes from our server: read the event counts;
+  - the counts are floors.
+
+**Headers** (`public/_headers`):
+
+- **A CSP** as a second line behind React's escaping: scripts only from the
+  site; connections only to the site, Supabase, Sentry and a
+  `*.workers.dev` API; no framing. `style-src` allows inline styles, for
+  React's `style` props.
+- **Also:** `nosniff`, a strict referrer policy, COOP, and immutable caching
+  for hashed files.
+- **`X-Robots-Tag: noindex`**, for the alpha only.
+- The privacy test reads the CSP, so a new origin must be named in the
+  policy too.
+
+**The browser checks run against a fixture server, not `vite preview`**
+(`scripts/e2e/serve.ts`).
+
+- **What it does:** serves the build as Pages would (`_headers` applied,
+  compressed, unknown paths to `index.html`), and answers the API from the
+  fixtures. The CSP is in force in every check.
+- **Its compression cache** is keyed by modification time, after a stale
+  `sw.js` hid an update.
+
+**Budgets in CI** (`budgets.json`).
+
+- **Bundle** (`npm run budgets:bundle`, in `verify`): exactly one startup
+  script and one stylesheet, and gzip sizes for the entry, the CSS, the
+  named lazy chunks and the precache. Set at today's sizes plus about 2%.
+- **Payload** (`tests/budgets/payload.test.ts`): one real day, 3,000
+  stories from a 24-hour GDELT load as `api_nodes` answered for them, run
+  through the Worker's own `buildNodes` and Brotli.
+  - It measures 137,636 bytes (134.4 KB) against 150 KB.
+  - It fails if `nodeLimit` outgrows the fixture, and pgTAP pins
+    `api_nodes` to the measured columns.
+- **Lighthouse** (`npm run budgets:lighthouse`, its own job): the desktop
+  preset, median of three, on the e2e build.
+  - **Local medians of five:** performance, accessibility, best practices
+    and SEO all 1.00; LCP 673 ms; CLS 0.011; 340,892 bytes.
+  - **Budgets:** accessibility 1, best practices 0.95, SEO 0.9 (without
+    `is-crawlable`: the alpha is noindex), performance 0.9, LCP 1.5 s, CLS
+    0.02, 350 KB.
+  - Performance and LCP leave room for GitHub's slower runners, and get one
+    adjustment after the first run there if needed.
+- **Lighthouse itself, not `@lhci/cli`:** LHCI 0.15.1 (June 2025) pins
+  Lighthouse 12.6.1 and brought 16 advisories into `npm audit`; Lighthouse
+  13.5.0 brings none. A short script takes the medians and checks them.
+- **Traps the script works around:**
+  - Playwright's full Chromium is blocked from starting on this machine, so
+    it uses the headless shell, as the e2e checks do;
+  - port 4190 is on browsers' bad-port list;
+  - Windows reserves ranges that include the usual debugging port, so the
+    OS picks one;
+  - the fixture server compresses on first request (seconds for the main
+    chunk at Brotli 11), which landed in the first run, so the script warms
+    it first.
+
+**`npm run deploy:check`** loads the production env as `vite build` will,
+`.env.local`'s local values included (the runbook's old trap). It checks
+each value without printing it:
+
+- a hosted Supabase URL and a publishable key;
+- real contact and operator details;
+- every origin allowed by the CSP.
+
+**The rolldown split, twice more.**
+
+- **What happened:** a new UI module imported by both the start and the lazy
+  discussion chunk split the start into four or five files (`useMinuteClock`,
+  then `DocLink`).
+- **The rule now:** lazy chunks reach shared code only through the `@/core`
+  and `@/state` barrels, or a window event (`POST_MADE_EVENT`).
+- **The guard:** the bundle budget fails on a second startup file.
+
+**What it costs:**
+
+- **The main chunk:** 400.2 to 408.5 KB gzip (+8.2 KB, above the plan's +6),
+  still one file. That is about 40 ms on Lighthouse's slow 4G.
+- **Cold start:** unchanged. On fast 4G with the CPU slowed 4×, the Earth
+  was on screen in 1,372 ms against 1,342 ms before, and all maps in
+  3,324 ms against 3,342 ms: medians of six alternating runs, within their
+  spread.
+- **Dependencies:** `@sentry/browser` (runtime, lazy); `@sentry/vite-plugin`
+  and `lighthouse` (dev).
+- **Upkeep:** one more CI job, and fixtures to keep in step with the API
+  (the payload's day, the e2e news).
+
+**Not checked here:**
+
+- the real Sentry and Umami dashboards, which need your accounts;
+- Lighthouse on GitHub's runners, until the push;
+- the legal review.
+
+---
+
 ## 2026-10-24 — Accessibility: three views, shapes for categories, axe in CI
 
 Prompt 5.1 makes the app fully usable without the globe. What each piece
