@@ -52,7 +52,9 @@ export const COLD_START_PROBE = `(() => {
   const WIDTH = { low: 2048, medium: 4096, high: 8192 };
   const fullMaps = (width) =>
     ['day-' + width, 'night-' + width, 'specular-' + width, 'clouds-' + Math.min(width, 2048)];
-  const tierNow = () => document.querySelector('[data-testid=quality-tier]')?.textContent?.trim();
+  // The app shell's attribute (src/ui/App.tsx); the footer readout went in 5.2.
+  const tierNow = () =>
+    document.querySelector('[data-quality-tier]')?.getAttribute('data-quality-tier') ?? undefined;
   const round = (v) => (v == null || !Number.isFinite(v) ? null : Math.round(v));
 
   const finish = async () => {
